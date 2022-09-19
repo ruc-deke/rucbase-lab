@@ -22,7 +22,9 @@ Rucbase是一个简单的关系数据库内核，用于《数据库系统》课�
 - bison
 - readline
 
-你可以在[Rucbase使用文档](docs/Rucbase使用文档.md)中查看更多信息
+欲查看有关依赖运行库和编译工具的更多信息，以及如何运行的说明，请查阅[Rucbase使用文档](docs/Rucbase使用文档.md)
+
+欲了解如何在非Linux系统PC上部署实验环境的指导，请查阅[Rucbase环境配置文档](docs/Rucbase环境配置文档.md)
 
 ## 实验文档索引
 
