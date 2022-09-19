@@ -28,5 +28,3 @@ __pycache__/
 /src/parser/build/
 *.zip
 
-#deps
-deps/googletest/*
