@@ -6,7 +6,7 @@
 |  _ <| |_| | |___| |_) / ___ \ ___) | |___ 
 |_| \_ \___/ \____|____/_/   \_\____/|_____|
 ```
-Rucbase是一个简单的关系数据库内核，用于《数据库系统》课程的实验教学。本实验框架参考了CMU15-445课程的[BusTub](https://github.com/cmu-db/bustub) 和Standford CS346课程的[Redbase](https://web.stanford.edu/class/cs346/2015/redbase.html) 。
+Rucbase是一个精简的RDBMS原型系统，用于《数据库系统实现》课程的实验教学。本实验框架源码参考和借鉴了CMU15-445课程的[BusTub](https://github.com/cmu-db/bustub) 和Standford CS346课程的[Redbase](https://web.stanford.edu/class/cs346/2015/redbase.html) 。
 
 ## 实验环境：
 - 操作系统：Ubuntu 18.04 及以上(64位)
