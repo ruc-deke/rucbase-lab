@@ -1,3 +1,27 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// buffer_pool_manager_test.cpp
+//
+// Identification: test/buffer/buffer_pool_manager_test.cpp
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// buffer_pool_manager_test.cpp
+//
+// Identification: src/storage/buffer_pool_manager_test.cpp
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// rwlatch.h
+//
+// Identification: src/include/common/rwlatch.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <climits>

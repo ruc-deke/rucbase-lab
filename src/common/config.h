@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// config.h
+//
+// Identification: src/include/common/config.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <atomic>

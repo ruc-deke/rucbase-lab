@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// clock_replacer.h
+//
+// Identification: src/include/buffer/clock_replacer.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <mutex>  // NOLINT

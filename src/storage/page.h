@@ -1,3 +1,27 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// page.h
+//
+// Identification: src/include/storage/page/page.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// page.h
+//
+// Identification: src/storage/page.h
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include "common/config.h"

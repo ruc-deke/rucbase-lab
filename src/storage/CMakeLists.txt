@@ -19,7 +19,3 @@ add_library(storage STATIC ${SOURCES})
  # buffer_pool_manager_concurrency_test
  add_executable(buffer_pool_manager_concurrency_test buffer_pool_manager_concurrency_test.cpp)
  target_link_libraries(buffer_pool_manager_concurrency_test storage gtest_main)  # add gtest
-
- # leaderboard_test
- add_executable(leaderboard_test leaderboard_test.cpp)
- target_link_libraries(leaderboard_test storage gtest_main)  # add gtest

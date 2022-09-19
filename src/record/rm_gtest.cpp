@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// rm_gtest.cpp
+//
+// Identification: src/record/rm_gtest.cpp
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #undef NDEBUG
 
 #define private public

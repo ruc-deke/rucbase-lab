@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// storage_gtest.cpp
+//
+// Identification: src/storage/storage_gtest.cpp
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #undef NDEBUG
 
 #define private public
@@ -168,7 +180,6 @@ TEST(StorageTest, SimpleTest) {
         memcpy(mock_buf, init_buf, PAGE_SIZE);
 
         buffer_pool_manager->UnpinPage(page->GetPageId(), true);
-        // BufferPool::mark_dirty(page);
 
         // flush
         if (rand() % 10 == 0) {

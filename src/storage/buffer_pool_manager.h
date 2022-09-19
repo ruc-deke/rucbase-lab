@@ -1,3 +1,27 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// buffer_pool_manager.h
+//
+// Identification: src/include/buffer/buffer_pool_manager.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// buffer_pool_manager.h
+//
+// Identification: src/storage/buffer_pool_manager.h
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 #include <fcntl.h>
 #include <unistd.h>
@@ -75,13 +99,6 @@ class BufferPoolManager {
         delete[] pages_;
         delete replacer_;
     }
-
-    /**
-     * @brief 页面置脏
-     *
-     * @param page 需置脏页面的指针
-     */
-    static void mark_dirty(Page *page) { page->is_dirty_ = true; }
 
    public:
     /**

@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         BusTub
+//
+// logger.h
+//
+// Identification: src/include/common/logger.h
+//
+// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
+//
+//===----------------------------------------------------------------------===//
+
 /***************************************************************************
  *   Copyright (C) 2008 by H-Store Project                                 *
  *   Brown University                                                      *

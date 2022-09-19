@@ -1,3 +1,15 @@
+//===----------------------------------------------------------------------===//
+//
+//                         Rucbase
+//
+// disk_manager.h
+//
+// Identification: src/storage/disk_manager.h
+//
+// Copyright (c) 2022, RUC Deke Group
+//
+//===----------------------------------------------------------------------===//
+
 #pragma once
 
 #include <fcntl.h>     // for open/close
