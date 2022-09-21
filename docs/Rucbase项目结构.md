@@ -1,10 +1,8 @@
 # Rucbase项目结构详解
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
-
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [存储管理(Storage Management)](#%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86storage-management)
   - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9)

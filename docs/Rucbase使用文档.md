@@ -1,10 +1,8 @@
 # Rucbase使用指南
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
-
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [环境配置](#%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE)
 - [项目下载](#%E9%A1%B9%E7%9B%AE%E4%B8%8B%E8%BD%BD)

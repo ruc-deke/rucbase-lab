@@ -1,3 +1,16 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [实验操作指南](#%E5%AE%9E%E9%AA%8C%E6%93%8D%E4%BD%9C%E6%8C%87%E5%8D%97)
+  - [补全代码](#%E8%A1%A5%E5%85%A8%E4%BB%A3%E7%A0%81)
+  - [自我测试](#%E8%87%AA%E6%88%91%E6%B5%8B%E8%AF%95)
+    - [扩展](#%E6%89%A9%E5%B1%95)
+  - [想运行数据库？](#%E6%83%B3%E8%BF%90%E8%A1%8C%E6%95%B0%E6%8D%AE%E5%BA%93)
+  - [如何提交](#%E5%A6%82%E4%BD%95%E6%8F%90%E4%BA%A4)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # 实验操作指南
 
 > 本文档将以实验一（存储管理实验）部分任务为例示范你应该如何完成一个实验任务，并进行自我测试和提交
@@ -147,4 +160,10 @@ Scanning dependencies of target lru_replacer
 ```
 
 在`rucbase-lab/build/lib`下你可以看到你生成的`liblru_replacer.a`静态库文件，你可以将它替换掉我们提供的静态库文件，这样就可以编译一个以你自己实现的`lru_replacer`作为相应功能模块的数据库可执行文件。
+
+## 如何提交
+
+我们鼓励你使用`Github`或者`Gitee`的私有仓库功能，建立自己的远程代码库进行代码与报告提交，并将助教账户添加为你们仓库的协作者或者赋予访问权限。助教会定期拉取你们的仓库代码进行测试，并将测试结果贴在仓库的`issues`中。
+
+你们也可以使用压缩包的方式将自己对应实验更改的代码文件以及相关报告发送到助教邮箱或者其他系统中，请根据个人喜好选择提交方式。
 

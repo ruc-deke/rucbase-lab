@@ -1,3 +1,20 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Rucbase环境配置文档](#rucbase%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE%E6%96%87%E6%A1%A3)
+  - [虚拟机软件VMware/VirtualBox](#%E8%99%9A%E6%8B%9F%E6%9C%BA%E8%BD%AF%E4%BB%B6vmwarevirtualbox)
+  - [WSL 2.0 (Windows Subsystem for Linux)](#wsl-20-windows-subsystem-for-linux)
+    - [WSL2.0相关注意事项](#wsl20%E7%9B%B8%E5%85%B3%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9)
+  - [Ubuntu操作系统](#ubuntu%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F)
+  - [代码编辑器VS Code](#%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8vs-code)
+    - [安装VS Code](#%E5%AE%89%E8%A3%85vs-code)
+    - [在VS Code中使用SSH连接到虚拟机](#%E5%9C%A8vs-code%E4%B8%AD%E4%BD%BF%E7%94%A8ssh%E8%BF%9E%E6%8E%A5%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BA)
+  - [代码托管平台GitHub](#%E4%BB%A3%E7%A0%81%E6%89%98%E7%AE%A1%E5%B9%B3%E5%8F%B0github)
+  - [Git使用](#git%E4%BD%BF%E7%94%A8)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Rucbase环境配置文档
 
 巧妇难为无米之炊，我们需要先对实验进行一些准备工作。配置好开发环境后，才能在Linux系统上运行Rucbase。
