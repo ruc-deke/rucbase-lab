@@ -1,7 +1,9 @@
 # Rucbase使用指南
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
+
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 
 - [环境配置](#%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE)
@@ -127,15 +129,38 @@ GoogleTest框架测试
 包含以下模块测试：
 
 - 存储模块：
-  - buffer_pool_manager_concurrency_test
-  - buffer_pool_manager_test
-  - leaderboard_test
+  
   - storage_gtest
-  - rm_gtest
+  
+  - buffer_pool_manager_test
+  
+  - leaderboard_test
+  
   - lru_replacer_test
+  
+  - clock_replacer_test
+  
+  - rm_gtest
+
+- 索引模块：
+  
+  - ix_gtest
+  - b_plus_tree_insert_test
+  - b_plus_tree_delete_test
+  - b_plus_tree_concurrent_test
+
+- 执行模块：
+  
+  - task1_test.sh
+  - task2_test.sh
+  - task3_test.sh
+  - taskall_test.sh
+
 - 事务模块：
-  - lock_test
+  
   - txn_test
+  - lock_test
+  - concurrency_test
 
 以lru_replacer_test为例，可以通过以下命令进行测试：
 
