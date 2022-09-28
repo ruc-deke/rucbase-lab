@@ -129,16 +129,14 @@ GoogleTest框架测试
 包含以下模块测试：
 
 - 存储模块：
-  
-  - storage_gtest
-  
-  - buffer_pool_manager_test
-  
-  - leaderboard_test
+
+  - disk_manager_test
   
   - lru_replacer_test
   
-  - clock_replacer_test
+  - clock_replacer_test (选做)
+  
+  - buffer_pool_manager_test
   
   - rm_gtest
 

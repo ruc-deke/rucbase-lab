@@ -119,7 +119,7 @@ bool BufferPoolManager::DeletePage(PageId page_id) {
 }
 
 /**
- * @brief Flushes all the pages in the buffer pool to disk. Test in storage_gtest
+ * @brief Flushes all the pages in the buffer pool to disk.
  *
  * @param fd 指定的diskfile open句柄
  */

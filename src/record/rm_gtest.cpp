@@ -75,6 +75,10 @@ std::ostream &operator<<(std::ostream &os, const Rid &rid) {
     return os << '(' << rid.page_no << ", " << rid.slot_no << ')';
 }
 
+/**
+ * @brief 简单测试record的基本功能
+ * @note lab1 计分：15 points
+ */
 TEST(RecordManagerTest, SimpleTest) {
     srand((unsigned)time(nullptr));
 
@@ -174,6 +178,10 @@ TEST(RecordManagerTest, SimpleTest) {
     rm_manager->destroy_file(filename);
 }
 
+/**
+ * @brief 多文件测试record
+ * @note lab1 计分：15 points
+ */
 TEST(RecordManagerTest, MultipleFilesTest) {
     srand((unsigned)time(nullptr));
 

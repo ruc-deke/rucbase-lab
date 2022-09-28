@@ -8,14 +8,11 @@ set(SOURCES
 )
 add_library(storage STATIC ${SOURCES})
 
- # storage_gtest
- add_executable(storage_gtest storage_gtest.cpp)
- target_link_libraries(storage_gtest storage gtest_main stdc++fs)  # add gtest; stdc++fs for "experimental/filesystem"
+# disk_manager_test
+add_library(disk STATIC disk_manager.cpp)
+add_executable(disk_manager_test disk_manager_test.cpp)
+target_link_libraries(disk_manager_test disk gtest_main)  # add gtest
 
- # buffer_pool_manager_test
- add_executable(buffer_pool_manager_test buffer_pool_manager_test.cpp)
- target_link_libraries(buffer_pool_manager_test storage gtest_main)  # add gtest
-
- # buffer_pool_manager_concurrency_test
- add_executable(buffer_pool_manager_concurrency_test buffer_pool_manager_concurrency_test.cpp)
- target_link_libraries(buffer_pool_manager_concurrency_test storage gtest_main)  # add gtest
+# buffer_pool_manager_test
+add_executable(buffer_pool_manager_test buffer_pool_manager_test.cpp)
+target_link_libraries(buffer_pool_manager_test storage gtest_main)  # add gtest

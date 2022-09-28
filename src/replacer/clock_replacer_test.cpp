@@ -18,7 +18,10 @@
 
 #include "gtest/gtest.h"
 
-TEST(ClockReplacerTest, SampleTest) {
+/**
+ * @note 选做
+ */
+TEST(ClockReplacerTest, SimpleTest) {
     ClockReplacer clock_replacer(7);
 
     // Scenario: unpin six elements, i.e. add them to the replacer.
@@ -58,6 +61,9 @@ TEST(ClockReplacerTest, SampleTest) {
     EXPECT_EQ(4, value);
 }
 
+/**
+ * @note 选做
+ */
 TEST(ClockReplacerTest, CornerCaseTest) {
     ClockReplacer clock_replacer(4);
     int value;

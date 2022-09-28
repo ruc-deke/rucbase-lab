@@ -10,6 +10,7 @@
   - [任务二 记录管理器](#%E4%BB%BB%E5%8A%A1%E4%BA%8C-%E8%AE%B0%E5%BD%95%E7%AE%A1%E7%90%86%E5%99%A8)
     - [任务2.1 记录操作](#%E4%BB%BB%E5%8A%A121-%E8%AE%B0%E5%BD%95%E6%93%8D%E4%BD%9C)
     - [任务2.2 记录迭代器](#%E4%BB%BB%E5%8A%A122-%E8%AE%B0%E5%BD%95%E8%BF%AD%E4%BB%A3%E5%99%A8)
+  - [实验计分](#%E5%AE%9E%E9%AA%8C%E8%AE%A1%E5%88%86)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -388,3 +389,35 @@ public:
 
 ​    获取`RmScan`内部存放的`rid`。
 
+
+
+## 实验计分
+
+在本实验中，每个任务对应一个单元测试文件，每个测试文件中包含若干测试点。通过测试点即可得分，满分为100分。
+
+测试文件及测试点如下：
+
+| 任务点                 | 测试文件                                 | 分值 |
+| ---------------------- | ---------------------------------------- | ---- |
+| 任务1.1 磁盘存储管理器 | src/storage/disk_manager_test.cpp        | 10   |
+| 任务1.2 缓冲池替换策略 | src/replacer/lru_replacer_test.cpp       | 20   |
+| 任务1.3 缓冲池管理器   | src/storage/buffer_pool_manager_test.cpp | 40   |
+| 任务2 记录管理器       | src/record/rm_gtest.cpp                  | 30   |
+
+编译生成可执行文件进行测试：
+
+```bash
+cd build
+
+make disk_manager_test
+./bin/disk_manager_test
+
+make lru_replacer_test
+./bin/lru_replacer_test
+
+make buffer_pool_manager_test
+./bin/buffer_pool_manager_test
+
+make rm_gtest
+./bin/rm_gtest
+```
