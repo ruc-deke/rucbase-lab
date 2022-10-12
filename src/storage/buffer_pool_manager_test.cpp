@@ -50,10 +50,12 @@ class BufferPoolManagerTest : public ::testing::Test {
         ::testing::Test::SetUp();
         // 对于每个测试点，创建一个disk manager
         disk_manager_ = std::make_unique<DiskManager>();
-        // 如果测试目录不存在，则先创建测试目录
-        if (!disk_manager_->is_dir(TEST_DB_NAME)) {
-            disk_manager_->create_dir(TEST_DB_NAME);
+        // 如果测试目录存在，则先删除原目录
+        if (disk_manager_->is_dir(TEST_DB_NAME)) {
+            disk_manager_->destroy_dir(TEST_DB_NAME);
         }
+        // 创建一个新的目录
+        disk_manager_->create_dir(TEST_DB_NAME);
         assert(disk_manager_->is_dir(TEST_DB_NAME));  // 检查是否创建目录成功
         // 进入测试目录
         if (chdir(TEST_DB_NAME.c_str()) < 0) {
