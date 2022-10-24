@@ -1,40 +1,8 @@
 # Rucbase项目结构详解
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+[toc]
 
-- [存储管理(Storage Management)](#%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86storage-management)
-  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9)
-  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84)
-    - [文件存储组织模块：src/storage](#%E6%96%87%E4%BB%B6%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87%E6%A8%A1%E5%9D%97srcstorage)
-      - [Page](#page)
-      - [DiskManager](#diskmanager)
-      - [BufferPoolManager](#bufferpoolmanager)
-    - [缓冲区管理：src/replacer](#%E7%BC%93%E5%86%B2%E5%8C%BA%E7%AE%A1%E7%90%86srcreplacer)
-    - [记录存储组织模块：src/record](#%E8%AE%B0%E5%BD%95%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87%E6%A8%A1%E5%9D%97srcrecord)
-    - [元数据存储组织：src/system](#%E5%85%83%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87srcsystem)
-- [索引(Index)](#%E7%B4%A2%E5%BC%95index)
-  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-1)
-  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-1)
-  - [知识点及对应实验设计](#%E7%9F%A5%E8%AF%86%E7%82%B9%E5%8F%8A%E5%AF%B9%E5%BA%94%E5%AE%9E%E9%AA%8C%E8%AE%BE%E8%AE%A1)
-- [并发控制(Concurrency control)](#%E5%B9%B6%E5%8F%91%E6%8E%A7%E5%88%B6concurrency-control)
-  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-2)
-  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-2)
-  - [知识点及对应实验设计](#%E7%9F%A5%E8%AF%86%E7%82%B9%E5%8F%8A%E5%AF%B9%E5%BA%94%E5%AE%9E%E9%AA%8C%E8%AE%BE%E8%AE%A1-1)
-- [故障恢复(Failure recovery)](#%E6%95%85%E9%9A%9C%E6%81%A2%E5%A4%8Dfailure-recovery)
-  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-3)
-  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-3)
-  - [知识点及对应实验设计](#%E7%9F%A5%E8%AF%86%E7%82%B9%E5%8F%8A%E5%AF%B9%E5%BA%94%E5%AE%9E%E9%AA%8C%E8%AE%BE%E8%AE%A1-2)
-- [查询处理与执行(Query processing and execution)](#%E6%9F%A5%E8%AF%A2%E5%A4%84%E7%90%86%E4%B8%8E%E6%89%A7%E8%A1%8Cquery-processing-and-execution)
-  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-4)
-  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-4)
-  - [知识点及对应实验设计](#%E7%9F%A5%E8%AF%86%E7%82%B9%E5%8F%8A%E5%AF%B9%E5%BA%94%E5%AE%9E%E9%AA%8C%E8%AE%BE%E8%AE%A1-3)
-- [语法解析](#%E8%AF%AD%E6%B3%95%E8%A7%A3%E6%9E%90)
-  - [语法树结构](#%E8%AF%AD%E6%B3%95%E6%A0%91%E7%BB%93%E6%9E%84)
-- [错误与异常处理](#%E9%94%99%E8%AF%AF%E4%B8%8E%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86)
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## 存储管理(Storage Management)
 
@@ -280,7 +248,43 @@ struct ColMeta {
 
 ### 项目结构
 
-### 知识点及对应实验设计
+索引模块相关的子目录为src/index，主要实现了B+树，用来支持索引功能。
+
+在本系统中，B+树以文件的方式存储在磁盘中，B+树的每个节点存储在一个磁盘块中，每个结点存储若干个键值对，在本系统中，如果想要把一个元组插入B+树，那么该元组会被解析成一个键值对`<key, value>`，其中key存储该元组中索引所在列的数据，value代表该元组的rid。
+
+我们使用`IxFileHdr`来管理B+树文件的元数据，其中num_pages用来记录文件中的磁盘块数，root_page用来存储B+树根节点对应的磁盘块号，first_free_page_no代表文件中第一个空闲的磁盘页面的页面号，col_type和col_len分别记录当前索引所在列的数据类型和数据长度，btree_order存储一个B+树结点所能存储的最多的键值对数量。在每个结点对应的磁盘块中，磁盘块首部存储所有的元信息，然后存储所有的key，磁盘块的末尾部分用来存储所有的value，因此，需要用keys_size用来记录当前结点中所有key数据的大小，以便确定value部分的首地址。first_leaf和last_leaf分别存储首叶结点对应的磁盘块号和尾叶结点对应的磁盘块号。
+
+```C++
+struct IxFileHdr {
+    page_id_t first_free_page_no;
+    int num_pages;        // disk pages
+    page_id_t root_page;  // root page no
+    ColType col_type;
+    int col_len;      // ColMeta->len
+    int btree_order;  // children per page 每个结点最多可插入的键值对数量
+    int keys_size;  // keys_size = (btree_order + 1) * col_len
+    // first_leaf初始化之后没有进行修改，只不过是在测试文件中遍历叶子结点的时候用了
+    page_id_t first_leaf;  // 在上层IxManager的open函数进行初始化，初始化为root page_no
+    page_id_t last_leaf;
+};
+```
+
+系统使用`IxPageHdr`来管理每个磁盘块（在内存中叫页面）的元数据，其中next_free_page_no代表当前B+树中，下一个空闲的未使用的磁盘块的块号，parent记录父结点所在磁盘块的块号，num_key代表当前节点中已经插入的键值对的数量，is_leaf用来判断当前结点是否为叶子结点，如果当前结点是叶子结点，那么prev_leaf存储当前结点的前一个叶子节点，next_leaf记录当前结点的下一个叶子结点。
+
+```C++
+struct IxPageHdr {
+    page_id_t next_free_page_no;
+    page_id_t parent;  // its parent's page_no
+    int num_key;  // # current keys (always equals to #child - 1) 已插入的keys数量，key_idx∈[0,num_key)
+    bool is_leaf;
+    page_id_t prev_leaf;  // previous leaf node's page_no, effective only when is_leaf is true
+    page_id_t next_leaf;  // next leaf node's page_no, effective only when is_leaf is true
+};
+```
+
+系统在其他模块如存储模块、执行模块中，使用`Rid`来存储记录号，在索引模块中使用`Iid`来存储记录号，二者是等价的，一一对应的。
+
+系统中，`IxNodeHandle`和`IxIndexHandle`分别提供了对B+树结点的操作方法和对B+树的操作方法。`IxManager`类为上层模块提供了创建索引、删除索引、把索引文件读取到内存中、关闭索引文件等接口。`IxScan`类提供了遍历B+树叶子结点的功能。
 
 ## 并发控制(Concurrency control)
 
@@ -350,7 +354,7 @@ class LockManager {
 
 LockRequestQueue类中，组模式GroupLockMode记录了当前锁队列中，已经授予的最严格的锁，用于在申请一个新锁时判断是否冲突；升级标志upgrading_记录了当前锁队列中是否有锁正在等待升级，一个队列中不能同时存在两个锁等待升级，会发生死锁；锁列表request_queue_维护了当前加在数据项上的锁的队列，包括已经被授予的锁和正在等待授予的锁。用一个条件变量（std::condition_variable）来维护锁队列的并发。
 
-### 知识点及对应实验设计
+
 
 ## 故障恢复(Failure recovery)
 
@@ -398,7 +402,7 @@ class LogRecord {
 
 故障恢复管理器主要提供故障恢复功能，分为Redo和Undo两个接口，是实验需要完成的部分。
 
-### 知识点及对应实验设计
+
 
 ## 查询处理与执行(Query processing and execution)
 
@@ -455,7 +459,7 @@ struct ColMeta {
 
 ColMeta中字段的类型包括int类型(`TYPE_INT`)、float类型(`TYPE_FLOAT`)和string类型(`TYPE_STRING`)。
 
-### 知识点及对应实验设计
+
 
 ## 语法解析
 
