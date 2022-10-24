@@ -1,6 +1,35 @@
 # Rucbase项目结构详解
 
-[toc]
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [存储管理(Storage Management)](#%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86storage-management)
+  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9)
+  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84)
+    - [文件存储组织模块：src/storage](#%E6%96%87%E4%BB%B6%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87%E6%A8%A1%E5%9D%97srcstorage)
+      - [Page](#page)
+      - [DiskManager](#diskmanager)
+      - [BufferPoolManager](#bufferpoolmanager)
+    - [缓冲区管理：src/replacer](#%E7%BC%93%E5%86%B2%E5%8C%BA%E7%AE%A1%E7%90%86srcreplacer)
+    - [记录存储组织模块：src/record](#%E8%AE%B0%E5%BD%95%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87%E6%A8%A1%E5%9D%97srcrecord)
+    - [元数据存储组织：src/system](#%E5%85%83%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8%E7%BB%84%E7%BB%87srcsystem)
+- [索引(Index)](#%E7%B4%A2%E5%BC%95index)
+  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-1)
+  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-1)
+- [并发控制(Concurrency control)](#%E5%B9%B6%E5%8F%91%E6%8E%A7%E5%88%B6concurrency-control)
+  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-2)
+  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-2)
+- [故障恢复(Failure recovery)](#%E6%95%85%E9%9A%9C%E6%81%A2%E5%A4%8Dfailure-recovery)
+  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-3)
+  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-3)
+- [查询处理与执行(Query processing and execution)](#%E6%9F%A5%E8%AF%A2%E5%A4%84%E7%90%86%E4%B8%8E%E6%89%A7%E8%A1%8Cquery-processing-and-execution)
+  - [相关知识点](#%E7%9B%B8%E5%85%B3%E7%9F%A5%E8%AF%86%E7%82%B9-4)
+  - [项目结构](#%E9%A1%B9%E7%9B%AE%E7%BB%93%E6%9E%84-4)
+- [语法解析](#%E8%AF%AD%E6%B3%95%E8%A7%A3%E6%9E%90)
+  - [语法树结构](#%E8%AF%AD%E6%B3%95%E6%A0%91%E7%BB%93%E6%9E%84)
+- [错误与异常处理](#%E9%94%99%E8%AF%AF%E4%B8%8E%E5%BC%82%E5%B8%B8%E5%A4%84%E7%90%86)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 
 
