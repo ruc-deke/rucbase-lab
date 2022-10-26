@@ -142,7 +142,6 @@ GoogleTest框架测试
 
 - 索引模块：
   
-  - ix_gtest
   - b_plus_tree_insert_test
   - b_plus_tree_delete_test
   - b_plus_tree_concurrent_test
