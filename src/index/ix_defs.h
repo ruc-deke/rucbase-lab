@@ -25,6 +25,7 @@ struct IxPageHdr {
     page_id_t next_leaf;  // next leaf node's page_no, effective only when is_leaf is true
 };
 
+// 这个其实和Rid结构类似
 struct Iid {
     int page_no;
     int slot_no;
