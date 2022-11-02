@@ -213,7 +213,6 @@ class BPlusTreeTests : public ::testing::Test {
 TEST_F(BPlusTreeTests, InsertTest) {
     const int64_t scale = 10;
     const int order = 3;
-    const int reopen_mod = 1;
 
     assert(order > 2 && order <= ih_->file_hdr_.btree_order);
     ih_->file_hdr_.btree_order = order;
@@ -233,12 +232,6 @@ TEST_F(BPlusTreeTests, InsertTest) {
         ASSERT_EQ(insert_ret, true);
 
         Draw(buffer_pool_manager_.get(), "insert" + std::to_string(key) + ".dot");
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     std::vector<Rid> rids;
@@ -250,12 +243,6 @@ TEST_F(BPlusTreeTests, InsertTest) {
 
         int32_t value = key & 0xFFFFFFFF;
         EXPECT_EQ(rids[0].slot_no, value);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // 找不到未插入的数据
@@ -275,7 +262,6 @@ TEST_F(BPlusTreeTests, InsertTest) {
 TEST_F(BPlusTreeTests, LargeScaleTest) {
     const int64_t scale = 10000;
     const int order = 256;
-    const int reopen_mod = 1;
 
     assert(order > 2 && order <= ih_->file_hdr_.btree_order);
     ih_->file_hdr_.btree_order = order;
@@ -297,12 +283,6 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
         index_key = (const char *)&key;
         bool insert_ret = ih_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // test GetValue
@@ -315,12 +295,6 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
 
         int64_t value = key & 0xFFFFFFFF;
         EXPECT_EQ(rids[0].slot_no, value);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // test Ixscan

@@ -322,7 +322,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
     const int64_t scale = 10;
     const int64_t delete_scale = 9;  // 删除的个数最好小于scale，等于的话会变成空树
     const int order = 4;
-    const int reopen_mod = 1;
 
     assert(order > 2 && order <= ih_->file_hdr_.btree_order);
     ih_->file_hdr_.btree_order = order;
@@ -341,12 +340,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
         index_key = (const char *)&key;
         bool insert_ret = ih_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
     Draw(buffer_pool_manager_.get(), "insert10.dot");
 
@@ -360,12 +353,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
 
         int64_t value = key & 0xFFFFFFFF;
         EXPECT_EQ(rids[0].slot_no, value);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // delete keys
@@ -379,12 +366,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
         ASSERT_EQ(delete_ret, true);
 
         Draw(buffer_pool_manager_.get(), "InsertAndDeleteTest1_delete" + std::to_string(key) + ".dot");
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // scan keys by Ixscan
@@ -412,7 +393,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
 TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
     const int64_t scale = 10;
     const int order = 4;
-    const int reopen_mod = 1;
 
     assert(order > 2 && order <= ih_->file_hdr_.btree_order);
     ih_->file_hdr_.btree_order = order;
@@ -431,12 +411,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
         index_key = (const char *)&key;
         bool insert_ret = ih_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
     Draw(buffer_pool_manager_.get(), "insert10.dot");
 
@@ -450,12 +424,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
 
         int64_t value = key & 0xFFFFFFFF;
         EXPECT_EQ(rids[0].slot_no, value);
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 
     // delete keys
@@ -466,12 +434,6 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
         ASSERT_EQ(delete_ret, true);
 
         Draw(buffer_pool_manager_.get(), "InsertAndDeleteTest2_delete" + std::to_string(key) + ".dot");
-
-        // reopen test
-        if (key % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
-        }
     }
 }
 
@@ -483,7 +445,7 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
 TEST_F(BPlusTreeTests, LargeScaleTest) {
     const int order = 255;  // 若order太小，而插入数据过多，将会超出缓冲池
     const int scale = 20000;
-    const int reopen_mod = 1;
+
     if (order >= 2 && order <= ih_->file_hdr_.btree_order) {
         ih_->file_hdr_.btree_order = order;
     }
@@ -526,11 +488,6 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
             del_cnt++;
             // Draw(buffer_pool_manager_.get(),
             //      "MixTest2_" + std::to_string(num) + "_delete" + std::to_string(key) + ".dot");
-        }
-        // Randomly re-open file
-        if (scale % reopen_mod == 0) {
-            ix_manager_->close_index(ih_.get());
-            ih_ = ix_manager_->open_index(TEST_FILE_NAME, index_no);
         }
         // check_all(ih_.get(), mock);
     }
