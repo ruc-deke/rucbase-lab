@@ -1,0 +1,74 @@
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Computer Science |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------
+>> update student set major = 'Electrical Engineering' where id = 2;
+rucbase> update student set major = 'Electrical Engineering' where id = 2;
+
+------------------------------
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Electrical En... |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------
+>> delete from student where name = 'Jack';
+rucbase> delete from student where name = 'Jack';
+
+------------------------------
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 2
+
+------------------------------
+>> update student set major = 'Computer Science' where id = 2;
+rucbase> update student set major = 'Computer Science' where id = 2;
+
+------------------------------
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Computer Science |
++------------------+------------------+------------------+
+Total record(s): 2
+
+------------------------------
+>> insert into student values (3, 'Jack', 'Electrical Engineering');
+rucbase> insert into student values (3, 'Jack', 'Electrical Engineering');
+
+------------------------------
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Computer Science |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------

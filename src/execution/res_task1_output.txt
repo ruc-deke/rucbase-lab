@@ -1,0 +1,63 @@
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
++------------------+
+
+------------------------------
+>> create table tb(s int, a int, b float, c char(16));
+rucbase> create table tb(s int, a int, b float, c char(16));
+
+------------------------------
+>> create table tb2(x int, y float, z char(16), s int);
+rucbase> create table tb2(x int, y float, z char(16), s int);
+
+------------------------------
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
+|               tb |
+|              tb2 |
++------------------+
+
+------------------------------
+>> desc tb;
+rucbase> desc tb;
++------------------+------------------+------------------+
+|            Field |             Type |            Index |
++------------------+------------------+------------------+
+|                s |              INT |               NO |
+|                a |              INT |               NO |
+|                b |            FLOAT |               NO |
+|                c |           STRING |               NO |
++------------------+------------------+------------------+
+
+------------------------------
+>> drop table tb;
+rucbase> drop table tb;
+
+------------------------------
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
+|              tb2 |
++------------------+
+
+------------------------------
+>> drop table tb2;
+rucbase> drop table tb2;
+
+------------------------------
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
++------------------+
+
+------------------------------

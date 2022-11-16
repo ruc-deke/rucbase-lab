@@ -1,7 +1,7 @@
 #pragma once
 
 #include "index/ix.h"
-#include "record/rm.h"
+// #include "record/rm.h"
 #include "common/context.h"
 #include "record/rm_file_handle.h"
 #include "sm_defs.h"
@@ -15,10 +15,9 @@ struct ColDef {
     int len;           // Length of column
 };
 
-/**
- * @brief SmManager管理数据库中db, table, index的元数据，支持create/drop/open/close等操作
- * 每个SmManager对应一个db
- */
+// SmManager类似于CMU中的Catalog
+// 管理数据库中db, table, index的元数据，支持create/drop/open/close等操作
+// 每个SmManager对应一个db
 class SmManager {
    public:
     DbMeta db_;  // create_db时将会将DbMeta写入文件，open_db时将会从文件中读出DbMeta
@@ -29,6 +28,10 @@ class SmManager {
     BufferPoolManager *buffer_pool_manager_;
     RmManager *rm_manager_;
     IxManager *ix_manager_;
+    // TODO: 全部改成私有变量，并且改成指针形式
+    // DbMeta *db_;
+    // std::map<std::string, std::unique_ptr<RmFileHandle>> *fhs_;
+    // std::map<std::string, std::unique_ptr<IxIndexHandle>> *ihs_;
 
    public:
     SmManager(DiskManager *disk_manager, BufferPoolManager *buffer_pool_manager, RmManager *rm_manager,
@@ -37,9 +40,19 @@ class SmManager {
           buffer_pool_manager_(buffer_pool_manager),
           rm_manager_(rm_manager),
           ix_manager_(ix_manager) {
+        // db_ = new DbMeta();
     }
 
-    ~SmManager() = default;
+    ~SmManager() {
+        // delete db_;
+    }
+
+    // TODO: Get private variables （注意，这里的get方法都必须返回指针，否则上层调用会出问题）
+    // DbMeta *get_db() { return db_; }
+
+    // std::map<std::string, std::unique_ptr<RmFileHandle>> *get_fhs() { return fhs_; }
+
+    // std::map<std::string, std::unique_ptr<IxIndexHandle>> *get_ihs() { return ihs_; }
 
     RmManager *get_rm_manager() { return rm_manager_; }  // called in some excutors to modify record
 

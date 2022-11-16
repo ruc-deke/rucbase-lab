@@ -86,6 +86,7 @@ class DbMeta {
     std::map<std::string, TabMeta> tabs_;  // 数据库内的表名称和元数据的映射
 
    public:
+    // DbMeta(std::string name) : name_(name) {}
 
     bool is_table(const std::string &tab_name) const { return tabs_.find(tab_name) != tabs_.end(); }
 

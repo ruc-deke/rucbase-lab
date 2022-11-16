@@ -1,0 +1,14 @@
+ExecutorTest_db
+2
+grade
+3
+grade course 2 32 0 0
+grade student_id 0 4 32 0
+grade score 1 4 36 0
+
+student
+3
+student id 0 4 0 0
+student name 2 32 4 0
+student major 2 32 36 0
+

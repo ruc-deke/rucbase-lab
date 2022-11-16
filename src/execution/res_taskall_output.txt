@@ -1,0 +1,182 @@
+>> create table student (id int, name char(32), major char(32));
+rucbase> create table student (id int, name char(32), major char(32));
+
+------------------------------
+>> create index student (id);
+rucbase> create index student (id);
+
+------------------------------
+>> create table grade (course char(32), student_id int, score float);
+rucbase> create table grade (course char(32), student_id int, score float);
+
+------------------------------
+>> create index grade (student_id);
+rucbase> create index grade (student_id);
+
+------------------------------
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
+|            grade |
+|          student |
++------------------+
+
+------------------------------
+>> desc student;
+rucbase> desc student;
++------------------+------------------+------------------+
+|            Field |             Type |            Index |
++------------------+------------------+------------------+
+|               id |              INT |              YES |
+|             name |           STRING |               NO |
+|            major |           STRING |               NO |
++------------------+------------------+------------------+
+
+------------------------------
+>> insert into student values (1, 'Tom', 'Computer Science');
+rucbase> insert into student values (1, 'Tom', 'Computer Science');
+
+------------------------------
+>> insert into student values (2, 'Jerry', 'Computer Science');
+rucbase> insert into student values (2, 'Jerry', 'Computer Science');
+
+------------------------------
+>> insert into student values (3, 'Jack', 'Electrical Engineering');
+rucbase> insert into student values (3, 'Jack', 'Electrical Engineering');
+
+------------------------------
+>> select * from student where id>=1;
+rucbase> select * from student where id>=1;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Computer Science |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------
+>> update student set major = 'Electrical Engineering' where id = 2;
+rucbase> update student set major = 'Electrical Engineering' where id = 2;
+
+------------------------------
+>> select * from student where id>=1;
+rucbase> select * from student where id>=1;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Electrical En... |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------
+>> delete from student where name = 'Jack';
+rucbase> delete from student where name = 'Jack';
+
+------------------------------
+>> select * from student where id>=1;
+rucbase> select * from student where id>=1;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 2
+
+------------------------------
+>> insert into grade values ('Data Structure', 1, 90.0);
+rucbase> insert into grade values ('Data Structure', 1, 90.0);
+
+------------------------------
+>> insert into grade values ('Data Structure', 2, 95.0);
+rucbase> insert into grade values ('Data Structure', 2, 95.0);
+
+------------------------------
+>> insert into grade values ('Calculus', 2, 82.0);
+rucbase> insert into grade values ('Calculus', 2, 82.0);
+
+------------------------------
+>> insert into grade values ('Calculus', 1, 88.5);
+rucbase> insert into grade values ('Calculus', 1, 88.5);
+
+------------------------------
+>> select * from student, grade;
+rucbase> select * from student, grade;
++------------------+------------------+------------------+------------------+------------------+------------------+
+|               id |             name |            major |           course |       student_id |            score |
++------------------+------------------+------------------+------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |   Data Structure |                1 |        90.000000 |
+|                1 |              Tom | Computer Science |   Data Structure |                2 |        95.000000 |
+|                1 |              Tom | Computer Science |         Calculus |                2 |        82.000000 |
+|                1 |              Tom | Computer Science |         Calculus |                1 |        88.500000 |
+|                2 |            Jerry | Electrical En... |   Data Structure |                1 |        90.000000 |
+|                2 |            Jerry | Electrical En... |   Data Structure |                2 |        95.000000 |
+|                2 |            Jerry | Electrical En... |         Calculus |                2 |        82.000000 |
+|                2 |            Jerry | Electrical En... |         Calculus |                1 |        88.500000 |
++------------------+------------------+------------------+------------------+------------------+------------------+
+Total record(s): 8
+
+------------------------------
+>> select id, name, major, course, score from student, grade where student.id = grade.student_id;
+rucbase> select id, name, major, course, score from student, grade where student.id = grade.student_id;
++------------------+------------------+------------------+------------------+------------------+
+|               id |             name |            major |           course |            score |
++------------------+------------------+------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |   Data Structure |        90.000000 |
+|                1 |              Tom | Computer Science |         Calculus |        88.500000 |
+|                2 |            Jerry | Electrical En... |   Data Structure |        95.000000 |
+|                2 |            Jerry | Electrical En... |         Calculus |        82.000000 |
++------------------+------------------+------------------+------------------+------------------+
+Total record(s): 4
+
+------------------------------
+>> select id, name, major, course, score from student join grade where student.id = grade.student_id;
+rucbase> select id, name, major, course, score from student join grade where student.id = grade.student_id;
++------------------+------------------+------------------+------------------+------------------+
+|               id |             name |            major |           course |            score |
++------------------+------------------+------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |   Data Structure |        90.000000 |
+|                1 |              Tom | Computer Science |         Calculus |        88.500000 |
+|                2 |            Jerry | Electrical En... |   Data Structure |        95.000000 |
+|                2 |            Jerry | Electrical En... |         Calculus |        82.000000 |
++------------------+------------------+------------------+------------------+------------------+
+Total record(s): 4
+
+------------------------------
+>> drop index student (id);
+rucbase> drop index student (id);
+
+------------------------------
+>> desc student;
+rucbase> desc student;
++------------------+------------------+------------------+
+|            Field |             Type |            Index |
++------------------+------------------+------------------+
+|               id |              INT |               NO |
+|             name |           STRING |               NO |
+|            major |           STRING |               NO |
++------------------+------------------+------------------+
+
+------------------------------
+>> drop table student;
+rucbase> drop table student;
+
+------------------------------
+>> drop table grade;
+rucbase> drop table grade;
+
+------------------------------
+>> show tables;
+rucbase> show tables;
++------------------+
+|           Tables |
++------------------+
++------------------+
+
+------------------------------

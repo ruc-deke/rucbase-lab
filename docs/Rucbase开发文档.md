@@ -2,7 +2,6 @@
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [flex && bison文件的修改](#flex--bison%E6%96%87%E4%BB%B6%E7%9A%84%E4%BF%AE%E6%94%B9)
 - [代码规范](#%E4%BB%A3%E7%A0%81%E8%A7%84%E8%8C%83)

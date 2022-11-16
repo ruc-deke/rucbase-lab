@@ -1,0 +1,70 @@
+>> select * from student;
+rucbase> select * from student;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |
+|                2 |            Jerry | Computer Science |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 3
+
+------------------------------
+>> select * from grade;
+rucbase> select * from grade;
++------------------+------------------+------------------+
+|           course |       student_id |            score |
++------------------+------------------+------------------+
+|   Data Structure |                1 |        90.000000 |
+|   Data Structure |                2 |        95.000000 |
+|         Calculus |                2 |        82.000000 |
+|         Calculus |                1 |        88.500000 |
++------------------+------------------+------------------+
+Total record(s): 4
+
+------------------------------
+>> select * from student where id>=2;
+rucbase> select * from student where id>=2;
++------------------+------------------+------------------+
+|               id |             name |            major |
++------------------+------------------+------------------+
+|                2 |            Jerry | Computer Science |
+|                3 |             Jack | Electrical En... |
++------------------+------------------+------------------+
+Total record(s): 2
+
+------------------------------
+>> select * from student, grade;
+rucbase> select * from student, grade;
++------------------+------------------+------------------+------------------+------------------+------------------+
+|               id |             name |            major |           course |       student_id |            score |
++------------------+------------------+------------------+------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |   Data Structure |                1 |        90.000000 |
+|                1 |              Tom | Computer Science |   Data Structure |                2 |        95.000000 |
+|                1 |              Tom | Computer Science |         Calculus |                2 |        82.000000 |
+|                1 |              Tom | Computer Science |         Calculus |                1 |        88.500000 |
+|                2 |            Jerry | Computer Science |   Data Structure |                1 |        90.000000 |
+|                2 |            Jerry | Computer Science |   Data Structure |                2 |        95.000000 |
+|                2 |            Jerry | Computer Science |         Calculus |                2 |        82.000000 |
+|                2 |            Jerry | Computer Science |         Calculus |                1 |        88.500000 |
+|                3 |             Jack | Electrical En... |   Data Structure |                1 |        90.000000 |
+|                3 |             Jack | Electrical En... |   Data Structure |                2 |        95.000000 |
+|                3 |             Jack | Electrical En... |         Calculus |                2 |        82.000000 |
+|                3 |             Jack | Electrical En... |         Calculus |                1 |        88.500000 |
++------------------+------------------+------------------+------------------+------------------+------------------+
+Total record(s): 12
+
+------------------------------
+>> select id, name, major, course from student, grade where student.id = grade.student_id;
+rucbase> select id, name, major, course from student, grade where student.id = grade.student_id;
++------------------+------------------+------------------+------------------+
+|               id |             name |            major |           course |
++------------------+------------------+------------------+------------------+
+|                1 |              Tom | Computer Science |   Data Structure |
+|                1 |              Tom | Computer Science |         Calculus |
+|                2 |            Jerry | Computer Science |   Data Structure |
+|                2 |            Jerry | Computer Science |         Calculus |
++------------------+------------------+------------------+------------------+
+Total record(s): 4
+
+------------------------------
