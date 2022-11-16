@@ -150,7 +150,7 @@ void SmManager::create_index(const std::string &tab_name, const std::string &col
         auto rec = file_handle->get_record(rm_scan.rid(), context);  // rid是record的存储位置，作为value插入到索引里
         const char *key = rec->data + col->offset;
         // record data里以各个属性的offset进行分隔，属性的长度为col len，record里面每个属性的数据作为key插入索引里
-        ih->insert_entry(key, rm_scan.rid());  // ljw: 此处调用了！
+        ih->insert_entry(key, rm_scan.rid(), context->txn_);
     }
     // Store index handle
     auto index_name = ix_manager_->get_index_name(tab_name, col_idx);

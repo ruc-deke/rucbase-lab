@@ -58,6 +58,8 @@ class SmManager {
 
     IxManager *get_ix_manager() { return ix_manager_; }  // called in some excutors to modify index
 
+    BufferPoolManager *get_bpm() { return buffer_pool_manager_; }
+
     // Database management
     bool is_dir(const std::string &db_name);
 

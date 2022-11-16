@@ -69,7 +69,7 @@ class IndexScanExecutor : public AbstractExecutor {
                 break;
             }
         }
-        scan_ = std::make_unique<IxScan>(ih, lower, upper);
+        scan_ = std::make_unique<IxScan>(ih, lower, upper, sm_manager_->get_bpm());
         // Get the first record
         while (!scan_->is_end()) {
             rid_ = scan_->rid();
