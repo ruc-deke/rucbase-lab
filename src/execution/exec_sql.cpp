@@ -29,7 +29,7 @@ char *exec_sql(const std::string &sql) {
     yy_delete_buffer(yy_buffer);
     memset(result, 0, BUFFER_LENGTH);
     offset = 0;
-    Context *context = new Context(nullptr, nullptr, nullptr, result, &offset);
+    Context *context = new Context(nullptr, nullptr, new Transaction(0), result, &offset);
     interp_->interp_sql(ast::parse_tree, context);  // 主要执行逻辑
     // std::cout << result << std::endl;
     return result;
