@@ -45,9 +45,16 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
         feed_right();
         right_->beginTuple();
         while (right_->is_end()) {
+            // 此处任务点取消,不用做
             // lab3 task2 Todo
             // 如果当前innerTable(右表或算子)扫描完了
             // 你需要移动到outerTable(左表)下一个记录,然后把右表移动到第一个记录的位置
+            left_->nextTuple();
+            if (left_->is_end()) {
+                break;
+            }
+            feed_right();
+            right_->beginTuple();
             // lab3 task2 Todo end
         }
     }
