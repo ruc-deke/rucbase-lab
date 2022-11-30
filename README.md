@@ -49,6 +49,7 @@ Rucbase是一个精简的RDBMS原型系统，用于《数据库系统实现》�
 - [Rucbase-Lab2索引管理实验文档](docs/Rucbase-Lab2[索引管理实验文档].md)
 - [Rucbase-Lab3查询执行实验文档](docs/Rucbase-Lab3[查询执行实验文档].md)
 - [Rucbase-Lab3查询执行实验指导](docs/Rucbase-Lab3[查询执行实验指导].md)
+- [Rucbase-Lab4并发控制实验文档](docs/Rucbase-Lab4[并发控制实验文档].md)
 
 ### 时间安排和工作量估计
 
