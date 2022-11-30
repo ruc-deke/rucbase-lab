@@ -1,6 +1,23 @@
 # Rucbase并发控制实验指南
 
-[toc]
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [声明](#%E5%A3%B0%E6%98%8E)
+  - [修改一：](#%E4%BF%AE%E6%94%B9%E4%B8%80)
+  - [修改二：](#%E4%BF%AE%E6%94%B9%E4%BA%8C)
+- [实验一 事务管理器实验（30分）](#%E5%AE%9E%E9%AA%8C%E4%B8%80-%E4%BA%8B%E5%8A%A1%E7%AE%A1%E7%90%86%E5%99%A8%E5%AE%9E%E9%AA%8C30%E5%88%86)
+  - [测试点及分数](#%E6%B5%8B%E8%AF%95%E7%82%B9%E5%8F%8A%E5%88%86%E6%95%B0)
+- [实验二 锁管理器实验（40分）](#%E5%AE%9E%E9%AA%8C%E4%BA%8C-%E9%94%81%E7%AE%A1%E7%90%86%E5%99%A8%E5%AE%9E%E9%AA%8C40%E5%88%86)
+  - [任务：加锁解锁操作](#%E4%BB%BB%E5%8A%A1%E5%8A%A0%E9%94%81%E8%A7%A3%E9%94%81%E6%93%8D%E4%BD%9C)
+    - [（1）行级锁加锁](#1%E8%A1%8C%E7%BA%A7%E9%94%81%E5%8A%A0%E9%94%81)
+    - [（2）表级锁加锁](#2%E8%A1%A8%E7%BA%A7%E9%94%81%E5%8A%A0%E9%94%81)
+    - [（3）解锁](#3%E8%A7%A3%E9%94%81)
+  - [测试点及分数](#%E6%B5%8B%E8%AF%95%E7%82%B9%E5%8F%8A%E5%88%86%E6%95%B0-1)
+- [实验三 并发控制实验（30分）](#%E5%AE%9E%E9%AA%8C%E4%B8%89-%E5%B9%B6%E5%8F%91%E6%8E%A7%E5%88%B6%E5%AE%9E%E9%AA%8C30%E5%88%86)
+  - [测试点及分数](#%E6%B5%8B%E8%AF%95%E7%82%B9%E5%8F%8A%E5%88%86%E6%95%B0-2)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 Rucbase并发控制模块采用的是基于封锁的并发控制协议，要求事务达到可串行化隔离级别。在本实验中，你需要实现事务管理器、锁管理器，并使用事务管理器和锁管理器提供的相关接口保证事务正确地并发执行。
 
