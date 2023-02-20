@@ -117,7 +117,12 @@ void RmFileHandle::release_page_handle(RmPageHandle &page_handle) {
     
 }
 
-// used for recovery (lab4)
+/**
+ * @brief 用于事务的rollback操作
+ *
+ * @param rid record的插入位置
+ * @param buf record的内容
+ */
 void RmFileHandle::insert_record(const Rid &rid, char *buf) {
     if (rid.page_no < file_hdr_.num_pages) {
         create_new_page_handle();
