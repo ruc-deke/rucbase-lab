@@ -368,9 +368,9 @@ for each row R1 in the outer table
 select * from 765pro, 346pro where 765pro.id<346pro.id
 ```
 
-为例，表`346pro`作为`innerTable`，`765pro`作为`outerTable`，在SQL解析后生成扫描算子时，两个表的初始扫描条件` std::vector<Condition> conds_`是`765pro.id<346pro.id`，当`innerTable`目前扫描到记录`{id:2, name='ranko'}`时，`outerTable`的扫描条件就可以从原来的`765pro.id<346pro.id`转换为`765pro.id<2`。也就是外表的扫描条件右值在当前内表的Tuple确定时可以转换为确定的值。
+为例，表`346pro`作为`innerTable`，`765pro`作为`outerTable`，在SQL解析后生成扫描算子时，两个表的初始扫描条件` std::vector<Condition> conds_`是`765pro.id<346pro.id`，当`outerTable`目前扫描到记录`{id:2, name='ranko'}`时，`innerTable`的扫描条件就可以从原来的`765pro.id<346pro.id`转换为`765pro.id<2`。也就是内表的扫描条件右值在当前外表的Tuple确定时可以转换为确定的值。
 
-由于连接算子在当前规定下左算子必为扫描算子，因此`LoopJoinExecutor.feed()`中会调用`left_->feed()`将outerTable算子的谓词条件从SQL语句`A.id>B.id`更新成当前innterTable确定的`BTuple val`,这样条件谓词就会成为`A.id > {BTuple val}`
+由于连接算子在当前规定下左算子必为扫描算子，因此`LoopJoinExecutor.feed()`中会调用`left_->feed()`将innerTable算子的谓词条件从SQL语句`A.id>B.id`更新成当前outerTable确定的`BTuple val`,这样条件谓词就会成为`A.id > {BTuple val}`
 
 理解这些后，你可以补全扫描算子的`feed()`了
 
