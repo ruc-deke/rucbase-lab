@@ -38,7 +38,8 @@ Rucbase是一个精简的RDBMS原型系统，用于《数据库系统实现》�
 
 - [Rucbase环境配置文档](docs/Rucbase环境配置文档.md)
 - [Rucbase使用文档](docs/Rucbase使用文档.md)
-- [Rucbase项目结构](docs/Rucbase项目结构.md)
+- [Rucbase项目结构](docs/Rucbase项目结构.pdf)
+- [框架图](docs/框架图.pdf)
 
 ### 学生实验文档(2022-10-26日更新)
 
