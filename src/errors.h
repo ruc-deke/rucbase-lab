@@ -1,134 +1,161 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 
 #include <cerrno>
 #include <cstring>
 #include <string>
+#include <vector>
 
-class RedBaseError : public std::exception {
-    std::string _msg;
-
+class RMDBError : public std::exception {
    public:
-    RedBaseError(const std::string &msg) : _msg("Error: " + msg) {}
+    RMDBError() : _msg("Error: ") {}
+
+    RMDBError(const std::string &msg) : _msg("Error: " + msg) {}
 
     const char *what() const noexcept override { return _msg.c_str(); }
+
+    int get_msg_len() { return _msg.length(); }
+
+    std::string _msg;
 };
 
-class InternalError : public RedBaseError {
+class InternalError : public RMDBError {
    public:
-    InternalError(const std::string &msg) : RedBaseError(msg) {}
+    InternalError(const std::string &msg) : RMDBError(msg) {}
 };
 
 // PF errors
-class UnixError : public RedBaseError {
+class UnixError : public RMDBError {
    public:
-    UnixError() : RedBaseError(strerror(errno)) {}
+    UnixError() : RMDBError(strerror(errno)) {}
 };
 
-class FileNotOpenError : public RedBaseError {
+class FileNotOpenError : public RMDBError {
    public:
-    FileNotOpenError(int fd) : RedBaseError("Invalid file descriptor: " + std::to_string(fd)) {}
+    FileNotOpenError(int fd) : RMDBError("Invalid file descriptor: " + std::to_string(fd)) {}
 };
 
-class FileNotClosedError : public RedBaseError {
+class FileNotClosedError : public RMDBError {
    public:
-    FileNotClosedError(const std::string &filename) : RedBaseError("File is opened: " + filename) {}
+    FileNotClosedError(const std::string &filename) : RMDBError("File is opened: " + filename) {}
 };
 
-class FileExistsError : public RedBaseError {
+class FileExistsError : public RMDBError {
    public:
-    FileExistsError(const std::string &filename) : RedBaseError("File already exists: " + filename) {}
+    FileExistsError(const std::string &filename) : RMDBError("File already exists: " + filename) {}
 };
 
-class FileNotFoundError : public RedBaseError {
+class FileNotFoundError : public RMDBError {
    public:
-    FileNotFoundError(const std::string &filename) : RedBaseError("File not found: " + filename) {}
+    FileNotFoundError(const std::string &filename) : RMDBError("File not found: " + filename) {}
 };
 
 // RM errors
-class RecordNotFoundError : public RedBaseError {
+class RecordNotFoundError : public RMDBError {
    public:
     RecordNotFoundError(int page_no, int slot_no)
-        : RedBaseError("Record not found: (" + std::to_string(page_no) + "," + std::to_string(slot_no) + ")") {}
+        : RMDBError("Record not found: (" + std::to_string(page_no) + "," + std::to_string(slot_no) + ")") {}
 };
 
-class InvalidRecordSizeError : public RedBaseError {
+class InvalidRecordSizeError : public RMDBError {
    public:
-    InvalidRecordSizeError(int record_size) : RedBaseError("Invalid record size: " + std::to_string(record_size)) {}
+    InvalidRecordSizeError(int record_size) : RMDBError("Invalid record size: " + std::to_string(record_size)) {}
 };
 
 // IX errors
-class InvalidColLengthError : public RedBaseError {
+class InvalidColLengthError : public RMDBError {
    public:
-    InvalidColLengthError(int col_len) : RedBaseError("Invalid column length: " + std::to_string(col_len)) {}
+    InvalidColLengthError(int col_len) : RMDBError("Invalid column length: " + std::to_string(col_len)) {}
 };
 
-class IndexEntryNotFoundError : public RedBaseError {
+class IndexEntryNotFoundError : public RMDBError {
    public:
-    IndexEntryNotFoundError() : RedBaseError("Index entry not found") {}
+    IndexEntryNotFoundError() : RMDBError("Index entry not found") {}
 };
 
 // SM errors
-class DatabaseNotFoundError : public RedBaseError {
+class DatabaseNotFoundError : public RMDBError {
    public:
-    DatabaseNotFoundError(const std::string &db_name) : RedBaseError("Database not found: " + db_name) {}
+    DatabaseNotFoundError(const std::string &db_name) : RMDBError("Database not found: " + db_name) {}
 };
 
-class DatabaseExistsError : public RedBaseError {
+class DatabaseExistsError : public RMDBError {
    public:
-    DatabaseExistsError(const std::string &db_name) : RedBaseError("Database already exists: " + db_name) {}
+    DatabaseExistsError(const std::string &db_name) : RMDBError("Database already exists: " + db_name) {}
 };
 
-class TableNotFoundError : public RedBaseError {
+class TableNotFoundError : public RMDBError {
    public:
-    TableNotFoundError(const std::string &tab_name) : RedBaseError("Table not found: " + tab_name) {}
+    TableNotFoundError(const std::string &tab_name) : RMDBError("Table not found: " + tab_name) {}
 };
 
-class TableExistsError : public RedBaseError {
+class TableExistsError : public RMDBError {
    public:
-    TableExistsError(const std::string &tab_name) : RedBaseError("Table already exists: " + tab_name) {}
+    TableExistsError(const std::string &tab_name) : RMDBError("Table already exists: " + tab_name) {}
 };
 
-class ColumnNotFoundError : public RedBaseError {
+class ColumnNotFoundError : public RMDBError {
    public:
-    ColumnNotFoundError(const std::string &col_name) : RedBaseError("Column not found: " + col_name) {}
+    ColumnNotFoundError(const std::string &col_name) : RMDBError("Column not found: " + col_name) {}
 };
 
-class IndexNotFoundError : public RedBaseError {
+class IndexNotFoundError : public RMDBError {
    public:
-    IndexNotFoundError(const std::string &tab_name, const std::string &col_name)
-        : RedBaseError("Index not found: " + tab_name + '.' + col_name) {}
+    IndexNotFoundError(const std::string &tab_name, const std::vector<std::string> &col_names) {
+        _msg += "Index not found: " + tab_name + ".(";
+        for(size_t i = 0; i < col_names.size(); ++i) {
+            if(i > 0) _msg += ", ";
+            _msg += col_names[i];
+        }
+        _msg += ")";
+    }
 };
 
-class IndexExistsError : public RedBaseError {
+class IndexExistsError : public RMDBError {
    public:
-    IndexExistsError(const std::string &tab_name, const std::string &col_name)
-        : RedBaseError("Index already exists: " + tab_name + '.' + col_name) {}
+    IndexExistsError(const std::string &tab_name, const std::vector<std::string> &col_names) {
+        _msg += "Index already exists: " + tab_name + ".(";
+        for(size_t i = 0; i < col_names.size(); ++i) {
+            if(i > 0) _msg += ", ";
+            _msg += col_names[i];
+        }
+        _msg += ")";
+    }
 };
 
 // QL errors
-class InvalidValueCountError : public RedBaseError {
+class InvalidValueCountError : public RMDBError {
    public:
-    InvalidValueCountError() : RedBaseError("Invalid value count") {}
+    InvalidValueCountError() : RMDBError("Invalid value count") {}
 };
 
-class StringOverflowError : public RedBaseError {
+class StringOverflowError : public RMDBError {
    public:
-    StringOverflowError() : RedBaseError("String is too long") {}
+    StringOverflowError() : RMDBError("String is too long") {}
 };
 
-class IncompatibleTypeError : public RedBaseError {
+class IncompatibleTypeError : public RMDBError {
    public:
     IncompatibleTypeError(const std::string &lhs, const std::string &rhs)
-        : RedBaseError("Incompatible type error: lhs " + lhs + ", rhs " + rhs) {}
+        : RMDBError("Incompatible type error: lhs " + lhs + ", rhs " + rhs) {}
 };
 
-class AmbiguousColumnError : public RedBaseError {
+class AmbiguousColumnError : public RMDBError {
    public:
-    AmbiguousColumnError(const std::string &col_name) : RedBaseError("Ambiguous column: " + col_name) {}
+    AmbiguousColumnError(const std::string &col_name) : RMDBError("Ambiguous column: " + col_name) {}
 };
 
-class PageNotExistError : public RedBaseError {
+class PageNotExistError : public RMDBError {
    public:
     PageNotExistError(const std::string &table_name, int page_no)
-        : RedBaseError("Page " + std::to_string(page_no) + " in table " + table_name + "not exits") {}
+        : RMDBError("Page " + std::to_string(page_no) + " in table " + table_name + "not exits") {}
 };

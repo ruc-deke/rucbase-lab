@@ -1,10 +1,18 @@
-#include "rm_scan.h"
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
 
+#include "rm_scan.h"
 #include "rm_file_handle.h"
 
 /**
  * @brief 初始化file_handle和rid
- *
  * @param file_handle
  */
 RmScan::RmScan(const RmFileHandle *file_handle) : file_handle_(file_handle) {
@@ -27,6 +35,7 @@ void RmScan::next() {
  */
 bool RmScan::is_end() const {
     // Todo: 修改返回值
+
     return false;
 }
 
@@ -34,6 +43,5 @@ bool RmScan::is_end() const {
  * @brief RmScan内部存放的rid
  */
 Rid RmScan::rid() const {
-    // Todo: 修改返回值
-    return Rid{-1, -1};
+    return rid_;
 }

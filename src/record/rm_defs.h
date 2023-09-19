@@ -1,6 +1,15 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 
-#include "common/macros.h"
 #include "defs.h"
 #include "storage/buffer_pool_manager.h"
 
@@ -9,42 +18,37 @@ constexpr int RM_FILE_HDR_PAGE = 0;
 constexpr int RM_FIRST_RECORD_PAGE = 1;
 constexpr int RM_MAX_RECORD_SIZE = 512;
 
-// record file header（RmManager::create_file函数初始化，并写入磁盘文件中的第0页）
+/* 文件头，记录表数据文件的元信息，写入磁盘中文件的第0号页面 */
 struct RmFileHdr {
-    int record_size;  // 元组大小（长度不固定，由上层进行初始化）
-    // std::atomic<page_id_t> num_pages;
-    int num_pages;             // 文件中当前分配的page个数（初始化为1）
-    int num_records_per_page;  // 每个page最多能存储的元组个数
-    int first_free_page_no;    // 文件中当前第一个可用的page no（初始化为-1）
-    int bitmap_size;           // bitmap大小
+    int record_size;            // 表中每条记录的大小，由于不包含变长字段，因此当前字段初始化后保持不变
+    int num_pages;              // 文件中分配的页面个数（初始化为1）
+    int num_records_per_page;   // 每个页面最多能存储的元组个数
+    int first_free_page_no;     // 文件中当前第一个包含空闲空间的页面号（初始化为-1）
+    int bitmap_size;            // 每个页面bitmap大小
 };
 
-// record page header（RmFileHandle::create_page函数进行初始化）
+/* 表数据文件中每个页面的页头，记录每个页面的元信息 */
 struct RmPageHdr {
-    int next_free_page_no;  // 当前page满了之后，下一个可用的page no（初始化为-1）
-    int num_records;        // 当前page中当前分配的record个数（初始化为0）
+    int next_free_page_no;  // 当前页面满了之后，下一个包含空闲空间的页面号（初始化为-1）
+    int num_records;        // 当前页面中当前已经存储的记录个数（初始化为0）
 };
 
-// 类似于Tuple
+/* 表中的记录 */
 struct RmRecord {
-    char *data;  // data初始化分配size个字节的空间
-    int size;    // size = RmFileHdr的record_size
-    bool allocated_ = false;
-
-    // DISALLOW_COPY(RmRecord);
-    // RmRecord(const RmRecord &other) = delete;
-    // RmRecord &operator=(const RmRecord &other) = delete;
+    char* data;  // 记录的数据
+    int size;    // 记录的大小
+    bool allocated_ = false;    // 是否已经为数据分配空间
 
     RmRecord() = default;
 
-    RmRecord(const RmRecord &other) {
+    RmRecord(const RmRecord& other) {
         size = other.size;
         data = new char[size];
         memcpy(data, other.data, size);
         allocated_ = true;
     };
 
-    RmRecord &operator=(const RmRecord &other) {
+    RmRecord &operator=(const RmRecord& other) {
         size = other.size;
         data = new char[size];
         memcpy(data, other.data, size);
@@ -58,20 +62,22 @@ struct RmRecord {
         allocated_ = true;
     }
 
-    RmRecord(int size_, char *data_) {
+    RmRecord(int size_, char* data_) {
         size = size_;
         data = new char[size_];
         memcpy(data, data_, size_);
         allocated_ = true;
     }
 
-    void SetData(char *data_) {
+    void SetData(char* data_) {
         memcpy(data, data_, size);
     }
 
-    void Deserialize(const char *data_) {
-        size = *reinterpret_cast<const int *>(data_);
-        delete[] data;
+    void Deserialize(const char* data_) {
+        size = *reinterpret_cast<const int*>(data_);
+        if(allocated_) {
+            delete[] data;
+        }
         data = new char[size];
         memcpy(data, data_ + sizeof(int), size);
     }

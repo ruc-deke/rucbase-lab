@@ -1,28 +1,32 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #include "log_recovery.h"
-#include "record/rm.h"
-#include "system/sm_manager.h"
 
 /**
- * 重做未刷入磁盘的写操作
- * 只需要考虑DML操作，暂时不需要考虑DDL操作
+ * @description: analyze阶段，需要获得脏页表（DPT）和未完成的事务列表（ATT）
  */
-void LogRecovery::Redo() {
-    // Todo:
-    // 1. 从磁盘的日志文件中顺序读取日志记录
-    // 2. 根据日志对应操作的类型，执行相应的操作
-    // 2.1 如果是事务相关操作，则需要维护事务活动列表active_txns_
-    // 2.2 如果是写操作，需要比较该日志的日志序列号和对应数据页的page_lsn_，判断是否要执行写操作
+void RecoveryManager::analyze() {
+ 
+}
+
+/**
+ * @description: 重做所有未落盘的操作
+ */
+void RecoveryManager::redo() {
 
 }
 
 /**
- * 撤销未完成事务的写操作
- * 只需要考虑DML操作，暂时不需要考虑DDL操作
+ * @description: 回滚未完成的事务
  */
-void LogRecovery::Undo() {
-    // Todo:
-    // 1. 遍历事务活动列表active_txns_获取所有未完成事务
-    // 2. 根据日志中的prev_lsn_信息遍历该事务已经执行的所有写操作
-    // 3. 撤销该事务的所有写操作
+void RecoveryManager::undo() {
 
 }

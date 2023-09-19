@@ -1,3 +1,13 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 #include "execution_defs.h"
 #include "execution_manager.h"
@@ -28,37 +38,9 @@ class UpdateExecutor : public AbstractExecutor {
         context_ = context;
     }
     std::unique_ptr<RmRecord> Next() override {
-        // Get all necessary index files
-        std::vector<IxIndexHandle *> ihs(tab_.cols.size(), nullptr);
-        for (auto &set_clause : set_clauses_) {
-            auto lhs_col = tab_.get_col(set_clause.lhs.col_name);
-            if (lhs_col->index) {
-                size_t lhs_col_idx = lhs_col - tab_.cols.begin();
-                // lab3 task3 Todo
-                // 获取需要的索引句柄,填充vector ihs
-                // lab3 task3 Todo end
-            }
-        }
-        // Update each rid from record file and index file
-        for (auto &rid : rids_) {
-            auto rec = fh_->get_record(rid, context_);
-            // lab3 task3 Todo
-            // Remove old entry from index
-            // lab3 task3 Todo end
-
-            // record a update operation into the transaction
-            RmRecord update_record{rec->size};
-            memcpy(update_record.data, rec->data, rec->size);
-
-            // lab3 task3 Todo
-            // Update record in record file
-            // lab3 task3 Todo end
-
-            // lab3 task3 Todo
-            // Insert new entry into index
-            // lab3 task3 Todo end
-        }
+        
         return nullptr;
     }
+
     Rid &rid() override { return _abstract_rid; }
 };

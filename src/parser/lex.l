@@ -82,6 +82,9 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "JOIN" {return JOIN;}
 "EXIT" { return EXIT; }
 "HELP" { return HELP; }
+"ORDER" { return ORDER; }
+"BY" {  return BY;  }
+"ASC" { return ASC; }
     /* operators */
 ">=" { return GEQ; }
 "<=" { return LEQ; }

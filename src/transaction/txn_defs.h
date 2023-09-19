@@ -1,3 +1,13 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 
 #include <atomic>
@@ -6,12 +16,26 @@
 #include "defs.h"
 #include "record/rm_defs.h"
 
+/* 标识事务状态 */
 enum class TransactionState { DEFAULT, GROWING, SHRINKING, COMMITTED, ABORTED };
 
+/* 系统的隔离级别，当前赛题中为可串行化隔离级别 */
 enum class IsolationLevel { READ_UNCOMMITTED, REPEATABLE_READ, READ_COMMITTED, SERIALIZABLE };
 
+/* 事务写操作类型，包括插入、删除、更新三种操作 */
 enum class WType { INSERT_TUPLE = 0, DELETE_TUPLE, UPDATE_TUPLE};
 
+/**
+ * @brief 事务的写操作记录，用于事务的回滚
+ * INSERT
+ * --------------------------------
+ * | wtype | tab_name | tuple_rid |
+ * --------------------------------
+ * DELETE / UPDATE
+ * ----------------------------------------------
+ * | wtype | tab_name | tuple_rid | tuple_value |
+ * ----------------------------------------------
+ */
 class WriteRecord {
    public:
     WriteRecord() = default;
@@ -20,11 +44,7 @@ class WriteRecord {
     WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid)
         : wtype_(wtype), tab_name_(tab_name), rid_(rid) {}
 
-    // constructor for delete operation
-    WriteRecord(WType wtype, const std::string &tab_name, const RmRecord &record)
-        : wtype_(wtype), tab_name_(tab_name), record_(record) {}
-
-    // constructor for update operation
+    // constructor for delete & update operation
     WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid, const RmRecord &record)
         : wtype_(wtype), tab_name_(tab_name), rid_(rid), record_(record) {}
 
@@ -41,17 +61,19 @@ class WriteRecord {
    private:
     WType wtype_;
     std::string tab_name_;
-
-    // for insert/update/delete operation
     Rid rid_;
     RmRecord record_;
 };
 
+/* 多粒度锁，加锁对象的类型，包括记录和表 */
 enum class LockDataType { TABLE = 0, RECORD = 1 };
 
+/**
+ * @description: 加锁对象的唯一标识
+ */
 class LockDataId {
    public:
-    // lock on table
+    /* 表级锁 */
     LockDataId(int fd, LockDataType type) {
         assert(type == LockDataType::TABLE);
         fd_ = fd;
@@ -60,6 +82,7 @@ class LockDataId {
         rid_.slot_no = -1;
     }
 
+    /* 行级锁 */
     LockDataId(int fd, const Rid &rid, LockDataType type) {
         assert(type == LockDataType::RECORD);
         fd_ = fd;
@@ -93,8 +116,10 @@ struct std::hash<LockDataId> {
     size_t operator()(const LockDataId &obj) const { return std::hash<int64_t>()(obj.Get()); }
 };
 
+/* 事务回滚原因 */
 enum class AbortReason { LOCK_ON_SHIRINKING = 0, UPGRADE_CONFLICT, DEADLOCK_PREVENTION };
 
+/* 事务回滚异常，在rmdb.cpp中进行处理 */
 class TransactionAbortException : public std::exception {
     txn_id_t txn_id_;
     AbortReason abort_reason_;
@@ -103,7 +128,7 @@ class TransactionAbortException : public std::exception {
     explicit TransactionAbortException(txn_id_t txn_id, AbortReason abort_reason)
         : txn_id_(txn_id), abort_reason_(abort_reason) {}
 
-    txn_id_t GetTransactionId() { return txn_id_; }
+    txn_id_t get_transaction_id() { return txn_id_; }
     AbortReason GetAbortReason() { return abort_reason_; }
     std::string GetInfo() {
         switch (abort_reason_) {

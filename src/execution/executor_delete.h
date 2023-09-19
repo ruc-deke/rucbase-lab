@@ -1,3 +1,13 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 #include "execution_defs.h"
 #include "execution_manager.h"
@@ -7,11 +17,11 @@
 
 class DeleteExecutor : public AbstractExecutor {
    private:
-    TabMeta tab_;
-    std::vector<Condition> conds_;
-    RmFileHandle *fh_;
-    std::vector<Rid> rids_;
-    std::string tab_name_;
+    TabMeta tab_;                   // 表的元数据
+    std::vector<Condition> conds_;  // delete的条件
+    RmFileHandle *fh_;              // 表的数据文件句柄
+    std::vector<Rid> rids_;         // 需要删除的记录的位置
+    std::string tab_name_;          // 表名称
     SmManager *sm_manager_;
 
    public:
@@ -25,29 +35,10 @@ class DeleteExecutor : public AbstractExecutor {
         rids_ = rids;
         context_ = context;
     }
-    std::unique_ptr<RmRecord> Next() override {
-        // Get all index files
-        std::vector<IxIndexHandle *> ihs(tab_.cols.size(), nullptr);
-        for (size_t col_i = 0; col_i < tab_.cols.size(); col_i++) {
-            if (tab_.cols[col_i].index) {
-                // lab3 task3 Todo
-                // 获取需要的索引句柄,填充vector ihs
-                // lab3 task3 Todo end
-            }
-        }
-        // Delete each rid from record file and index file
-        for (auto &rid : rids_) {
-            auto rec = fh_->get_record(rid, context_);
-            // lab3 task3 Todo
-            // Delete from index file
-            // Delete from record file
-            // lab3 task3 Todo end
 
-            // record a delete operation into the transaction
-            RmRecord delete_record{rec->size};
-            memcpy(delete_record.data, rec->data, rec->size);
-        }
+    std::unique_ptr<RmRecord> Next() override {
         return nullptr;
     }
+
     Rid &rid() override { return _abstract_rid; }
 };

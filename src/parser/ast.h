@@ -1,9 +1,21 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <vector>
 #include <string>
 #include <memory>
 
+enum JoinType {
+    INNER_JOIN, LEFT_JOIN, RIGHT_JOIN, FULL_JOIN
+};
 namespace ast {
 
 enum SvType {
@@ -12,6 +24,12 @@ enum SvType {
 
 enum SvCompOp {
     SV_OP_EQ, SV_OP_NE, SV_OP_LT, SV_OP_GT, SV_OP_LE, SV_OP_GE
+};
+
+enum OrderByDir {
+    OrderBy_DEFAULT,
+    OrderBy_ASC,
+    OrderBy_DESC
 };
 
 // Base class for tree nodes
@@ -77,18 +95,18 @@ struct DescTable : public TreeNode {
 
 struct CreateIndex : public TreeNode {
     std::string tab_name;
-    std::string col_name;
+    std::vector<std::string> col_names;
 
-    CreateIndex(std::string tab_name_, std::string col_name_) :
-            tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
+    CreateIndex(std::string tab_name_, std::vector<std::string> col_names_) :
+            tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
 };
 
 struct DropIndex : public TreeNode {
     std::string tab_name;
-    std::string col_name;
+    std::vector<std::string> col_names;
 
-    DropIndex(std::string tab_name_, std::string col_name_) :
-            tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
+    DropIndex(std::string tab_name_, std::vector<std::string> col_names_) :
+            tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
 };
 
 struct Expr : public TreeNode {
@@ -140,6 +158,14 @@ struct BinaryExpr : public TreeNode {
             lhs(std::move(lhs_)), op(op_), rhs(std::move(rhs_)) {}
 };
 
+struct OrderBy : public TreeNode
+{
+    std::shared_ptr<Col> cols;
+    OrderByDir orderby_dir;
+    OrderBy( std::shared_ptr<Col> cols_, OrderByDir orderby_dir_) :
+       cols(std::move(cols_)), orderby_dir(std::move(orderby_dir_)) {}
+};
+
 struct InsertStmt : public TreeNode {
     std::string tab_name;
     std::vector<std::shared_ptr<Value>> vals;
@@ -167,15 +193,36 @@ struct UpdateStmt : public TreeNode {
             tab_name(std::move(tab_name_)), set_clauses(std::move(set_clauses_)), conds(std::move(conds_)) {}
 };
 
+struct JoinExpr : public TreeNode {
+    std::string left;
+    std::string right;
+    std::vector<std::shared_ptr<BinaryExpr>> conds;
+    JoinType type;
+
+    JoinExpr(std::string left_, std::string right_,
+               std::vector<std::shared_ptr<BinaryExpr>> conds_, JoinType type_) :
+            left(std::move(left_)), right(std::move(right_)), conds(std::move(conds_)), type(type_) {}
+};
+
 struct SelectStmt : public TreeNode {
     std::vector<std::shared_ptr<Col>> cols;
     std::vector<std::string> tabs;
     std::vector<std::shared_ptr<BinaryExpr>> conds;
+    std::vector<std::shared_ptr<JoinExpr>> jointree;
+
+    
+    bool has_sort;
+    std::shared_ptr<OrderBy> order;
+
 
     SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
                std::vector<std::string> tabs_,
-               std::vector<std::shared_ptr<BinaryExpr>> conds_) :
-            cols(std::move(cols_)), tabs(std::move(tabs_)), conds(std::move(conds_)) {}
+               std::vector<std::shared_ptr<BinaryExpr>> conds_,
+               std::shared_ptr<OrderBy> order_) :
+            cols(std::move(cols_)), tabs(std::move(tabs_)), conds(std::move(conds_)), 
+            order(std::move(order_)) {
+                has_sort = (bool)order;
+            }
 };
 
 // Semantic value
@@ -183,6 +230,7 @@ struct SemValue {
     int sv_int;
     float sv_float;
     std::string sv_str;
+    OrderByDir sv_orderby_dir;
     std::vector<std::string> sv_strs;
 
     std::shared_ptr<TreeNode> sv_node;
@@ -207,6 +255,8 @@ struct SemValue {
 
     std::shared_ptr<BinaryExpr> sv_cond;
     std::vector<std::shared_ptr<BinaryExpr>> sv_conds;
+
+    std::shared_ptr<OrderBy> sv_orderby;
 };
 
 extern std::shared_ptr<ast::TreeNode> parse_tree;

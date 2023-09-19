@@ -1,3 +1,12 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "ast.h"
@@ -83,11 +92,15 @@ private:
         } else if (auto x = std::dynamic_pointer_cast<CreateIndex>(node)) {
             std::cout << "CREATE_INDEX\n";
             print_val(x->tab_name, offset);
-            print_val(x->col_name, offset);
+            // print_val(x->col_name, offset);
+            for(auto col_name: x->col_names)
+                print_val(col_name, offset);
         } else if (auto x = std::dynamic_pointer_cast<DropIndex>(node)) {
             std::cout << "DROP_INDEX\n";
             print_val(x->tab_name, offset);
-            print_val(x->col_name, offset);
+            // print_val(x->col_name, offset);
+            for(auto col_name: x->col_names)
+                print_val(col_name, offset);
         } else if (auto x = std::dynamic_pointer_cast<ColDef>(node)) {
             std::cout << "COL_DEF\n";
             print_val(x->col_name, offset);

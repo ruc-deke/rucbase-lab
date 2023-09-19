@@ -1,0 +1,2 @@
+add_executable(disk_manager_test storage/disk_manager_test.cpp)
+target_link_libraries(disk_manager_test storage gtest_main)

@@ -1,38 +1,42 @@
+/* Copyright (c) 2023 Renmin University of China
+RMDB is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+        http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details. */
+
 #pragma once
 
-#include "log_record.h"
+#include <map>
+#include <unordered_map>
+#include "log_manager.h"
+#include "storage/disk_manager.h"
 #include "system/sm_manager.h"
 
-class LogRecovery {
-   public:
-    LogRecovery(SmManager *sm_manager, DiskManager *disk_manager) {
-        log_buffer_ = new char[LOG_BUFFER_SIZE];
-        log_offset_ = 0;
-        active_txns_ = std::unordered_map<txn_id_t, lsn_t>();
-        lsn_mapping_ = std::unordered_map<lsn_t, int>();
-        sm_manager_ = sm_manager;
+class RedoLogsInPage {
+public:
+    RedoLogsInPage() { table_file_ = nullptr; }
+    RmFileHandle* table_file_;
+    std::vector<lsn_t> redo_logs_;   // 在该page上需要redo的操作的lsn
+};
+
+class RecoveryManager {
+public:
+    RecoveryManager(DiskManager* disk_manager, BufferPoolManager* buffer_pool_manager, SmManager* sm_manager) {
         disk_manager_ = disk_manager;
+        buffer_pool_manager_ = buffer_pool_manager;
+        sm_manager_ = sm_manager;
     }
 
-    ~LogRecovery() {
-        delete[] log_buffer_;
-        sm_manager_ = nullptr;
-        disk_manager_ = nullptr;
-    }
-
-    void Redo();
-    void Undo();
-    inline bool GetRecoveryMode() { return recovery_mode_; }
-
-    bool DeserializeLogRecord(const char* data, LogRecord &log_record);
-
-   private:
-    // store the running transactions, the mapping of running transactions to their lastest log records
-    std::unordered_map<txn_id_t, lsn_t> active_txns_;   // 活动事务列表，记录当前系统运行过程中所有正在执行的事务
-    std::unordered_map<lsn_t, int> lsn_mapping_;
-    char *log_buffer_;      // 从磁盘中读取的日志记录
-    int log_offset_;        // log_buffer_的偏移量
-    SmManager *sm_manager_;
-    DiskManager *disk_manager_;
-    bool recovery_mode_ = false; // 用于标识在系统开启时是否进行系统故障恢复
+    void analyze();
+    void redo();
+    void undo();
+private:
+    LogBuffer buffer_;                                              // 读入日志
+    DiskManager* disk_manager_;                                     // 用来读写文件
+    BufferPoolManager* buffer_pool_manager_;                        // 对页面进行读写
+    SmManager* sm_manager_;                                         // 访问数据库元数据
 };
