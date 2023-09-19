@@ -1,27 +1,3 @@
-//===----------------------------------------------------------------------===//
-//
-//                         Rucbase
-//
-// b_plus_tree_delete_test.cpp
-//
-// Identification: src/index/b_plus_tree_delete_test.cpp
-//
-// Copyright (c) 2022, RUC Deke Group
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-//
-//                         BusTub
-//
-// b_plus_tree_delete_test.cpp
-//
-// Identification: test/storage/b_plus_tree_delete_test.cpp
-//
-// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
-//
-//===----------------------------------------------------------------------===//
-
 #include <algorithm>
 #include <cstdio>
 #include <random>  // for std::default_random_engine

@@ -11,6 +11,7 @@ target_link_libraries(buffer_pool_manager_test storage gtest_main)
 add_executable(record_manager_test storage/record_manager_test.cpp)
 target_link_libraries(record_manager_test record gtest_main)
 
+# index test
 add_executable(b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp)
 target_link_libraries(b_plus_tree_insert_test system index gtest_main)
 

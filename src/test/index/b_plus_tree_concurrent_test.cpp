@@ -1,27 +1,3 @@
-//===----------------------------------------------------------------------===//
-//
-//                         Rucbase
-//
-// b_plus_tree_concurrent_test.cpp
-//
-// Identification: src/index/b_plus_tree_concurrent_test.cpp
-//
-// Copyright (c) 2022, RUC Deke Group
-//
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-//
-//                         BusTub
-//
-// b_plus_tree_concurrent_test.cpp
-//
-// Identification: test/storage/b_plus_tree_concurrent_test.cpp
-//
-// Copyright (c) 2015-2019, Carnegie Mellon University Database Group
-//
-//===----------------------------------------------------------------------===//
-
 #include <chrono>  // NOLINT
 #include <cstdio>
 #include <functional>
