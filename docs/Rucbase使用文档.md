@@ -82,7 +82,7 @@ sudo make install
 mkdir build
 cd build 
 cmake .. [-DCMAKE_BUILD_TYPE=Debug]|[-DCMAKE_BUILD_TYPE=Release]
-make rucbase <-j4>|<-j8> # 选择4 or 8线程编译，如果你不想选择，那么make -j也是可以的
+make rmdb <-j4>|<-j8> # 选择4 or 8线程编译，如果你不想选择，那么make -j也是可以的
 ```
 
 可以使用以下命令来进行客户端的编译：
@@ -101,7 +101,7 @@ make <-j4>|<-j8> # 选择4 or 8线程编译
 
 ```bash
 cd build
-./bin/rucbase <database_name> # 如果存在该数据库,直接加载;若不存在该数据库,自动创建
+./bin/rmdb <database_name> # 如果存在该数据库,直接加载;若不存在该数据库,自动创建
 ```
 
 然后开启客户端，用户可以同时开启多个客户端：
@@ -133,12 +133,10 @@ GoogleTest框架测试
   - disk_manager_test
   
   - lru_replacer_test
-  
-  - clock_replacer_test (选做)
-  
+    
   - buffer_pool_manager_test
   
-  - rm_gtest
+  - record_manager_test
 
 - 索引模块：
   
@@ -235,29 +233,3 @@ show tables;
 
 exit;
 ```
-
-## 基本结构
-
-+ rucbase_client: 客户端源代码，无需修改
-
-+ src: 服务端源代码
-  
-  + Parser: 将原始SQL语句转换为抽象语法树AST, 由ExecutionManager进一步解释和执行。
-  
-  + storage: 存储层, 由自己实现的BufferPoolManager和*unix提供接口的磁盘文件系统组成, 暴露给上层的单位为Page
-  
-  + replacer: 缓冲区替换算法
-  
-  + record : 管理存储了无序记录的Page, 对Page进行Tuple级操作
-  
-  + index : 管理存储在记录文件中的无序数据记录的持久索引
-  
-  + system : 处理DDL语句, 负责跟踪 创建/删除 表/索引
-  
-  + execution : 执行模块, 负责DML语句 查询计划树的生成与执行
-  
-  + transaction : 事务模块，提供事务的Begin/Commit/Abort接口, LockManager提供事务相关的锁
-  
-  + recovery : 日志模块，WAL算法，负责日志管理和系统恢复，目前只支持DML语句恢复
-
-![Architecture](../pics/architecture_fixed.jpg)
