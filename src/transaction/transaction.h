@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include <deque>
 #include <string>
 #include <thread>
+#include <memory>
 #include <unordered_set>
 
 #include "txn_defs.h"
