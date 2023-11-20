@@ -1,0 +1,35 @@
+| id | name | major |
+| 0 | KangKanga | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 1 | TomTomTom | Computer ScienceComputer Science |
+| 2 | JerryJerr | Computer ScienceComputer Science |
+| 3 | JackJackJ | Electrical Engineeringer Science |
+| 3 | JerryJerr | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 4 | JerryJerr | bbbbbbbbbbbbbbbcccccccccdddddddd |
+| 5 | JackJackJ | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 7 | RMDBrmdbr | 74125896332145698712365478996321 |
+| name | major |
+| KangKanga | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| TomTomTom | Computer ScienceComputer Science |
+| JerryJerr | Computer ScienceComputer Science |
+| JackJackJ | Electrical Engineeringer Science |
+| JerryJerr | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| JerryJerr | bbbbbbbbbbbbbbbcccccccccdddddddd |
+| JackJackJ | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| RMDBrmdbr | 74125896332145698712365478996321 |
+| id | name | major |
+| 0 | KangKanga | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 1 | TomTomTom | Computer ScienceComputer Science |
+| 2 | JerryJerr | Computer ScienceComputer Science |
+| 3 | JerryJerr | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 4 | JerryJerr | bbbbbbbbbbbbbbbcccccccccdddddddd |
+| 5 | JackJackJ | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| 7 | RMDBrmdbr | 74125896332145698712365478996321 |
+| name |
+| JerryJerr |
+| name |
+| JackJackJ |
+| id | name | major |
+| 1 | TomTomTom | Computer ScienceComputer Science |
+| 2 | JerryJerr | Computer ScienceComputer Science |
+| 4 | JerryJerr | bbbbbbbbbbbbbbbcccccccccdddddddd |
+| 7 | RMDBrmdbr | 74125896332145698712365478996321 |

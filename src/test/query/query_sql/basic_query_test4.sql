@@ -1,0 +1,21 @@
+-- Lab3-查询执行  测试点4: 单表删除与条件查询
+create table student (id int, name char(9), major char(32));
+insert into student values (0, 'KangKanga', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+insert into student values (1, 'TomTomTom', 'Computer ScienceComputer Science');
+insert into student values (2, 'JerryJerr', 'Computer ScienceComputer Science');
+insert into student values (3, 'JackJackJ', 'Electrical Engineeringer Science');
+insert into student values (3, 'JerryJerr', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+insert into student values (4, 'JerryJerr', 'bbbbbbbbbbbbbbbcccccccccdddddddd');
+insert into student values (5, 'JackJackJ', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+insert into student values (-1, 'LiXianShe', 'c741258963qwertyuioplkjhgfdsazxc');
+insert into student values (7, 'RMDBrmdbr', '74125896332145698712365478996321');
+delete from student where name = 'Jack';
+delete from student where id < 0;
+select * from student;
+select name,major from student where id > -5;
+delete from student where id = 3 and name = 'JackJackJ';
+select * from student;
+select name from student where id = 3;
+select name from student where name = 'JackJackJ';
+delete from student where major = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+select * from student where id>=1;

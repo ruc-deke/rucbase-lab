@@ -1,0 +1,62 @@
+| id | name | major | course | student_id | score |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDataa | 1 | 90.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDataa | 1 | 90.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDataa | 1 | 90.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatab | 1 | 60.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatab | 1 | 60.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatab | 1 | 60.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatac | 1 | 82.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatac | 1 | 82.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatac | 1 | 82.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatad | 1 | 88.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatad | 1 | 88.500000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatad | 1 | 88.500000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDataa | 2 | 91.250000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDataa | 2 | 91.250000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDataa | 2 | 91.250000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatab | 2 | 90.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatab | 2 | 90.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatab | 2 | 90.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatac | 2 | 89.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatac | 2 | 89.500000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatac | 2 | 89.500000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatad | 2 | 88.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatad | 2 | 88.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatad | 2 | 88.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDataa | 3 | 90.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDataa | 3 | 90.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDataa | 3 | 90.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatab | 3 | 90.125000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatab | 3 | 90.125000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatab | 3 | 90.125000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatac | 3 | 99.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatac | 3 | 99.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatac | 3 | 99.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatad | 3 | 97.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatad | 3 | 97.500000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatad | 3 | 97.500000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDataa | 4 | 82.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDataa | 4 | 82.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDataa | 4 | 82.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatab | 4 | 85.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatab | 4 | 85.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatab | 4 | 85.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatac | 4 | 85.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatac | 4 | 85.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatac | 4 | 85.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatad | 4 | 90.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatad | 4 | 90.500000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatad | 4 | 90.500000 |
+| id | name | major | course | score |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDataa | 90.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatab | 60.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatac | 82.000000 |
+| 1 | TomTomTom | Computer ScienceComputer Science | DataDatad | 88.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDataa | 91.250000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatab | 90.000000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatac | 89.500000 |
+| 2 | JerryJerr | Computer ScienceComputer Science | DataDatad | 88.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDataa | 90.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatab | 90.125000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatac | 99.000000 |
+| 3 | JackJackJ | Electrical Engineeringer Science | DataDatad | 97.500000 |
