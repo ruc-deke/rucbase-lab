@@ -2,7 +2,7 @@ import os;
 import time;
 # test : basic_query
 NUM_TESTS = 5
-SCORES = [2, 2, 2, 2, 4]
+SCORES = [25, 15, 15, 15, 30]
 
 # current dir is root/build
 def get_test_name(index):
