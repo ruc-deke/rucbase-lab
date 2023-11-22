@@ -45,14 +45,27 @@ class SeqScanExecutor : public AbstractExecutor {
         fed_conds_ = conds_;
     }
 
+    /**
+     * @brief 构建表迭代器scan_,并开始迭代扫描,直到扫描到第一个满足谓词条件的元组停止,并赋值给rid_
+     *
+     */
     void beginTuple() override {
         
     }
 
+    /**
+     * @brief 从当前scan_指向的记录开始迭代扫描,直到扫描到第一个满足谓词条件的元组停止,并赋值给rid_
+     *
+     */
     void nextTuple() override {
         
     }
 
+    /**
+     * @brief 返回下一个满足扫描条件的记录
+     *
+     * @return std::unique_ptr<RmRecord>
+     */
     std::unique_ptr<RmRecord> Next() override {
         return nullptr;
     }
