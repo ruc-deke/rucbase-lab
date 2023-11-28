@@ -65,11 +65,12 @@ Rucbase查询执行模块采用的是火山模型(Volcano Model),你可以通过
 
 ### 测试点及分数
 
-在完成本任务后，你需要通过src/test文件夹下的basic_query_test1.sql测试。
+在完成本任务后，你需要使用src/test文件夹下的query_unit_test.py单元测试文件来进行basic_query_test1.sql的测试
 
 ```bash
 cd src/test/query
-python query_test_basic.py  # 25分
+python query_unit_test.py basic_query_test1.sql # 25分
+python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desired test file index
 ```
 
 
@@ -132,23 +133,25 @@ std::unique_ptr<RmRecord> Next() override{}
 
 ### 测试点及分数
 
-在完成本任务后，你需要通过src/test文件夹下的basic_query_test2～basic_query_test5.sql测试。
+在完成本实验所有任务后，你需要通过src/test文件夹下的basic_query_test1～basic_query_test5.sql测试。
 
 ```bash
 cd src/test/query
-python query_test_basic.py  # 75分
+python query_test_basic.py  # 100分
 ```
 
 
 ## 测试说明
 
-本实验通过SQL语句黑盒测试，包括五个测试点，每个测试点分数如下：
+本实验通过SQL语句黑盒测试，包括五个测试点，每个测试点测试内容和分数如下：
 
-- `basic_query_test1`：25 Points
-- `basic_query_test2`：15 Points
-- `basic_query_test3`：15 Points
-- `basic_query_test4`：15 Points
-- `basic_query_test5`：30 Points
+| **测试点**     | **测试内容**      | **分数**      |
+| ------------- | ----------------- | ------------- |
+| `basic_query_test1` | 表和索引的创建与删除  | 25 |
+| `basic_query_test2` | 单表插入与条件查询    | 15 |
+| `basic_query_test3` | 单表更新与条件查询    | 15 |
+| `basic_query_test4` | 单表删除与条件查询    | 15 |
+| `basic_query_test5` | 多表连接与条件查询    | 30 |
 
 **注意⚠️：**
 
