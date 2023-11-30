@@ -156,3 +156,4 @@ python query_test_basic.py  # 100分
 **注意⚠️：**
 
 在本测试中，要求把select语句的输出写入到指定文件中，写入逻辑已经在select_from函数中给出，不要修改写入格式。
+对于执行错误的SQL语句，需要打印failure到output.txt文件中。
