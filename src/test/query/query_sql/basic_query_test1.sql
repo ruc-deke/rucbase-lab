@@ -8,6 +8,7 @@ create table grade (id int);
 drop table t;
 show tables;
 create index grade(id);
+create index grade(student_id);
 create index student(id);
 
 drop table grade;
