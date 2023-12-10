@@ -80,6 +80,15 @@ python transaction_test.py
 |  `commit_test`  |  事务的开始与提交  |  20  |
 |  `abort_test`  |  事务的开始与回滚  |  20  |
 
+你也可以通过单元测试文件来进行单个测试点的测试，使用方法如下：
+
+```bash
+cd src/test/transaction
+python transaction_unit_test.py <test_case_name>
+# The <test_case_name> should be one of the following options from the TESTS array:
+# 'commit_test', 'abort_test', 'commit_index_test', 'abort_index_test'
+# Replace <test_case_name> with the desired test case name to run that specific test.
+```
 
 ## 实验二 并发控制实验（60分）
 
@@ -191,6 +200,20 @@ python concurrency_test.py
 | `lost_update_test` | 丢失更新    | 10 |
 | `unrepeatable_read_test` | 不可重复读    | 10 |
 | `unrepeatable_read_test_hard` | 不可重复读    | 10 |
+
+你也可以通过单元测试文件来进行针对上述六个测试点的单独测试，使用方法如下：
+
+```bash
+cd src/test/concurrency
+python concurrency_unit_test.py <test_case_name>
+# Run the unit test script with a specific test case name
+# The <test_case_name> should be one of the following options from the TESTS dictionary:
+# 'concurrency_read_test', 'dirty_write_test', 'dirty_read_test', 
+# 'lost_update_test', 'unrepeatable_read_test', 'unrepeatable_read_test_hard', 
+# 'phantom_read_test_1', 'phantom_read_test_2', 'phantom_read_test_3', 'phantom_read_test_4'
+# Each test case has an associated check method and score as defined in the TESTS dictionary.
+# Replace <test_case_name> with the desired test case name to run that specific test.
+```
 
 ## 附加实验（40分）
 
