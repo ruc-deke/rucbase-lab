@@ -23,3 +23,14 @@ target_link_libraries(b_plus_tree_concurrent_test system index gtest_main)
 
 # query test
 add_executable(query_test query/query_test.cpp)
+
+# transaction test
+add_executable(transaction_test transaction/transaction_test.cpp)
+target_link_libraries(transaction_test readline)
+
+# regress test
+add_executable(regress_test regress/regress_test_main.cpp regress/regress_test.cpp)
+
+# concurrency test
+add_executable(concurrency_test concurrency/concurrency_test_main.cpp concurrency_test/concurrency_test.cpp regress/regress_test.cpp)
+

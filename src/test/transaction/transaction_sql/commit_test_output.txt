@@ -1,0 +1,134 @@
+| c_discount | c_last | c_credit | w_tax |
+| 0.100000 | BARRBARROUGH | BC | 0.190000 |
+| d_next_o_id | d_tax |
+| 4 | 0.150000 |
+| i_price | i_name | i_data |
+| 55.000000 | BHpI5dhw4dDgiodle6qIvU67 | YAL3j4hAoyKrv42TzMRQQnWbLo3TZKG91lrJs664873vwnqtGz |
+| s_quantity | s_data | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 |
+| 24 | LNDAguaLPtLCnrjxaO2rEHWaA3YBhWosgorEmsookt25H45vZm | oFCwmXrKxL0xGWzL3e7ffVi9 | QRIsmuTYl0i54iIaHA8Tg6p8 | MgGUm7cxaIbW5HotwKsOvSbL | 7yInbTjSVCEvqoM1FVuHl9tU | wAIza7kmXO1CG5D5E0FOYA4D | ZtLuM4oq0z6nFh4RfNxPie9j | SwvuRN1dgKti85FzB6gJRTr9 | a2THN4CkUnJvhDsnDkB8LL43 | 8REazocC4E1zaXTwja6bdL4C | IrBbmsNcKSApFJjXhoTA5BrT |
+| i_price | i_name | i_data |
+| 55.000000 | BHpI5dhw4dDgiodle6qIvU67 | YAL3j4hAoyKrv42TzMRQQnWbLo3TZKG91lrJs664873vwnqtGz |
+| s_quantity | s_data | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 |
+| 7 | LNDAguaLPtLCnrjxaO2rEHWaA3YBhWosgorEmsookt25H45vZm | oFCwmXrKxL0xGWzL3e7ffVi9 | QRIsmuTYl0i54iIaHA8Tg6p8 | MgGUm7cxaIbW5HotwKsOvSbL | 7yInbTjSVCEvqoM1FVuHl9tU | wAIza7kmXO1CG5D5E0FOYA4D | ZtLuM4oq0z6nFh4RfNxPie9j | SwvuRN1dgKti85FzB6gJRTr9 | a2THN4CkUnJvhDsnDkB8LL43 | 8REazocC4E1zaXTwja6bdL4C | IrBbmsNcKSApFJjXhoTA5BrT |
+| i_price | i_name | i_data |
+| 94.312500 | zmygDi8g2eUcAo5UZdpIlSEX | qMRcuTnCHtFFBCOC618bAyiqGYgF4ONOm96vAkrR8pPrSBPOky |
+| s_quantity | s_data | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 |
+| 24 | IpBbBbkNfYg58YKInD7NnqlFg7Q0TztmKioBu9A9VFQfPxKkbS | KHjyEe5RVZ54r3jol880B9Mq | dCQ1CsmDdaO6CQNydHjlpXDg | jJQ8Lcuk9ST1Cv7ORHxnaG1z | NKoHyrKIouQK0mULqG8UCUs1 | gYXmjgXpjp9LqGjMXiqOI0cW | 4jvCIholgflNeZKRvqhwEhvX | V0Lsxoz7Bx6odGszw0bOjzhF | USxHmM9O2YBEPKqvyla0mgYT | YSsoqF7RZhm9BfoSJx7VG5vg | uH3hqOjOwoeJsqvSGV0z6JKw |
+| i_price | i_name | i_data |
+| 5.450000 | 5UbII7s3ghlwj3u03PVeVlll | aH65R8QaN1M1WOLa2hbwbrbyNRUEDvlrCiedtTAGBIBjKqEKNu |
+| s_quantity | s_data | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 |
+| 100 | 8djbwPQrO5c7yPL0MFv1awtkj6cjtyzFqiOGShe02OzZTi2HUs | yEcV2yKpYLxaa2Ot4XFqze2N | Og0ieBggZhJXKmdspU2lmprO | gkVWfin7JSKVicNyQacQXzQf | qbmutUVEg7Z7cVEQjnNUpAhV | HkWuBxBVlMH206G0qleMmeEJ | Al95S193th7sdWys5VDmYpyE | Lal4b07tPMxJYTGypSHacAJP | 2yQL0ZZY9EsDn2GrMZDsMNMu | Gk9rSdVzHJM9UxJ0XpkPVBwl | 0eS1lg5zeY1fDM4GWWHLSsxc |
+| i_price | i_name | i_data |
+| 19.350000 | BLg4nebBDk7hweKFWviHE5MX | FGHQgGoAdAa7mSh7dZib1mgrdEXkbw2txQGXugOBrUWdZkAeFy |
+| s_quantity | s_data | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 |
+| 41 | aIHHdDOi8FayK1ahfAor598gXNeUgeywe1j6QaICTTeq8tLrx6 | SyQVEi78nAi3ioUbmrbJulFz | MIbnKBykLx2vWQ2qSM9Uel8s | CPAO7e4OpYPLfw4TyypDJsWE | xkeY5vx4weG6MIinBw6Q3GBW | HCbVbi3zMKR6s2vcoVM4qojv | kJMRm0MWeuDE5GDPZfnvEgrJ | 9kWiZWlf6i3EJKqhml95zUq6 | S0HHga0s9VkjFP1wu3a3W9ZX | o02PEOsdbO7dmgf6eoVF2PUz | MX29OZNKhrBUvF6Mok7KwvkF |
+| ol_o_id | ol_d_id | ol_w_id | ol_number | ol_i_id | ol_supply_w_id | ol_delivery_d | ol_quantity | ol_amount | ol_dist_info |
+| 1 | 1 | 1 | 1 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | IeQ8muD7ZIQXG4Tj6AftKAcx |
+| 1 | 1 | 1 | 2 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | GrRqIJFjRhx7XLfORVJPNz5V |
+| 1 | 1 | 1 | 3 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | ZVNpKAnkqLJnkj5eIaTQfu8T |
+| 1 | 1 | 1 | 4 | 6 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | yeoXVIWqzpoNqjjmPjm5WBbl |
+| 1 | 1 | 1 | 5 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 60YrsFapjMcyASJ1YNn44Rs1 |
+| 1 | 1 | 1 | 6 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | viy8dUrXTQYPncU0WRa9mQbY |
+| 1 | 1 | 1 | 7 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 0dJaCjAdC9VHc9nD1LuV5g8t |
+| 1 | 1 | 1 | 8 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | FFTeZHtCIfpHPkrxex9qVfF0 |
+| 1 | 1 | 1 | 9 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | mImfQt67su0KG1A85zVrNSXH |
+| 1 | 1 | 1 | 10 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | iEzDfmieljbehRW8PMAiRurV |
+| 1 | 1 | 1 | 11 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 6XggohIDGKlfmWhZJMhhw9Zb |
+| 1 | 1 | 1 | 12 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | UC1KOFjMz4tJdbDPTCJdzf2S |
+| 1 | 1 | 1 | 13 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | IOUQmzxO9xfDmQRRDEakGqCh |
+| 1 | 1 | 1 | 14 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | StQ9k5qoKF2r1KtwRpeNcw7l |
+| 2 | 1 | 1 | 1 | 5 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 8ISHL46C5lbCnfVS7jLhmE5S |
+| 2 | 1 | 1 | 2 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | mfFSm7K5QoutWabFxcZlpc3C |
+| 2 | 1 | 1 | 3 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | BAKggnpD5HYpI7vdobLuZTP9 |
+| 2 | 1 | 1 | 4 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | PKJUQhYKCQ4714l352BBZdBM |
+| 2 | 1 | 1 | 5 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | s2G0QAK6BKY8ztzOA68e7pNA |
+| 2 | 1 | 1 | 6 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | xFwPrHx268fkAG4W7zMYMZsz |
+| 2 | 1 | 1 | 7 | 6 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | hd8WhcT7LCKKEraxPXVJooRk |
+| 2 | 1 | 1 | 8 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | iKmilYAEY8d4reT81Grtrlyv |
+| 2 | 1 | 1 | 9 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | s7BERJPPLeM5gw76yAnbr0Nq |
+| 2 | 1 | 1 | 10 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 8PZWz5EAh227kjyO2rGsCgLh |
+| 2 | 1 | 1 | 11 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | BgoM61i4u0TRhf6ufvrWuv4O |
+| 2 | 1 | 1 | 12 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 3f4Or3LS1svCfgssqVlNUT62 |
+| 2 | 1 | 1 | 13 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | vb2vUDc6zEiUmcNu068D1AKr |
+| 2 | 1 | 1 | 14 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | whU0s5pvzohloLliey6TbeBt |
+| 3 | 1 | 1 | 1 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | oAr4MsSv1diZkeQPLchxp9B5 |
+| 3 | 1 | 1 | 2 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | Ah1ESQLy9g5nJpMsqcexnspb |
+| 3 | 1 | 1 | 3 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | O1qPYzzD4Rnp6c1TrIAEiVkN |
+| 3 | 1 | 1 | 4 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | vpWO8CHAtDYieY2ayuVxGPVj |
+| 3 | 1 | 1 | 5 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | JH5zpu82iUjHFe9EFJSx01TB |
+| 3 | 1 | 1 | 6 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | BWRYCOSePxNWzfgNUh6m0cId |
+| 3 | 1 | 1 | 7 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | Dj1UHeIxODJfvk5Hkom69mGV |
+| 3 | 1 | 1 | 8 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | AbT8asPwSyBTsbKMXPwhcNUD |
+| 3 | 1 | 1 | 9 | 6 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | XooxmcBheikfgjQBTAcQ71nA |
+| 3 | 1 | 1 | 10 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | PLkeBRXtG3bePx2JPmJSdYev |
+| 3 | 1 | 1 | 11 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | gimwPUWwF6Rc508wArPPpjU7 |
+| 3 | 1 | 1 | 12 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | A7MgkXELnKVLkIN5vo9WKqT1 |
+| 3 | 1 | 1 | 13 | 6 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | b21hKFyZNwJZBAUbTdiEFXUm |
+| 3 | 1 | 1 | 14 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | OZMQ4e5cAFdM96oFUDZQn3YY |
+| 1 | 2 | 1 | 1 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | Qsub3eslbgppjGUYLSTe0RUB |
+| 1 | 2 | 1 | 2 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | oKev7mdYKN2QXXHlA8TZIAvq |
+| 1 | 2 | 1 | 3 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | QLhADTXYzJLApABlLNuZMypf |
+| 1 | 2 | 1 | 4 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | DGQyEpmr3tF9O97mMqwEZmst |
+| 1 | 2 | 1 | 5 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | v8RJKmKaOSce0lvMrzERhgKJ |
+| 1 | 2 | 1 | 6 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | UTUQrNNOw6Vm6G0FeATN5MCG |
+| 1 | 2 | 1 | 7 | 5 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | S6UIjlZpdolSppo9bnTdW0t4 |
+| 1 | 2 | 1 | 8 | 6 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 4gqT8ezOzJSSiJgajbLY5kak |
+| 1 | 2 | 1 | 9 | 5 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | EDCh0ykub9AfuC7kSwJqVb4e |
+| 1 | 2 | 1 | 10 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | aZGnCYryhhsnWDbw8xgzvdh8 |
+| 1 | 2 | 1 | 11 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | L2H3M2neYU5UwJIW85zmkHZv |
+| 1 | 2 | 1 | 12 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | kRZl3HOiYRl1VF4Xiahl29C9 |
+| 2 | 2 | 1 | 1 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | dNyrVDKqM9uJdaf53OOo6gmA |
+| 2 | 2 | 1 | 2 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | WdU6UHjJTnlt0DP8M2SXobHd |
+| 2 | 2 | 1 | 3 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | ynYNAbpZRWzqGV8MVDOT5890 |
+| 2 | 2 | 1 | 4 | 5 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | gYe7HNZ9FNYtHYNVgfmlCN1a |
+| 2 | 2 | 1 | 5 | 4 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | QmJCw741wqJe5e3nB4E2Es0O |
+| 2 | 2 | 1 | 6 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 38jDDYO6j5HpHeaSTR0mTv0w |
+| 2 | 2 | 1 | 7 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | K1Q3YuC4XQwLnOfGWOuN7nSD |
+| 2 | 2 | 1 | 8 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | nRuBmgMu5LBt2JIVA7l110Ek |
+| 2 | 2 | 1 | 9 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | AHzxFfyDLYSB6XzwMum5wWL0 |
+| 2 | 2 | 1 | 10 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | bjiVzXYB4ekJjvMo6jg71IYo |
+| 2 | 2 | 1 | 11 | 7 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | e01Xd0CshK5UdLEfoKIHmAME |
+| 3 | 2 | 1 | 1 | 2 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | TMvna3hJtVQ17xiRQ21oTzLh |
+| 3 | 2 | 1 | 2 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | B1mGwoFpuxb8KZ4ptnnOm1Fa |
+| 3 | 2 | 1 | 3 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 1t2eE7ELvfTLM7KZiNEUwapP |
+| 3 | 2 | 1 | 4 | 10 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | 9JqEyOXRzBVaLMhDEmND62TA |
+| 3 | 2 | 1 | 5 | 9 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | kntQVoY1GWVOy8jvA3d97WBG |
+| 3 | 2 | 1 | 6 | 8 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | Lk70c2RW3kR7lvjs7BgekbKy |
+| 3 | 2 | 1 | 7 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | Rb1DYvIJ0V94s3ovxKZFF6Zx |
+| 3 | 2 | 1 | 8 | 3 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | LHGPhyk2ads2yzYxb8JFd9Iv |
+| 3 | 2 | 1 | 9 | 1 | 1 | 2023-06-03 19:25:47 | 5 | 0.000000 | HKFNCiHC1bG0GOUX643OdFBq |
+| 4 | 1 | 1 | 1 | 10 | 1 | 2023-06-03 19:25:47 | 7 | 286.625000 | VF2uQHlDhtxa5dKhPwWyCqgY |
+| 4 | 1 | 1 | 2 | 10 | 1 | 2023-06-03 19:25:47 | 4 | 587.625000 | KycgPD8lxa34k61eDp0ZTGVa |
+| 4 | 1 | 1 | 3 | 6 | 1 | 2023-06-03 19:25:47 | 4 | 203.156250 | WNiJ9wxwASHqLafFzwcZR0x4 |
+| 4 | 1 | 1 | 4 | 9 | 1 | 2023-06-03 19:25:47 | 8 | 113.000000 | mGZ52H95MeTVdST9GNcJKCRO |
+| 4 | 1 | 1 | 5 | 4 | 1 | 2023-06-03 19:25:47 | 9 | 940.000000 | OHvFymiGEdnzJWo4iv811TRo |
+| s_i_id | s_w_id | s_quantity | s_dist_01 | s_dist_02 | s_dist_03 | s_dist_04 | s_dist_05 | s_dist_06 | s_dist_07 | s_dist_08 | s_dist_09 | s_dist_10 | s_ytd | s_order_cnt | s_remote_cnt | s_data |
+| 1 | 1 | 13 | wSrMDTGvcKKcH1Uq0FVagtpi | 5hqmccnVqnOXM7gxfIBRw17I | ipPzlDZJSYmchjnVE5kX7Eus | hcg3zOEgr8kXhIMgLSzXMhqF | JNkQ3xBRh5SXvmIOxQbzRvXj | 1YWGnqRjaqgMNc7nybGceaPz | Trboa3Us6ZwlouJQ3nrrDW7d | Mh8SIcVR3IU9YC6LxfBHwRFR | VPFgeU7vyhoomSJoklxa3F7M | NLFmQkNtR1wLBQxjS7HGlMFQ | 0.000000 | 0 | 0 | kVPXiCVAkwyHbwGKnJ5BCn0NATtSZa3BAp2ylqjE2cT6zlvR1L |
+| 2 | 1 | 50 | 3Qsv4FSQKzeTt4ovCAw8pXML | qD2TCsXp1iy08Zfh2Wf2nkBe | DkiDblFfdvBxX1JMHnvJ3U6k | sP2EoZk9xAXUGMusLTUsBPWZ | wzHQIo6R06LPKJk8EBK8qzgl | hHsfl8VvRRovMPsM0vXOOeVY | NvvPc01e1F8dUQPwunjD7lkE | mLod6bGNT9ssTCLcsLZQueFU | x4eC5GbguOBnoEwjfMU7DhBH | tBupTH9L74sgmVbMyyXLl5Sr | 0.000000 | 0 | 0 | EguLzFFMFFJlniTewXQWkJMvWDSPn6CV5ZjQLotZsNIKMoBo0E |
+| 3 | 1 | 52 | QN6CxGIQCpT0KTsrIPwfPTq3 | 6ISHr1cj19YIlc8j5AmyCNqM | WPQuny27h2G7xRWg98J53ZOA | QvMDKDAc8174cI7nhwrISfx3 | XtOajTgAqDRdLN7OeOCyl17Y | 0VDpFB5R3BfKTaRZRNVDxraK | syTvOZGiL802QCrRENLF78O6 | o20ODA0Ucjy8o4Kn6iAPbhVU | ToJIHeZMsR7B58EhevG4VX0i | oZHOiEPnf6xFfVR2gl4Irxot | 0.000000 | 0 | 0 | t4Xhw9DPiWFxWZLGGkI63k0WECKINUVnp33zUYiH2GQvPxXrwK |
+| 4 | 1 | 9 | SyQVEi78nAi3ioUbmrbJulFz | MIbnKBykLx2vWQ2qSM9Uel8s | CPAO7e4OpYPLfw4TyypDJsWE | xkeY5vx4weG6MIinBw6Q3GBW | HCbVbi3zMKR6s2vcoVM4qojv | kJMRm0MWeuDE5GDPZfnvEgrJ | 9kWiZWlf6i3EJKqhml95zUq6 | S0HHga0s9VkjFP1wu3a3W9ZX | o02PEOsdbO7dmgf6eoVF2PUz | MX29OZNKhrBUvF6Mok7KwvkF | 0.000000 | 0 | 0 | aIHHdDOi8FayK1ahfAor598gXNeUgeywe1j6QaICTTeq8tLrx6 |
+| 5 | 1 | 58 | 2AuL3NDHofnGX4pOGs6FFNwT | Ys2WMHlKoHZrd7qYz6tm6Ecg | RffaarL6mtlSRgWZvt5tGNrY | F0WNGsrNX0yXoP1MNxIPrbv3 | rPV5WwIb2ZvxU4x90PySxSuU | FzdCYt1lPMPsaSkXhVvCTLXb | pDeJfTs523xpH94fNYqWQpUa | mXO3sAyEXXlc2gkyMtqlFTCb | COhSn099NpIwqwCiOLI4x6c4 | VeLqOWCrGrhhASq0zPdr59fc | 0.000000 | 0 | 0 | 7XoakZzTuSLRM81VufmDN6I8fg2EDPHwSwA80lEO4OhNyWWhyn |
+| 6 | 1 | 4 | KHjyEe5RVZ54r3jol880B9Mq | dCQ1CsmDdaO6CQNydHjlpXDg | jJQ8Lcuk9ST1Cv7ORHxnaG1z | NKoHyrKIouQK0mULqG8UCUs1 | gYXmjgXpjp9LqGjMXiqOI0cW | 4jvCIholgflNeZKRvqhwEhvX | V0Lsxoz7Bx6odGszw0bOjzhF | USxHmM9O2YBEPKqvyla0mgYT | YSsoqF7RZhm9BfoSJx7VG5vg | uH3hqOjOwoeJsqvSGV0z6JKw | 0.000000 | 0 | 0 | IpBbBbkNfYg58YKInD7NnqlFg7Q0TztmKioBu9A9VFQfPxKkbS |
+| 7 | 1 | 56 | kEFJaBLbYlWvOAnz021H6eFD | fL07KqbpajRxGRS4wexEDQvZ | 4CBZvaLugbf99aq8vsOaiiwv | rv7IRpWXiXc2TyPFIurDrPyx | sybRDHzsKQWyb60nyQb5flCf | TjCkFIObMXOm8PxJgimhl591 | 5b2fzHQ6nVHGdVhOoEf0n07V | pr5t8SW6GIuAZjOnycK08ROH | OsdU2jKQxcYel6qm0PvJAhFF | UCSQrdmIJwMeTXBICx6drJWk | 0.000000 | 0 | 0 | 0tSYOjvGu04Rzn3S10eAmrm8A93hdQ69TNhws6C4ydXG5OkQU1 |
+| 8 | 1 | 67 | XnvBf6EPFhOyE4veaNjSRph5 | 0jIbAvr7hHuLV2RfdYK67nD2 | B4la1I6oOXudZkBsZQl1tfCo | mrz5uGa9reD1QlMIw7qigHjQ | R7xYIgEjo9EEpY5tIDehUVHb | T6Cv6B9kV0NZ21GzVvtF3MT5 | RufTQPiUSGphsUwYcUoZIR03 | oI6t4KIaWWY3jvinN7F7k3Ln | Kj1urkV7CdOkmvpKy7pCXbbb | DPu0jMfwhlYZH5hzG8dZFO3w | 0.000000 | 0 | 0 | h26NmgGLZ7CO0HRWnUhfEjn234DS0xySiWZ9ecaXNzPo89Osqt |
+| 9 | 1 | 8 | yEcV2yKpYLxaa2Ot4XFqze2N | Og0ieBggZhJXKmdspU2lmprO | gkVWfin7JSKVicNyQacQXzQf | qbmutUVEg7Z7cVEQjnNUpAhV | HkWuBxBVlMH206G0qleMmeEJ | Al95S193th7sdWys5VDmYpyE | Lal4b07tPMxJYTGypSHacAJP | 2yQL0ZZY9EsDn2GrMZDsMNMu | Gk9rSdVzHJM9UxJ0XpkPVBwl | 0eS1lg5zeY1fDM4GWWHLSsxc | 0.000000 | 0 | 0 | 8djbwPQrO5c7yPL0MFv1awtkj6cjtyzFqiOGShe02OzZTi2HUs |
+| 10 | 1 | 4 | oFCwmXrKxL0xGWzL3e7ffVi9 | QRIsmuTYl0i54iIaHA8Tg6p8 | MgGUm7cxaIbW5HotwKsOvSbL | 7yInbTjSVCEvqoM1FVuHl9tU | wAIza7kmXO1CG5D5E0FOYA4D | ZtLuM4oq0z6nFh4RfNxPie9j | SwvuRN1dgKti85FzB6gJRTr9 | a2THN4CkUnJvhDsnDkB8LL43 | 8REazocC4E1zaXTwja6bdL4C | IrBbmsNcKSApFJjXhoTA5BrT | 0.000000 | 0 | 0 | LNDAguaLPtLCnrjxaO2rEHWaA3YBhWosgorEmsookt25H45vZm |
+| d_id | d_w_id | d_name | d_street_1 | d_street_2 | d_city | d_state | d_zip | d_tax | d_ytd | d_next_o_id |
+| 1 | 1 | arpX4qo41C | OKhV153zP5sdWqqPiQ43 | stJ6ypGTTjcjwoNQUF43 | NGfBc8oqxE489nhVYggv | r7 | LYOeX6qw5 | 0.150000 | 300000.000000 | 5 |
+| 2 | 1 | ocHzHb1oqY | UjxhkzMRI83YFxMUkMbK | 3dFzbFVow4eyRONu7N4V | 13k8Fp6vER3LGAP6cnOF | uM | QniGlFKBV | 0.100000 | 300000.000000 | 4 |
+| no_o_id | no_d_id | no_w_id |
+| 2 | 1 | 1 |
+| 3 | 1 | 1 |
+| 2 | 2 | 1 |
+| 3 | 2 | 1 |
+| 4 | 1 | 1 |
+| o_id | o_d_id | o_w_id | o_c_id | o_entry_d | o_carrier_id | o_ol_cnt | o_all_local |
+| 1 | 1 | 1 | 1 | 2023-06-03 19:25:47 | 3 | 15 | 1 |
+| 2 | 1 | 1 | 3 | 2023-06-03 19:25:47 | 0 | 10 | 1 |
+| 3 | 1 | 1 | 2 | 2023-06-03 19:25:47 | 0 | 15 | 1 |
+| 1 | 2 | 1 | 3 | 2023-06-03 19:25:47 | 10 | 15 | 1 |
+| 2 | 2 | 1 | 2 | 2023-06-03 19:25:47 | 0 | 6 | 1 |
+| 3 | 2 | 1 | 1 | 2023-06-03 19:25:47 | 0 | 5 | 1 |
+| 4 | 1 | 1 | 2 | 2023-06-03 19:25:47 | 26 | 5 | 1 |
+| o_id | o_d_id | o_w_id | o_c_id | o_entry_d | o_carrier_id | o_ol_cnt | o_all_local |
+| 4 | 1 | 1 | 2 | 2023-06-03 19:25:47 | 26 | 5 | 1 |
