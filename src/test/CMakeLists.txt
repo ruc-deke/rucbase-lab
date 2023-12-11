@@ -32,5 +32,5 @@ target_link_libraries(transaction_test readline)
 add_executable(regress_test regress/regress_test_main.cpp regress/regress_test.cpp)
 
 # concurrency test
-add_executable(concurrency_test concurrency/concurrency_test_main.cpp concurrency_test/concurrency_test.cpp regress/regress_test.cpp)
+add_executable(concurrency_test concurrency/concurrency_test_main.cpp concurrency/concurrency_test.cpp regress/regress_test.cpp)
 

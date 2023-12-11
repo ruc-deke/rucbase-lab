@@ -1,5 +1,5 @@
 #include "concurrency_test.h"
-#include "test/regress_test.h"
+#include "../regress/regress_test.h"
 #include <string.h>
 #include <stdio.h>
 
