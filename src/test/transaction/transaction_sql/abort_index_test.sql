@@ -7,9 +7,9 @@ create table orders (o_id int, o_d_id int, o_w_id int, o_c_id int, o_entry_d cha
 create table order_line (ol_o_id int, ol_d_id int, ol_w_id int, ol_number int, ol_i_id int, ol_supply_w_id int, ol_delivery_d char(19), ol_quantity int, ol_amount float, ol_dist_info char(24));
 create table item (i_id int, i_im_id int, i_name char(24), i_price float, i_data char(50));
 create table stock (s_i_id int, s_w_id int, s_quantity int, s_dist_01 char(24), s_dist_02 char(24), s_dist_03 char(24), s_dist_04 char(24), s_dist_05 char(24), s_dist_06 char(24), s_dist_07 char(24), s_dist_08 char(24), s_dist_09 char(24), s_dist_10 char(24), s_ytd float, s_order_cnt int, s_remote_cnt int, s_data char(50));
-create index orders (o_w_id);
-create index order_line (ol_w_id);
-create index new_orders (no_w_id);
+create index orders (o_w_id, o_d_id, o_id);
+create index order_line (ol_w_id, ol_d_id, ol_o_id, ol_number);
+create index new_orders (no_w_id, no_d_id, no_o_id);
 insert into warehouse values (1, 'ZTDAt58cTb', 'gg4JAQ6tA0juxYz4K1i7', '1g3zj0duDdsSavtyhFz9', 'tWVhV7XqwnOD5hFuWAin', 'fj', 'qqoUDdkZj', 0.150000, 300000.000000);
 insert into district values (1, 1, 'ecOHjIfbuc', 'UQ28P1lusnNiCt1OmgfA', 'RSr21T0D0dnILeyqgajk', '2LlJaFucV6A9bGNDMb0j', 'Va', 'kMQK8DSpR', 0.150000, 300000.000000, 11);
 insert into district values (2, 1, '1EMZPMoiqR', 'scNKNiovNdvu6LzbbBd5', 'FfgwaBPDepIHHpIjFyCd', 'NfxYTWUMeQq103cnVIdO', '0T', '2xz0Mfp98', 0.140000, 300000.000000, 11);

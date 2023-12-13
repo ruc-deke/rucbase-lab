@@ -177,9 +177,6 @@ private:
 - `drop_table(const std::string, Context *)`
 - `create_index(const std::string, const std::string, Context *)`
 - `drop_index(const std::string, const std::string, Context *)`
-- `insert_into(const std::string, std::vector<Value>, Context *)`
-- `delete_from(const std::string, std::vector<Condition>, Context *)`
-- `update_set(const std::string, std::vector<SetClause>, std::vector<Condition>, Context *)`
 
 **提示**：除了事务锁的申请，还需要考虑`txn_map`等共享数据结构。
 
