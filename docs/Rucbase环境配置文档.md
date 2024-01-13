@@ -7,6 +7,7 @@
   - [WSL 2.0 (Windows Subsystem for Linux)](#wsl-20-windows-subsystem-for-linux)
     - [WSL2.0相关注意事项](#wsl20%E7%9B%B8%E5%85%B3%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9)
   - [Ubuntu操作系统](#ubuntu%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F)
+  - [使用Docker进行环境配置](#)
   - [代码编辑器VS Code](#%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8vs-code)
     - [安装VS Code](#%E5%AE%89%E8%A3%85vs-code)
     - [在VS Code中使用SSH连接到虚拟机](#%E5%9C%A8vs-code%E4%B8%AD%E4%BD%BF%E7%94%A8ssh%E8%BF%9E%E6%8E%A5%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BA)
@@ -76,7 +77,9 @@ Linux是开源的操作系统，拥有数百个发行版，其中Ubuntu是一个
 
 [学习Linux命令行](https://nju-projectn.github.io/ics-pa-gitbook/ics2021/linux.html)
 
+## 使用Docker进行环境配置
 
+[使用Docker配置环境教程](https://www.bilibili.com/video/BV1Nc41147Pd/?vd_source=1e0431eaeb521fce46cdddb12e68d8c6#reply202992270912)
 
 ## 代码编辑器VS Code
 
