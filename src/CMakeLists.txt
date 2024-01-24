@@ -17,5 +17,5 @@ add_subdirectory(test)
 
 target_link_libraries(parser execution pthread)
 
-add_executable(rucbase rmdb.cpp)
-target_link_libraries(rucbase parser execution readline pthread planner analyze)
+add_executable(rmdb rmdb.cpp)
+target_link_libraries(rmdb parser execution readline pthread planner analyze)
