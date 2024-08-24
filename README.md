@@ -6,7 +6,7 @@
 |  _ <| |_| | |___| |_) / ___ \ ___) | |___ 
 |_| \_ \___/ \____|____/_/   \_\____/|_____|
 ```
-Rucbase是一个精简的RDBMS原型系统，用于《数据库系统实现》课程的实验教学。本实验框架源码参考和借鉴了CMU15-445课程的[BusTub](https://github.com/cmu-db/bustub) 和Standford CS346课程的[Redbase](https://web.stanford.edu/class/cs346/2015/redbase.html) 。
+RUCBase是由中国人民大学数据库教学团队开发，配套教育部“101计划”计算机核心教材《数据库管理系统原理与实现》建设的教学用数据库管理系统，旨在支撑面向本科数据库零基础学生的数据库系统课程实验教学。RUCBase系统框架部分参考和借鉴了CMU15-445课程的[BusTub](https://github.com/cmu-db/bustub) 和Standford CS346课程的[Redbase](https://web.stanford.edu/class/cs346/2015/redbase.html)，目前中国人民大学、哈尔滨工业大学、华中科技大学、西安电子科技大学等高校使用该教学系统进行数据库内核实验。
 
 ## 实验环境：
 - 操作系统：Ubuntu 18.04 及以上(64位)
