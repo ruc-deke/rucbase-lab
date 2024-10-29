@@ -14,10 +14,13 @@ See the Mulan PSL v2 for more details. */
 #include <unistd.h>
 
 #include <fstream>
+#include <filesystem>
 
 #include "index/ix.h"
 #include "record/rm.h"
 #include "record_printer.h"
+
+namespace fs = std::filesystem;
 
 /**
  * @description: 判断是否为一个文件夹
@@ -71,11 +74,42 @@ void SmManager::create_db(const std::string& db_name) {
  * @param {string&} db_name 数据库名称，与文件夹同名
  */
 void SmManager::drop_db(const std::string& db_name) {
+    // ! dbj1013 TODO
+      // 1. 检查数据库是否存在
     if (!is_dir(db_name)) {
         throw DatabaseNotFoundError(db_name);
     }
-    std::string cmd = "rm -r " + db_name;
-    if (system(cmd.c_str()) < 0) {
+    // 2. 进入数据库目录
+    if (chdir(db_name.c_str()) < 0) {
+        throw UnixError();
+    }
+    // 3. 关闭并删除所有表和索引 (重要!)
+    for (auto const& [tableName, tableMeta] : db_.tabs_) { //C++17 structured bindings
+        // 关闭表文件
+        auto fh_it = fhs_.find(tableName);
+        if (fh_it != fhs_.end()) {
+            rm_manager_->close_file(fh_it->second.get());
+        }
+        // 删除与表关联的索引
+        for (const auto& index : tableMeta.indexes) {
+          std::string indexName = ix_manager_->get_index_name(tableName, index.cols);
+          auto ih_it = ihs_.find(indexName);
+          if (ih_it != ihs_.end()) {
+              ix_manager_->close_index(ih_it->second.get());
+              ix_manager_->destroy_index(tableName, index.cols); // 删除索引文件
+          }
+        }
+        rm_manager_->destroy_file(tableName); // 删除表文件
+    }
+    // 4. 清空 fhs_ 和 ihs_ (在删除文件后)
+    fhs_.clear();
+    ihs_.clear();
+    // 5. 返回上一级目录
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
+    // 6. 删除数据库目录
+    if (!fs::remove_all(db_name)) {
         throw UnixError();
     }
 }

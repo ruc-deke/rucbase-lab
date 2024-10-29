@@ -35,10 +35,7 @@ class DeleteExecutor : public AbstractExecutor {
         rids_ = rids;
         context_ = context;
     }
+    std::unique_ptr<RmRecord> Next() override;
+    Rid &rid() override;
 
-    std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
-    }
-
-    Rid &rid() override { return _abstract_rid; }
 };
