@@ -90,6 +90,10 @@ python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desire
 
 所有算子都继承了抽象算子类`execuotr_abstract`，它给出了各个算子继承的基类抽象算子的声明和相应方法。
 
+**注意⚠️：**
+
+**有些`execuotr_abstract中定义的虚函数在子类中没有添加TODO，但也是需要implement的，否则会导致程序无法正确运行。**
+
 
 ### 连接算子实现提示
 
