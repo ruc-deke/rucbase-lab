@@ -133,7 +133,8 @@ jobs:
 
       - name: Configure Debug
         shell: msys2 {0}
-        run: cmake --preset debug
+        # MSYS2 hides POSIX declarations such as fileno/mkstemp in strict C++ mode.
+        run: cmake --preset debug -DCMAKE_CXX_FLAGS=-D_POSIX_C_SOURCE=200809L
 
       - name: Build Debug
         shell: msys2 {0}
