@@ -9,6 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include <netinet/in.h>
+#include <cstdio>
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <setjmp.h>
