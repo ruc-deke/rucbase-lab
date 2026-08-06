@@ -54,7 +54,7 @@ int init_tcp_sock(const char *server_host, int server_port) {
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(server_port);
     serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
-    bzero(&(serv_addr.sin_zero), 8);
+    memset(&(serv_addr.sin_zero), 0, sizeof(serv_addr.sin_zero));
 
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
         fprintf(stderr, "Failed to connect. errmsg=%d:%s\n", errno, strerror(errno));
