@@ -1,0 +1,98 @@
+name: Release with SLSA provenance
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build release artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      base64_subjects: ${{ steps.subjects.outputs.base64_subjects }}
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison \
+            libreadline-dev
+
+      - name: Configure Release
+        run: cmake --preset release -DBUILD_TESTING=OFF
+
+      - name: Build server and client
+        run: |
+          cmake --build --preset release \
+            --target rmdb \
+            --target rucbase_client \
+            --parallel 2
+
+      - name: Package Linux artifact
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          tar -czf "dist/rucbase-${RELEASE_TAG}-linux-amd64.tar.gz" \
+            -C build/release/bin rmdb rucbase_client
+
+      - name: Create SLSA subject list
+        id: subjects
+        run: |
+          subjects=$(sha256sum dist/*.tar.gz | base64 -w0)
+          echo "base64_subjects=${subjects}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release artifact for publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: rucbase-release-artifact
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release artifact
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: rucbase-release-artifact
+          path: dist
+
+      - name: Upload artifact to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: dist/*.tar.gz
+
+  provenance:
+    name: Generate SLSA3 provenance
+    needs: [build, publish]
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.build.outputs.base64_subjects }}
+      provenance-name: rucbase-${{ github.ref_name }}.intoto.jsonl
+      upload-assets: true

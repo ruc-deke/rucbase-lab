@@ -86,10 +86,20 @@ RUN install -d -m 0755 /etc/apt/keyrings \
 
 # Install the newest CLI releases available when the image is built. Never bake
 # account credentials or API keys into this image.
-RUN npm config set fetch-retries 5 \
+#
+# Codex ships platform binaries as npm optionalDependencies. Multi-arch buildx
+# (especially amd64 under QEMU on Apple Silicon) may skip them when the host
+# arch differs, so force linux + the target cpu so the correct package lands.
+RUN architecture="$(dpkg --print-architecture)" \
+    && case "${architecture}" in \
+        amd64) npm_cpu=x64 ;; \
+        arm64) npm_cpu=arm64 ;; \
+        *) echo "Unsupported architecture for Codex: ${architecture}" >&2; exit 1 ;; \
+    esac \
+    && npm config set fetch-retries 5 \
     && npm config set fetch-retry-mintimeout 20000 \
     && npm config set fetch-retry-maxtimeout 120000 \
-    && npm install --global --no-audit --no-fund \
+    && npm install --global --no-audit --no-fund --os=linux --cpu="${npm_cpu}" \
         "@openai/codex@latest" \
         "@anthropic-ai/claude-code@latest" \
     && npm cache clean --force \

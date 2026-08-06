@@ -1,0 +1,184 @@
+name: RucBase CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_lab_tests:
+        description: Run all teaching-lab black-box tests
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cmake:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            name: Linux (GCC)
+            artifact_suffix: linux
+          - os: macos-15-intel
+            name: macOS (Intel)
+            artifact_suffix: macos-intel
+          - os: macos-15
+            name: macOS (Apple Silicon)
+            artifact_suffix: macos-arm64
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison \
+            libreadline-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install flex bison readline
+          echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix readline)" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python test dependency
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Configure Debug
+        run: cmake --preset debug
+
+      - name: Build Debug
+        run: cmake --build --preset debug --parallel 2
+
+      # Storage/index/transaction tests intentionally cover unfinished lab TODOs.
+      # Keep the protocol and parser smoke tests required while the skeleton is taught.
+      - name: Run parser and Wire smoke tests
+        run: |
+          ctest --preset debug --output-on-failure \
+            -R '^(test_parser|wire_test\.)'
+
+      - name: Run teaching-lab black-box tests (manual)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lab_tests && runner.os == 'Linux' }}
+        run: |
+          ctest --preset debug --output-on-failure -L blackbox
+
+      - name: Upload test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-test-logs-${{ matrix.artifact_suffix }}
+          path: |
+            build/debug/test-logs
+            build/debug/Testing/Temporary
+          if-no-files-found: ignore
+
+  windows-msys2:
+    name: Windows (MSYS2/POSIX)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      # MSYS2 tools expect Unix line endings; configure Git before checkout.
+      - name: Configure Git line endings
+        shell: bash
+        run: git config --global core.autocrlf input
+
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MSYS
+          update: true
+          install: >-
+            base-devel
+            git
+            gcc
+            cmake
+            flex
+            bison
+            libreadline-devel
+
+      - name: Configure Debug
+        shell: msys2 {0}
+        run: cmake --preset debug
+
+      - name: Build Debug
+        shell: msys2 {0}
+        run: cmake --build --preset debug --parallel 2
+
+      - name: Run parser and Wire smoke tests
+        shell: msys2 {0}
+        run: |
+          ctest --preset debug --output-on-failure \
+            -R '^(test_parser|wire_test\.)'
+
+      - name: Upload test logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-test-logs-windows-msys2
+          path: |
+            build/debug/test-logs
+            build/debug/Testing/Temporary
+          if-no-files-found: ignore
+
+  release:
+    name: Release build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison \
+            libreadline-dev
+
+      - name: Configure Release
+        run: cmake --preset release
+
+      - name: Build Release
+        run: cmake --build --preset release --parallel 2

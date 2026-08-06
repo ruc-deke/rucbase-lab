@@ -23,7 +23,7 @@ RucBase是由中国人民大学卢卫教授领导的数据库教学团队开发�
 ## 主要组成
 
 - `rmdb`：数据库服务端，负责数据库、SQL 执行和客户端连接。
-- `RucBase_client`：课程方提供的交互式 SQL 客户端，支持交互执行、单条 SQL 和脚本文件。
+- `rucbase_client`：课程方提供的交互式 SQL 客户端，支持交互执行、单条 SQL 和脚本文件。
 - `src/test`：GoogleTest 单元测试、C++ 黑盒客户端和 pytest 黑盒测试。
 - `docs`：环境、使用、开发和分阶段实验文档。
 
@@ -41,32 +41,32 @@ RucBase是由中国人民大学卢卫教授领导的数据库教学团队开发�
 
 ```bash
 docker pull --platform linux/amd64 \
-  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/RucBase-dev:latest
+  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
 ```
 
 **ARM64：Apple Silicon Mac（M1/M2/M3/M4/M5）**
 
 ```bash
 docker pull --platform linux/arm64 \
-  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/RucBase-dev:latest
+  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
 ```
 
 首次创建容器：
 
 ```bash
 # Windows / Intel Mac
-docker run --name RucBase-dev --platform linux/amd64 -it \
-  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/RucBase-dev:latest
+docker run --name rucbase-dev --platform linux/amd64 -it \
+  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
 
 # Apple Silicon Mac
-docker run --name RucBase-dev --platform linux/arm64 -it \
-  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/RucBase-dev:latest
+docker run --name rucbase-dev --platform linux/arm64 -it \
+  crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
 ```
 
 以后重新进入容器：
 
 ```bash
-docker start -ai RucBase-dev
+docker start -ai rucbase-dev
 ```
 
 进入容器后，在源码目录中构建：
@@ -131,14 +131,14 @@ cd build/debug
 
 ```bash
 cd build/debug
-./bin/RucBase_client -h 127.0.0.1 -p 8765
+./bin/rucbase_client -h 127.0.0.1 -p 8765
 ```
 
 客户端也支持单条 SQL 和脚本文件：
 
 ```bash
-./bin/RucBase_client -h 127.0.0.1 -p 8765 -e "show tables;"
-./bin/RucBase_client -h 127.0.0.1 -p 8765 -f demo.sql
+./bin/rucbase_client -h 127.0.0.1 -p 8765 -e "show tables;"
+./bin/rucbase_client -h 127.0.0.1 -p 8765 -f demo.sql
 ```
 
 交互模式下以分号结束一条语句；输入 `exit;`、`bye;` 或按 Ctrl-D 退出客户端。
@@ -206,7 +206,7 @@ ctest --preset debug -L blackbox --output-on-failure
 │   ├── transaction/      # 事务与并发控制
 │   ├── recovery/         # 日志与恢复
 │   └── net/              # RucBase Wire Protocol
-├── RucBase_client/       # 官方交互客户端
+├── rucbase_client/       # 官方交互客户端
 ├── src/test/             # 单元、黑盒和实验测试
 ├── docs/                 # 使用、开发、环境和实验文档
 ├── docker/               # 教学开发镜像
