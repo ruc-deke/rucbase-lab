@@ -11,10 +11,12 @@
 #include <unistd.h>
 
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <fstream>
 #include <mutex>
 
@@ -183,7 +185,7 @@ int main(int argc, char *argv[]) {
     // 测试点1
     test.open(test_name);
     while(std::getline(test, sql)) {
-        usleep(10000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         send_recv_sql(sockfd, sql);
     }
 
