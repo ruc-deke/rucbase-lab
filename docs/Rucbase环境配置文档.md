@@ -4,10 +4,16 @@
 
 - [Rucbase环境配置文档](#rucbase%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE%E6%96%87%E6%A1%A3)
   - [虚拟机软件VMware/VirtualBox](#%E8%99%9A%E6%8B%9F%E6%9C%BA%E8%BD%AF%E4%BB%B6vmwarevirtualbox)
+    - [VMware Workstation / Fusion（推荐）](#vmware-workstation--fusion%E6%8E%A8%E8%8D%90)
+    - [VirtualBox（开源备选）](#virtualbox%E5%BC%80%E6%BA%90%E5%A4%87%E9%80%89)
   - [WSL 2.0 (Windows Subsystem for Linux)](#wsl-20-windows-subsystem-for-linux)
     - [WSL2.0相关注意事项](#wsl20%E7%9B%B8%E5%85%B3%E6%B3%A8%E6%84%8F%E4%BA%8B%E9%A1%B9)
   - [Ubuntu操作系统](#ubuntu%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F)
-  - [使用Docker进行环境配置](#)
+  - [使用Docker进行环境配置](#%E4%BD%BF%E7%94%A8docker%E8%BF%9B%E8%A1%8C%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE)
+    - [拉取镜像](#%E6%8B%89%E5%8F%96%E9%95%9C%E5%83%8F)
+    - [首次创建并进入容器](#%E9%A6%96%E6%AC%A1%E5%88%9B%E5%BB%BA%E5%B9%B6%E8%BF%9B%E5%85%A5%E5%AE%B9%E5%99%A8)
+    - [以后重新进入容器](#%E4%BB%A5%E5%90%8E%E9%87%8D%E6%96%B0%E8%BF%9B%E5%85%A5%E5%AE%B9%E5%99%A8)
+    - [视频教程](#%E8%A7%86%E9%A2%91%E6%95%99%E7%A8%8B)
   - [代码编辑器VS Code](#%E4%BB%A3%E7%A0%81%E7%BC%96%E8%BE%91%E5%99%A8vs-code)
     - [安装VS Code](#%E5%AE%89%E8%A3%85vs-code)
     - [在VS Code中使用SSH连接到虚拟机](#%E5%9C%A8vs-code%E4%B8%AD%E4%BD%BF%E7%94%A8ssh%E8%BF%9E%E6%8E%A5%E5%88%B0%E8%99%9A%E6%8B%9F%E6%9C%BA)
@@ -20,7 +26,7 @@
 
 巧妇难为无米之炊，我们需要先对实验进行一些准备工作。配置好开发环境后，才能在Linux系统上运行Rucbase。
 
-在本实验中，我们统一使用Ubuntu操作系统（Linux的一个主流发行版）。推荐在你的主机（Windows/macOS）中使用VS Code作为代码编辑器。使用虚拟机的同学，推荐使用SSH连接到虚拟机进行实验。  
+在本实验中，我们统一使用Ubuntu操作系统（Linux的一个主流发行版）。课程Docker镜像和手工安装均以Ubuntu 24.04 LTS为基线。推荐在你的主机（Windows/macOS）中使用VS Code作为代码编辑器。使用虚拟机的同学，推荐使用SSH连接到虚拟机进行实验。
 
 请同学们按照我们的要求进行环境配置。如果你没有按照文档要求进行实验（比如使用了其他的Linux发行版），可能会出现一些奇怪的bug，进而影响实验进度和分数。
 
@@ -32,15 +38,35 @@
 
 我们使用虚拟机软件安装Linux操作系统。虚拟机（Virtual Machine）指通过软件模拟的具有完整硬件系统功能的、运行在一个完全隔离环境中的完整计算机系统。
 
-VMware是目前流行的虚拟机运行软件，在Windows/macOS主机上均可以安装使用。它在Windows和macOS中有不同的名字，但使用方法基本一致，请根据你主机的操作系统选择对应版本。
+### VMware Workstation / Fusion（推荐）
 
-[下载Windows版VMware Workstation 16 Pro](https://www.vmware.com/go/getworkstation-win)
+VMware 是目前流行的桌面虚拟机软件。Windows / Linux 主机使用 **VMware Workstation Pro**，macOS 主机使用 **VMware Fusion Pro**，功能与使用方式基本一致，请按主机操作系统选择对应产品。
 
-[下载macOS版本VMware Fusion 12 Pro](https://www.vmware.com/go/getfusion)
+**许可说明（重要更新）：** 自 2024 年 11 月起，Broadcom 将 VMware Workstation Pro 与 Fusion Pro 改为**免费**，适用于个人、教育与商业用途，**无需购买许可证、无需填写激活密钥**。安装时若出现 License Key 提示，选择面向免费使用的选项（如 *Personal Use* / *Finish for free version*）即可继续。
 
-VMware是收费软件，你可以选择试用一段时间，在激活过程中需要小心防范欺诈链接。
+> 旧版 **Workstation Player / Fusion Player** 已停更，请直接下载 **Pro** 版本（免费版 Pro 从 Workstation Pro 17.5.2、Fusion Pro 13.5.2 起提供）。请勿从非官方渠道下载“破解版”或来路不明的密钥，以免安全风险。
 
-如果你不希望使用收费软件，我们推荐[Oracle VM VirtualBox](https://www.virtualbox.org/)，它是一款优秀的开源跨平台虚拟化软件。
+**下载方式：**
+
+1. 打开官方产品页了解概况：[VMware Workstation & Fusion](https://www.vmware.com/products/desktop-hypervisor/workstation-and-fusion)
+2. 实际安装包需在 Broadcom 支持门户获取（通常需免费注册账号）：
+   - [Broadcom 下载中心](https://support.broadcom.com/group/ecx/downloads)
+   - 在产品列表中搜索 **VMware Workstation Pro**（Windows / Linux）或 **VMware Fusion Pro**（macOS），选择较新的稳定版下载
+3. 安装完成后即可新建虚拟机，无需额外付费激活
+
+**平台对照：**
+
+| 主机系统 | 产品 | 说明 |
+| --- | --- | --- |
+| Windows | VMware Workstation Pro | 推荐 17.5.2 及以上免费版 |
+| Linux | VMware Workstation Pro | 同上 |
+| macOS（Intel / Apple Silicon） | VMware Fusion Pro | 推荐 13.5.2 及以上免费版；Apple Silicon 请选对应 ARM 安装包 |
+
+若官网入口或下载流程有调整，以 [Broadcom / VMware 官方说明](https://blogs.vmware.com/cloud-foundation/2024/11/11/vmware-fusion-and-workstation-are-now-free-for-all-users/) 为准。
+
+### VirtualBox（开源备选）
+
+若更倾向完全开源、或 VMware 下载不便，可使用 [Oracle VM VirtualBox](https://www.virtualbox.org/)。它是跨平台的开源虚拟化软件，对本实验同样适用。
 
 ## WSL 2.0 (Windows Subsystem for Linux)
 
@@ -57,13 +83,13 @@ VMware是收费软件，你可以选择试用一段时间，在激活过程中�
 
 ## Ubuntu操作系统
 
-安装并激活好虚拟机软件后，我们就要在VMware上安装Linux操作系统。
+安装好虚拟机软件后，我们就要在虚拟机中安装Linux操作系统。
 
 Linux是开源的操作系统，拥有数百个发行版，其中Ubuntu是一个非常流行的桌面发行版。我们本次实验中就采用Ubuntu操作系统作为Rucbase的运行环境。
 
 **我们强烈建议你使用Ubuntu系统，虽然在内部测试中，项目在原生Debian和CentOS上也可以通过编译，但是仍然可能遇到一些始料未及的问题**
 
-[下载Ubuntu 20.04.5 LTS](https://mirrors.tuna.tsinghua.edu.cn/ubuntu-releases/20.04.5/ubuntu-20.04.5-desktop-amd64.iso)
+[从清华大学开源软件镜像站下载Ubuntu 24.04 LTS](https://mirrors.tuna.tsinghua.edu.cn/ubuntu-releases/24.04/)
 
 下载好Ubuntu后，在VMware中选择文件-新建虚拟机，选择“安装程序光盘映像文件”，即刚才下载的iso文件，然后按提示安装即可。
 
@@ -79,7 +105,64 @@ Linux是开源的操作系统，拥有数百个发行版，其中Ubuntu是一个
 
 ## 使用Docker进行环境配置
 
-[使用Docker配置环境教程](https://www.bilibili.com/video/BV1Nc41147Pd/?vd_source=1e0431eaeb521fce46cdddb12e68d8c6#reply202992270912)
+我们为Rucbase提供了国内Docker镜像。请先安装并启动Docker Desktop；Windows用户需要确认Docker Desktop运行在Linux容器模式。
+
+### 拉取镜像
+
+首次配置环境时，请根据主机处理器架构执行对应命令拉取最新镜像。
+
+> 下列ARM64命令从Ubuntu 24.04多架构镜像发布后生效。在新版尚未推送期间，Apple Silicon请临时使用`--platform linux/amd64`运行现有镜像。
+
+#### x64（Windows、Intel Mac）
+
+```bash
+docker pull --platform linux/amd64 crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
+```
+
+#### ARM64（Apple Silicon：M1/M2/M3/M4/M5）
+
+Apple Silicon使用原生`linux/arm64`镜像：
+
+```bash
+docker pull --platform linux/arm64 crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
+```
+
+### 首次创建并进入容器
+
+#### Windows（Docker Desktop，Linux容器模式）
+
+```bash
+docker run --name rucbase-dev --platform linux/amd64 -it crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
+```
+
+#### macOS（Apple Silicon：M1/M2/M3/M4/M5）
+
+Apple Silicon使用原生`linux/arm64`平台：
+
+```bash
+docker run --name rucbase-dev --platform linux/arm64 -it crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
+```
+
+#### macOS（Intel）
+
+```bash
+docker run --name rucbase-dev --platform linux/amd64 -it crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest
+```
+
+### 以后重新进入容器
+
+容器创建完成后，Windows和macOS用户均使用以下命令重新启动并进入容器，无需再次执行`docker run`：
+
+```bash
+docker start -ai rucbase-dev
+```
+
+### 视频教程
+
+我们分别录制了Windows和macOS系统的Rucbase实验环境搭建演示视频：
+
+- [Windows系统实验环境搭建](https://www.bilibili.com/video/BV1ruuA6KE58/)
+- [macOS系统实验环境搭建](https://www.bilibili.com/video/BV1U9uw6jEfW/)
 
 ## 代码编辑器VS Code
 
@@ -114,8 +197,4 @@ Git 是一个版本控制系统，可以让你跟踪你对文件所做的修改�
 ## Git使用
 
 对于不熟悉Git使用的同学，我们推荐你阅读该博客教程[Git教程 - 廖雪峰的官方网站 (liaoxuefeng.com)](https://www.liaoxuefeng.com/wiki/896043488029600)
-
-同时，我们也推荐你尽早申请Github教育优惠，获取相关福利软件。其中，我们强烈推荐使用`GitKraken`作为你的`git`可视化管理工具。
-
-
 
