@@ -30,6 +30,11 @@ class SocketPair {
     int server() const { return fds_[1]; }
 
     void CloseServer() {
+        // A plain close sends FIN, and the peer may still accept one small
+        // write from its local buffer (notably on Windows/MSYS2).  Reset the
+        // socket instead so the write-error assertion is deterministic.
+        const struct linger reset{1, 0};
+        (void)setsockopt(fds_[1], SOL_SOCKET, SO_LINGER, &reset, sizeof(reset));
         close(fds_[1]);
         fds_[1] = -1;
     }
