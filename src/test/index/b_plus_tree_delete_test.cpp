@@ -445,7 +445,6 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
     int del_cnt = 0;
     std::multimap<int, Rid> mock;
     mock.clear();
-    int num = 0;
     while (add_cnt + del_cnt < scale) {
         double dice = rand() * 1. / RAND_MAX;
         double insert_prob = 1. - mock.size() / (0.5 * scale);
@@ -487,7 +486,6 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
             //      "MixTest2_" + std::to_string(num) + "_delete" + std::to_string(key) + ".dot");
         }
         // check_all(ih_.get(), mock);
-        num++;
     }
     std::cout << "Insert keys count: " << add_cnt << '\n' << "Delete keys count: " << del_cnt << '\n';
     check_all(ih_.get(), mock);

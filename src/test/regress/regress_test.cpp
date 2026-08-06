@@ -6,11 +6,14 @@
 #include <sys/un.h>
 #include <termios.h>
 
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <fstream>
 
 #include "regress_test.h"
+#include "net/wire.h"
 
 int init_unix_sock(const char *unix_sock_path) {
     int sockfd = socket(PF_UNIX, SOCK_STREAM, 0);
@@ -75,6 +78,12 @@ int connect_database(const char* unix_sockect_path, const char* server_host, int
         exit(1);
     }
 
+    if (!rucbase::wire::ClientHandshake(sockfd)) {
+        fprintf(stderr, "wire handshake failed\n");
+        close(sockfd);
+        exit(1);
+    }
+
     return sockfd;
 }
 
@@ -88,27 +97,27 @@ int send_sql(int sockfd, const std::string& sql) {
     return send_recv_sql(sockfd, sql, recv_buf);
 }
 int send_recv_sql(int sockfd, const std::string& sql, char* recv_buf) {
-    int send_bytes;
-    int recv_bytes;
-    
-    if((send_bytes = write(sockfd, sql.c_str(), sql.length() + 1)) == -1) {
-        fprintf(stderr, "Send Error %d: %s\n", errno, strerror(errno));
-        exit(1);
+    const size_t first = sql.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos || sql.compare(first, 2, "--") == 0) {
+        memset(recv_buf, 0, MAX_MEM_BUFFER_SIZE);
+        return 0;
+    }
+    std::string response;
+    std::string diagnostic;
+    if (!rucbase::wire::ExecStream(sockfd, sql, &response, &diagnostic)) {
+        fprintf(stderr, "EXEC_STREAM failed: %s\n",
+                diagnostic.empty() ? "unknown error" : diagnostic.c_str());
+        const char *failure = "failure\n";
+        memcpy(recv_buf, failure, strlen(failure) + 1);
+        return static_cast<int>(strlen(failure));
     }
 
     memset(recv_buf, 0, MAX_MEM_BUFFER_SIZE);
-    recv_bytes = recv(sockfd, recv_buf, MAX_MEM_BUFFER_SIZE, 0);
-
-    if(recv_bytes < 0) {
-        fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
-        exit(1);
+    const size_t copy_n = std::min(response.size(), static_cast<size_t>(MAX_MEM_BUFFER_SIZE - 1));
+    if (copy_n > 0) {
+        memcpy(recv_buf, response.data(), copy_n);
     }
-    else if(recv_bytes == 0) {
-        printf("Connection has been closed\n");
-        exit(1);
-    }
-
-    return recv_bytes;
+    return static_cast<int>(copy_n);
 }
 
 void start_test(int sockfd, std::string infile) {
@@ -120,7 +129,9 @@ void start_test(int sockfd, std::string infile) {
     
     while(std::getline(test_input, sql)) {
         memset(recv_buf, 0, sizeof(recv_buf));
-        if(send_recv_sql(sockfd, sql, recv_buf) <= 0)
-            break;
+        const int response_size = send_recv_sql(sockfd, sql, recv_buf);
+        if (response_size > 0) {
+            std::cout.write(recv_buf, response_size);
+        }
     }
 }

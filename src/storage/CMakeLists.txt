@@ -5,3 +5,4 @@ set(SOURCES
         ../replacer/lru_replacer.cpp 
 )
 add_library(storage STATIC ${SOURCES})
+rucbase_configure_target(storage)

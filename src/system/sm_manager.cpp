@@ -105,13 +105,10 @@ void SmManager::close_db() {
 }
 
 /**
- * @description: 显示所有的表,通过测试需要将其结果写入到output.txt,详情看题目文档
+ * @description: 显示所有的表，结果通过当前请求的 Wire 响应返回
  * @param {Context*} context 
  */
 void SmManager::show_tables(Context* context) {
-    std::fstream outfile;
-    outfile.open("output.txt", std::ios::out | std::ios::app);
-    outfile << "| Tables |\n";
     RecordPrinter printer(1);
     printer.print_separator(context);
     printer.print_record({"Tables"}, context);
@@ -119,10 +116,8 @@ void SmManager::show_tables(Context* context) {
     for (auto &entry : db_.tabs_) {
         auto &tab = entry.second;
         printer.print_record({tab.name}, context);
-        outfile << "| " << tab.name << " |\n";
     }
     printer.print_separator(context);
-    outfile.close();
 }
 
 /**

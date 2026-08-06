@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #include <signal.h>
 #include <unistd.h>
 #include <atomic>
+#include <cstdlib>
 
 #include "errors.h"
 #include "optimizer/optimizer.h"
@@ -23,11 +24,13 @@ See the Mulan PSL v2 for more details. */
 #include "optimizer/planner.h"
 #include "portal.h"
 #include "analyze/analyze.h"
+#include "net/wire.h"
 
 #define SOCK_PORT 8765
 #define MAX_CONN_LIMIT 8
 
 static bool should_exit = false;
+static std::string database_name;
 
 // 构建全局所需的管理器对象
 auto disk_manager = std::make_unique<DiskManager>();
@@ -45,13 +48,11 @@ auto optimizer = std::make_unique<Optimizer>(sm_manager.get(), planner.get());
 auto portal = std::make_unique<Portal>(sm_manager.get());
 auto analyze = std::make_unique<Analyze>(sm_manager.get());
 pthread_mutex_t *buffer_mutex;
-pthread_mutex_t *sockfd_mutex;
 
 static jmp_buf jmpbuf;
-void sigint_handler(int signo) {
+void sigint_handler(int) {
     should_exit = true;
     log_manager->flush_log_to_disk();
-    std::cout << "The Server receive Crtl+C, will been closed\n";
     longjmp(jmpbuf, 1);
 }
 
@@ -67,137 +68,198 @@ void SetTransaction(txn_id_t *txn_id, Context *context) {
 }
 
 void *client_handler(void *sock_fd) {
-    int fd = *((int *)sock_fd);
-    pthread_mutex_unlock(sockfd_mutex);
+    auto *fd_arg = static_cast<int *>(sock_fd);
+    const int fd = *fd_arg;
+    delete fd_arg;
 
-    int i_recvBytes;
-    // 接收客户端发送的请求
-    char data_recv[BUFFER_LENGTH];
-    // 需要返回给客户端的结果
+    // Fixed-size text buffer still used by RecordPrinter / Context (teaching path).
+    // Wire frames wrap that text for EXEC_STREAM responses.
     char *data_send = new char[BUFFER_LENGTH];
-    // 需要返回给客户端的结果的长度
     int offset = 0;
-    // 记录客户端当前正在执行的事务ID
     txn_id_t txn_id = INVALID_TXN_ID;
 
-    std::string output = "establish client connection, sockfd: " + std::to_string(fd) + "\n";
-    std::cout << output;
+    std::cout << "Client connected (fd=" << fd << ")" << std::endl;
+
+    if (!rucbase::wire::ReadAndCheckHandshake(fd)) {
+        std::cerr << "Wire handshake failed (fd=" << fd << ")" << std::endl;
+        close(fd);
+        delete[] data_send;
+        pthread_exit(NULL);
+    }
 
     while (true) {
-        std::cout << "Waiting for request..." << std::endl;
-        memset(data_recv, 0, BUFFER_LENGTH);
-
-        i_recvBytes = read(fd, data_recv, BUFFER_LENGTH);
-
-        if (i_recvBytes == 0) {
-            std::cout << "Maybe the client has closed" << std::endl;
+        rucbase::wire::Frame request;
+        if (!rucbase::wire::ReadFrame(fd, &request)) {
             break;
         }
-        if (i_recvBytes == -1) {
-            std::cout << "Client read error!" << std::endl;
-            break;
+        if (request.flags != 0 || request.tag != rucbase::wire::kTagExecStream) {
+            const std::string diag = "unsupported request (only EXEC_STREAM is implemented)";
+            if (!rucbase::wire::WriteFrame(fd, rucbase::wire::kTagError, 0, diag)) {
+                break;
+            }
+            continue;
         }
-        
-        printf("i_recvBytes: %d \n ", i_recvBytes);
 
-        if (strcmp(data_recv, "exit") == 0) {
-            std::cout << "Client exit." << std::endl;
-            break;
+        const std::string &sql = request.payload;
+        if (sql.empty()) {
+            if (!rucbase::wire::WriteFrame(fd, rucbase::wire::kTagError, 0, "empty SQL")) {
+                break;
+            }
+            continue;
         }
-        if (strcmp(data_recv, "crash") == 0) {
+
+        // Teaching extension retained from the legacy protocol.
+        if (sql == rucbase::wire::kDatabaseNameRequest) {
+            if (!rucbase::wire::WriteFrame(fd, rucbase::wire::kTagMeta, 0,
+                                          rucbase::wire::EncodeMetaSingleCharColumn("database")) ||
+                !rucbase::wire::WriteFrame(fd, rucbase::wire::kTagRow, 0,
+                                          rucbase::wire::EncodeRowSingleChar(database_name)) ||
+                !rucbase::wire::WriteFrame(fd, rucbase::wire::kTagResultEnd, 0,
+                                          rucbase::wire::EncodeResultEnd(1))) {
+                break;
+            }
+            continue;
+        }
+
+        if (sql == "crash") {
             std::cout << "Server crash" << std::endl;
             exit(1);
         }
 
-        std::cout << "Read from client " << fd << ": " << data_recv << std::endl;
+        std::cout << "[fd=" << fd << "] " << sql << std::endl;
 
         memset(data_send, '\0', BUFFER_LENGTH);
         offset = 0;
+        enum class Outcome { Ok, Abort, Error };
+        Outcome outcome = Outcome::Ok;
+        std::string diagnostic;
 
-        // 开启事务，初始化系统所需的上下文信息（包括事务对象指针、锁管理器指针、日志管理器指针、存放结果的buffer、记录结果长度的变量）
         Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, data_send, &offset);
         // Lab 3 need to remove transaction part
         // Lab 4 need to restart transaction
         // SetTransaction(&txn_id, context);
 
-        // 用于判断是否已经调用了yy_delete_buffer来删除buf
         bool finish_analyze = false;
         pthread_mutex_lock(buffer_mutex);
-        YY_BUFFER_STATE buf = yy_scan_string(data_recv);
+        YY_BUFFER_STATE buf = yy_scan_string(sql.c_str());
         if (yyparse() == 0) {
             if (ast::parse_tree != nullptr) {
                 try {
-                    // analyze and rewrite
                     std::shared_ptr<Query> query = analyze->do_analyze(ast::parse_tree);
                     yy_delete_buffer(buf);
                     finish_analyze = true;
                     pthread_mutex_unlock(buffer_mutex);
-                    // 优化器
                     std::shared_ptr<Plan> plan = optimizer->plan_query(query, context);
-                    // portal
                     std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, context);
                     portal->run(portalStmt, ql_manager.get(), &txn_id, context);
                     portal->drop();
                 } catch (TransactionAbortException &e) {
-                    // 事务需要回滚，需要把abort信息返回给客户端并写入output.txt文件中
-                    std::string str = "abort\n";
-                    memcpy(data_send, str.c_str(), str.length());
-                    data_send[str.length()] = '\0';
-                    offset = str.length();
-
-                    // 回滚事务
+                    outcome = Outcome::Abort;
+                    diagnostic = "abort";
                     txn_manager->abort(context->txn_, log_manager.get());
                     std::cout << e.GetInfo() << std::endl;
 
-                    std::fstream outfile;
-                    outfile.open("output.txt", std::ios::out | std::ios::app);
-                    outfile << str;
-                    outfile.close();
                 } catch (RMDBError &e) {
-                    // 遇到异常，需要打印failure到output.txt文件中，并发异常信息返回给客户端
+                    outcome = Outcome::Error;
+                    diagnostic = e.what();
+                    if (!diagnostic.empty() && diagnostic.back() != '\n') {
+                        diagnostic.push_back('\n');
+                    }
                     std::cerr << e.what() << std::endl;
 
-                    memcpy(data_send, e.what(), e.get_msg_len());
-                    data_send[e.get_msg_len()] = '\n';
-                    data_send[e.get_msg_len() + 1] = '\0';
-                    offset = e.get_msg_len() + 1;
-
-                    // 将报错信息写入output.txt
-                    std::fstream outfile;
-                    outfile.open("output.txt",std::ios::out | std::ios::app);
-                    outfile << "failure\n";
-                    outfile.close();
                 }
+            } else {
+                outcome = Outcome::Error;
+                diagnostic = "empty parse tree\n";
             }
+        } else {
+            outcome = Outcome::Error;
+            diagnostic = "parse error\n";
         }
-        if(finish_analyze == false) {
+        if (finish_analyze == false) {
             yy_delete_buffer(buf);
             pthread_mutex_unlock(buffer_mutex);
         }
-        // future TODO: 格式化 sql_handler.result, 传给客户端
-        // send result with fixed format, use protobuf in the future
-        if (write(fd, data_send, offset + 1) == -1) {
+
+        WireResultSet wire_result = std::move(context->wire_result_);
+        delete context;
+
+        if (diagnostic.size() > rucbase::wire::kMaxDiagnosticBytes) {
+            diagnostic.resize(rucbase::wire::kMaxDiagnosticBytes);
+        }
+
+        bool send_ok = true;
+        if (outcome == Outcome::Abort) {
+            send_ok = rucbase::wire::WriteFrame(fd, rucbase::wire::kTagTransactionAbort, 0, diagnostic);
+        } else if (outcome == Outcome::Error) {
+            send_ok = rucbase::wire::WriteFrame(fd, rucbase::wire::kTagError, 0, diagnostic);
+        } else if (wire_result.has_query_result) {
+            // Typed multi-column META / ROW* / RESULT_END (docs/rmdb_wire.md §4.2).
+            std::vector<rucbase::wire::ColumnDef> columns;
+            columns.reserve(wire_result.columns.size());
+            for (const auto &column : wire_result.columns) {
+                rucbase::wire::ColumnDef def;
+                def.name = column.name;
+                def.sql_type = rucbase::wire::ColTypeToWire(static_cast<int>(column.type));
+                columns.push_back(std::move(def));
+            }
+            send_ok = rucbase::wire::WriteFrame(fd, rucbase::wire::kTagMeta, 0,
+                                                rucbase::wire::EncodeMeta(columns));
+            for (const auto &row : wire_result.rows) {
+                if (!send_ok) {
+                    break;
+                }
+                std::vector<rucbase::wire::Cell> cells;
+                cells.reserve(row.size());
+                for (size_t i = 0; i < row.size(); ++i) {
+                    rucbase::wire::Cell cell;
+                    cell.sql_type = i < columns.size() ? columns[i].sql_type : rucbase::wire::kTypeChar;
+                    const auto &src = row[i];
+                    if (cell.sql_type == rucbase::wire::kTypeInt32) {
+                        cell.int_val = src.int_val;
+                    } else if (cell.sql_type == rucbase::wire::kTypeFloat32) {
+                        cell.float_val = src.float_val;
+                    } else {
+                        cell.str_val = src.str_val;
+                    }
+                    cells.push_back(std::move(cell));
+                }
+                send_ok = rucbase::wire::WriteFrame(fd, rucbase::wire::kTagRow, 0,
+                                                    rucbase::wire::EncodeRow(cells));
+            }
+            if (send_ok) {
+                send_ok = rucbase::wire::WriteFrame(
+                    fd, rucbase::wire::kTagResultEnd, 0,
+                    rucbase::wire::EncodeResultEnd(static_cast<uint64_t>(wire_result.rows.size())));
+            }
+        } else if (offset <= 0) {
+            send_ok = rucbase::wire::WriteFrame(fd, rucbase::wire::kTagCommandOk, 0, "");
+        } else {
+            // help / show tables / desc: still text-formatted into data_send.
+            const std::string text(data_send, static_cast<size_t>(offset));
+            send_ok =
+                rucbase::wire::WriteFrame(fd, rucbase::wire::kTagMeta, 0,
+                                          rucbase::wire::EncodeMetaSingleCharColumn("output")) &&
+                rucbase::wire::WriteFrame(fd, rucbase::wire::kTagRow, 0,
+                                          rucbase::wire::EncodeRowSingleChar(text)) &&
+                rucbase::wire::WriteFrame(fd, rucbase::wire::kTagResultEnd, 0,
+                                          rucbase::wire::EncodeResultEnd(1));
+        }
+        if (!send_ok) {
             break;
         }
-        // 如果是单条语句，需要按照一个完整的事务来执行，所以执行完当前语句后，自动提交事务
-        // if(context->txn_->get_txn_mode() == false)
-        // {
-        //     txn_manager->commit(context->txn_, context->log_mgr_);
-        // }
     }
 
-    // Clear
-    std::cout << "Terminating current client_connection..." << std::endl;
-    close(fd);           // close a file descriptor.
-    pthread_exit(NULL);  // terminate calling thread!
+    std::cout << "Client disconnected (fd=" << fd << ")" << std::endl;
+    close(fd);
+    delete[] data_send;
+    pthread_exit(NULL);
 }
 
-void start_server() {
+void start_server(int server_port) {
     // init mutex
     buffer_mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
-    sockfd_mutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(buffer_mutex, nullptr);
-    pthread_mutex_init(sockfd_mutex, nullptr);
 
     int sockfd_server;
     int fd_temp;
@@ -213,7 +275,7 @@ void start_server() {
     memset(&s_addr_in, 0, sizeof(s_addr_in));
     s_addr_in.sin_family = AF_INET;
     s_addr_in.sin_addr.s_addr = htonl(INADDR_ANY);
-    s_addr_in.sin_port = htons(SOCK_PORT);
+    s_addr_in.sin_port = htons(server_port);
     fd_temp = bind(sockfd_server, (struct sockaddr *)(&s_addr_in), sizeof(s_addr_in));
     if (fd_temp == -1) {
         std::cout << "Bind error!" << std::endl;
@@ -226,19 +288,18 @@ void start_server() {
         exit(1);
     }
 
+    std::cout << "Rucbase(" << database_name << ") listening on 0.0.0.0:" << server_port << std::endl;
+
     while (!should_exit) {
-        std::cout << "Waiting for new connection..." << std::endl;
         pthread_t thread_id;
         struct sockaddr_in s_addr_client {};
         int client_length = sizeof(s_addr_client);
 
         if (setjmp(jmpbuf)) {
-            std::cout << "Break from Server Listen Loop\n";
             break;
         }
 
         // Block here. Until server accepts a new connection.
-        pthread_mutex_lock(sockfd_mutex);
         int sockfd = accept(sockfd_server, (struct sockaddr *)(&s_addr_client), (socklen_t *)(&client_length));
         if (sockfd == -1) {
             std::cout << "Accept error!" << std::endl;
@@ -246,51 +307,69 @@ void start_server() {
         }
         
         // 和客户端建立连接，并开启一个线程负责处理客户端请求
-        if (pthread_create(&thread_id, nullptr, &client_handler, (void *)(&sockfd)) != 0) {
+        auto *client_fd = new int(sockfd);
+        if (pthread_create(&thread_id, nullptr, &client_handler, client_fd) != 0) {
             std::cout << "Create thread fail!" << std::endl;
+            close(sockfd);
+            delete client_fd;
             break;  // break while loop
         }
+        pthread_detach(thread_id);
 
     }
 
-    // Clear
-    std::cout << " Try to close all client-connection.\n";
-    int ret = shutdown(sockfd_server, SHUT_WR);  // shut down the all or part of a full-duplex connection.
-    if(ret == -1) { printf("%s\n", strerror(errno)); }
-//    assert(ret != -1);
+    close(sockfd_server);
     sm_manager->close_db();
-    std::cout << " DB has been closed.\n";
-    std::cout << "Server shuts down." << std::endl;
+    std::cout << "Rucbase(" << database_name << ") stopped" << std::endl;
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
+    int server_port = SOCK_PORT;
+    int opt;
+    while ((opt = getopt(argc, argv, "p:")) != -1) {
+        if (opt != 'p') {
+            std::cerr << "Usage: " << argv[0] << " [-p port] <database>" << std::endl;
+            return 1;
+        }
+
+        char *end = nullptr;
+        long parsed_port = strtol(optarg, &end, 10);
+        if (*optarg == '\0' || *end != '\0' || parsed_port < 1 || parsed_port > 65535) {
+            std::cerr << "Invalid port: " << optarg << std::endl;
+            return 1;
+        }
+        server_port = static_cast<int>(parsed_port);
+    }
+
+    if (optind != argc - 1) {
         // 需要指定数据库名称
-        std::cerr << "Usage: " << argv[0] << " <database>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " [-p port] <database>" << std::endl;
         exit(1);
     }
 
     signal(SIGINT, sigint_handler);
+    // macOS does not provide MSG_NOSIGNAL. Treat a disconnected peer as an
+    // ordinary send() failure instead of allowing SIGPIPE to stop the server.
+    signal(SIGPIPE, SIG_IGN);
     try {
         std::cout << "\n"
-                     "  _____  __  __ _____  ____  \n"
-                     " |  __ \\|  \\/  |  __ \\|  _ \\ \n"
-                     " | |__) | \\  / | |  | | |_) |\n"
-                     " |  _  /| |\\/| | |  | |  _ < \n"
-                     " | | \\ \\| |  | | |__| | |_) |\n"
-                     " |_|  \\_\\_|  |_|_____/|____/ \n"
+                     "  ____  _   _  ____ ____    _    ____  _____ \n"
+                     " |  _ \\| | | |/ ___| __ )  / \\  / ___|| ____|\n"
+                     " | |_) | | | | |   |  _ \\ / _ \\ \\___ \\|  _|  \n"
+                     " |  _ <| |_| | |___| |_) / ___ \\ ___) | |___ \n"
+                     " |_| \\_ \\___/ \\____|____/_/   \\_\\____/|_____|\n"
                      "\n"
-                     "Welcome to RMDB!\n"
+                     "Welcome to Rucbase!\n"
                      "Type 'help;' for help.\n"
                      "\n";
         // Database name is passed by args
-        std::string db_name = argv[1];
-        if (!sm_manager->is_dir(db_name)) {
+        database_name = argv[optind];
+        if (!sm_manager->is_dir(database_name)) {
             // Database not found, create a new one
-            sm_manager->create_db(db_name);
+            sm_manager->create_db(database_name);
         }
         // Open database
-        sm_manager->open_db(db_name);
+        sm_manager->open_db(database_name);
 
         // recovery database
         recovery->analyze();
@@ -298,7 +377,7 @@ int main(int argc, char **argv) {
         recovery->undo();
         
         // 开启服务端，开始接受客户端连接
-        start_server();
+        start_server(server_port);
     } catch (RMDBError &e) {
         std::cerr << e.what() << std::endl;
         exit(1);

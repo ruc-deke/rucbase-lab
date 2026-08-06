@@ -168,11 +168,7 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     auto conds = std::move(query->conds);
     std::shared_ptr<Plan> table_join_executors;
     
-    int scantbl[tables.size()];
-    for(size_t i = 0; i < tables.size(); i++)
-    {
-        scantbl[i] = -1;
-    }
+    std::vector<int> scantbl(tables.size(), -1);
     // 假设在ast中已经添加了jointree，这里需要修改的逻辑是，先处理jointree，然后再考虑剩下的部分
     if(conds.size() >= 1)
     {
@@ -183,8 +179,8 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
         auto it = conds.begin();
         while (it != conds.end()) {
             std::shared_ptr<Plan> left , right;
-            left = pop_scan(scantbl, it->lhs_col.tab_name, joined_tables, table_scan_executors);
-            right = pop_scan(scantbl, it->rhs_col.tab_name, joined_tables, table_scan_executors);
+            left = pop_scan(scantbl.data(), it->lhs_col.tab_name, joined_tables, table_scan_executors);
+            right = pop_scan(scantbl.data(), it->rhs_col.tab_name, joined_tables, table_scan_executors);
             std::vector<Condition> join_conds{*it};
             //建立join
             table_join_executors = std::make_shared<JoinPlan>(T_NestLoop, std::move(left), std::move(right), join_conds);
@@ -198,10 +194,10 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
             std::shared_ptr<Plan> right_need_to_join_executors = nullptr;
             bool isneedreverse = false;
             if (std::find(joined_tables.begin(), joined_tables.end(), it->lhs_col.tab_name) == joined_tables.end()) {
-                left_need_to_join_executors = pop_scan(scantbl, it->lhs_col.tab_name, joined_tables, table_scan_executors);
+                left_need_to_join_executors = pop_scan(scantbl.data(), it->lhs_col.tab_name, joined_tables, table_scan_executors);
             }
             if (std::find(joined_tables.begin(), joined_tables.end(), it->rhs_col.tab_name) == joined_tables.end()) {
-                right_need_to_join_executors = pop_scan(scantbl, it->rhs_col.tab_name, joined_tables, table_scan_executors);
+                right_need_to_join_executors = pop_scan(scantbl.data(), it->rhs_col.tab_name, joined_tables, table_scan_executors);
                 isneedreverse = true;
             } 
 

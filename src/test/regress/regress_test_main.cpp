@@ -3,12 +3,6 @@
 #include "regress_test.h"
 
 int main(int argc, char** argv) {
-    if(argc < 2) {
-        fprintf(stderr, "Test_case needed.\n");
-        exit(1);
-    }
-    std::string infile = argv[1];
-
     const char *unix_socket_path = nullptr;
     const char *server_host = "127.0.0.1";
     int server_port = PORT_DEFAULT;
@@ -30,7 +24,13 @@ int main(int argc, char** argv) {
                 break;
         }
     }
-    
+
+    if (optind >= argc) {
+        fprintf(stderr, "Test_case needed.\n");
+        exit(1);
+    }
+    std::string infile = argv[optind];
+
     int sockfd = connect_database(unix_socket_path, server_host, server_port);
     start_test(sockfd, infile);
     disconnect(sockfd);

@@ -1,159 +1,411 @@
 #include <netdb.h>
-#include <netinet/in.h>
+#include <getopt.h>
 #include <readline/history.h>
 #include <readline/readline.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <sys/types.h>
-#include <sys/un.h>
-#include <termios.h>
 #include <unistd.h>
 
-#include <cassert>
+#include <cerrno>
+#include <csignal>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
 #include <iostream>
-#include <memory>
+#include <sstream>
 #include <string>
+#include <vector>
 
-#define MAX_MEM_BUFFER_SIZE 8192
-#define PORT_DEFAULT 8765
+#include "net/wire.h"
 
-bool is_exit_command(std::string &cmd) { return cmd == "exit" || cmd == "exit;" || cmd == "bye" || cmd == "bye;"; }
+namespace {
 
-int init_unix_sock(const char *unix_sock_path) {
-    int sockfd = socket(PF_UNIX, SOCK_STREAM, 0);
+constexpr int kDefaultPort = 8765;
+
+void PrintUsage(const char *prog) {
+    std::cerr
+        << "Usage: " << prog << " [options]\n"
+        << "\n"
+        << "Rucbase interactive SQL client (staff-provided).\n"
+        << "\n"
+        << "Options:\n"
+        << "  -h <host>     Server host (default: 127.0.0.1)\n"
+        << "  -p <port>     Server port (default: " << kDefaultPort << ")\n"
+        << "  -e <sql>      Execute one statement and exit\n"
+        << "  -f <file>     Execute SQL statements from a file and exit\n"
+        << "  -q            Quiet mode (suppress the welcome banner)\n"
+        << "  -?, --help    Show this help\n"
+        << "\n"
+        << "Interactive tips:\n"
+        << "  - End a statement with ';'\n"
+        << "  - Multi-line input is supported until ';'\n"
+        << "  - Type exit; or bye; (or Ctrl-D) to quit\n"
+        << "\n"
+        << "Examples:\n"
+        << "  " << prog << "\n"
+        << "  " << prog << " -h 127.0.0.1 -p 8765\n"
+        << "  " << prog << " -e \"show tables;\"\n"
+        << "  " << prog << " -f demo.sql\n";
+}
+
+bool IsExitCommand(const std::string &cmd) {
+    return cmd == "exit" || cmd == "exit;" || cmd == "bye" || cmd == "bye;";
+}
+
+std::string Trim(const std::string &input) {
+    const auto begin = input.find_first_not_of(" \t\r\n");
+    if (begin == std::string::npos) {
+        return "";
+    }
+    const auto end = input.find_last_not_of(" \t\r\n");
+    return input.substr(begin, end - begin + 1);
+}
+
+bool LooksComplete(const std::string &sql) {
+    const std::string trimmed = Trim(sql);
+    return !trimmed.empty() && trimmed.back() == ';';
+}
+
+int InitTcpSocket(const char *server_host, int server_port) {
+    addrinfo hints{};
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    addrinfo *result = nullptr;
+    const std::string port = std::to_string(server_port);
+    const int rc = getaddrinfo(server_host, port.c_str(), &hints, &result);
+    if (rc != 0) {
+        std::cerr << "getaddrinfo(" << server_host << ":" << server_port << ") failed: " << gai_strerror(rc)
+                  << '\n';
+        return -1;
+    }
+
+    int sockfd = -1;
+    for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next) {
+        sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+        if (sockfd < 0) {
+            continue;
+        }
+        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
+            break;
+        }
+        close(sockfd);
+        sockfd = -1;
+    }
+    freeaddrinfo(result);
+
     if (sockfd < 0) {
-        fprintf(stderr, "failed to create unix socket. %s", strerror(errno));
-        return -1;
-    }
-
-    struct sockaddr_un sockaddr;
-    memset(&sockaddr, 0, sizeof(sockaddr));
-    sockaddr.sun_family = PF_UNIX;
-    snprintf(sockaddr.sun_path, sizeof(sockaddr.sun_path), "%s", unix_sock_path);
-
-    if (connect(sockfd, (struct sockaddr *)&sockaddr, sizeof(sockaddr)) < 0) {
-        fprintf(stderr, "failed to connect to server. unix socket path '%s'. error %s", sockaddr.sun_path,
-                strerror(errno));
-        close(sockfd);
+        std::cerr << "failed to connect to " << server_host << ":" << server_port << " (" << strerror(errno)
+                  << ")\n"
+                  << "Hint: start the server first, e.g.\n"
+                  << "  ./bin/rmdb -p " << server_port << " <database_name>\n";
         return -1;
     }
     return sockfd;
 }
 
-int init_tcp_sock(const char *server_host, int server_port) {
-    struct hostent *host;
-    struct sockaddr_in serv_addr;
-
-    if ((host = gethostbyname(server_host)) == NULL) {
-        fprintf(stderr, "gethostbyname failed. errmsg=%d:%s\n", errno, strerror(errno));
-        return -1;
+bool SendSql(int sockfd, const std::string &sql, bool print_response) {
+    const std::string command = Trim(sql);
+    if (command.empty()) {
+        return true;
     }
 
-    int sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        fprintf(stderr, "create socket error. errmsg=%d:%s\n", errno, strerror(errno));
-        return -1;
+    std::string response;
+    std::string diagnostic;
+    if (!rucbase::wire::ExecStream(sockfd, command, &response, &diagnostic)) {
+        if (!diagnostic.empty()) {
+            std::cerr << diagnostic;
+            if (diagnostic.back() != '\n') {
+                std::cerr << '\n';
+            }
+        } else {
+            std::cerr << "EXEC_STREAM failed\n";
+        }
+        return false;
     }
-
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(server_port);
-    serv_addr.sin_addr = *((struct in_addr *)host->h_addr);
-    bzero(&(serv_addr.sin_zero), 8);
-
-    if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(struct sockaddr)) == -1) {
-        fprintf(stderr, "Failed to connect. errmsg=%d:%s\n", errno, strerror(errno));
-        close(sockfd);
-        return -1;
+    if (print_response && !response.empty()) {
+        std::cout << response;
+        if (response.back() != '\n') {
+            std::cout << '\n';
+        }
     }
-    return sockfd;
+    return true;
 }
 
-int main(int argc, char *argv[]) {
-    int ret = 0;  // set_terminal_noncanonical();
-                  //    if (ret < 0) {
-                  //        printf("Warning: failed to set terminal non canonical. Long command may be "
-                  //               "handled incorrect\n");
-                  //    }
+std::string FetchDatabaseName(int sockfd) {
+    std::string database;
+    std::string diagnostic;
+    if (!rucbase::wire::ExecStream(sockfd, rucbase::wire::kDatabaseNameRequest, &database, &diagnostic) ||
+        Trim(database).empty()) {
+        return "?";
+    }
+    return Trim(database);
+}
 
-    const char *unix_socket_path = nullptr;
-    const char *server_host = "127.0.0.1";  // 127.0.0.1 192.168.31.25
-    int server_port = PORT_DEFAULT;
-    int opt;
+std::vector<std::string> SplitStatements(const std::string &script) {
+    std::vector<std::string> statements;
+    std::string current;
+    bool in_string = false;
+    bool in_line_comment = false;
+    bool in_block_comment = false;
 
-    while ((opt = getopt(argc, argv, "s:h:p:")) > 0) {
-        switch (opt) {
-            case 's':
-                unix_socket_path = optarg;
-                break;
-            case 'p':
-                char *ptr;
-                server_port = (int)strtol(optarg, &ptr, 10);
-                break;
-            case 'h':
-                server_host = optarg;
-                break;
-            default:
-                break;
+    const auto append_space = [&current]() {
+        if (!current.empty() && current.back() != ' ') {
+            current.push_back(' ');
+        }
+    };
+
+    for (size_t index = 0; index < script.size(); ++index) {
+        const char ch = script[index];
+        const char next = index + 1 < script.size() ? script[index + 1] : '\0';
+
+        if (in_line_comment) {
+            if (ch == '\n') {
+                in_line_comment = false;
+                append_space();
+            }
+            continue;
+        }
+
+        if (in_block_comment) {
+            if (ch == '*' && next == '/') {
+                in_block_comment = false;
+                ++index;
+                append_space();
+            }
+            continue;
+        }
+
+        if (!in_string && ch == '-' && next == '-') {
+            in_line_comment = true;
+            ++index;
+            append_space();
+            continue;
+        }
+        if (!in_string && ch == '/' && next == '*') {
+            in_block_comment = true;
+            ++index;
+            append_space();
+            continue;
+        }
+
+        if (ch == '\'') {
+            current.push_back(ch);
+            if (in_string && next == '\'') {
+                current.push_back(next);
+                ++index;
+            } else {
+                in_string = !in_string;
+            }
+            continue;
+        }
+
+        if (!in_string && ch == ';') {
+            current.push_back(ch);
+            statements.push_back(Trim(current));
+            current.clear();
+            continue;
+        }
+
+        if (!in_string && (ch == '\n' || ch == '\r' || ch == '\t')) {
+            append_space();
+        } else {
+            current.push_back(ch);
         }
     }
 
-    // const char *prompt_str = "RucBase > ";
-
-    int sockfd, send_bytes;
-    // char send[MAXLINE];
-
-    if (unix_socket_path != nullptr) {
-        sockfd = init_unix_sock(unix_socket_path);
-    } else {
-        sockfd = init_tcp_sock(server_host, server_port);
+    if (!Trim(current).empty()) {
+        statements.push_back(Trim(current));
     }
+    return statements;
+}
+
+bool RunScriptFile(int sockfd, const std::string &path) {
+    std::ifstream file(path);
+    if (!file) {
+        std::cerr << "failed to open SQL file: " << path << '\n';
+        return false;
+    }
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    for (const auto &stmt : SplitStatements(buffer.str())) {
+        if (IsExitCommand(stmt)) {
+            return true;
+        }
+        if (!SendSql(sockfd, stmt, true)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int RunInteractive(int sockfd, const std::string &database_name) {
+    std::string pending;
+    const std::string primary_prompt = "Rucbase(" + database_name + ")> ";
+    const std::string continuation_prompt(primary_prompt.size() - 3, ' ');
+    while (true) {
+        const std::string prompt = pending.empty() ? primary_prompt : continuation_prompt + "-> ";
+        char *line_read = readline(prompt.c_str());
+        if (line_read == nullptr) {
+            std::cout << "\n";
+            break;
+        }
+        std::string line = line_read;
+        free(line_read);
+
+        if (Trim(line).empty() && pending.empty()) {
+            continue;
+        }
+
+        if (!pending.empty()) {
+            pending.push_back(' ');
+        }
+        pending += line;
+
+        if (!LooksComplete(pending) && !IsExitCommand(Trim(pending))) {
+            continue;
+        }
+
+        const std::string command = Trim(pending);
+        pending.clear();
+        if (command.empty()) {
+            continue;
+        }
+
+        add_history(command.c_str());
+        if (IsExitCommand(command)) {
+            std::cout << "The client will be closed.\n";
+            break;
+        }
+        if (!SendSql(sockfd, command, true)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+}  // namespace
+
+int main(int argc, char *argv[]) {
+    const char *server_host = "127.0.0.1";
+    int server_port = kDefaultPort;
+    const char *execute_sql = nullptr;
+    const char *script_file = nullptr;
+    bool quiet = false;
+
+    opterr = 0;
+    constexpr int kHelpOption = 1000;
+    const option long_options[] = {
+        {"help", no_argument, nullptr, kHelpOption},
+        {nullptr, 0, nullptr, 0},
+    };
+    int opt = 0;
+    while ((opt = getopt_long(argc, argv, ":h:p:e:f:q?", long_options, nullptr)) != -1) {
+        switch (opt) {
+            case 'h':
+                server_host = optarg;
+                break;
+            case 'p': {
+                char *end = nullptr;
+                const long value = std::strtol(optarg, &end, 10);
+                if (end == optarg || *end != '\0' || value <= 0 || value > 65535) {
+                    std::cerr << "invalid port: " << optarg << '\n';
+                    return 1;
+                }
+                server_port = static_cast<int>(value);
+                break;
+            }
+            case 'e':
+                execute_sql = optarg;
+                break;
+            case 'f':
+                script_file = optarg;
+                break;
+            case 'q':
+                quiet = true;
+                break;
+            case kHelpOption:
+                PrintUsage(argv[0]);
+                return 0;
+            case ':':
+                std::cerr << "option requires an argument: -" << static_cast<char>(optopt) << '\n';
+                PrintUsage(argv[0]);
+                return 1;
+            case '?':
+                if (std::strcmp(argv[optind - 1], "-?") == 0) {
+                    PrintUsage(argv[0]);
+                    return 0;
+                }
+                if (optopt != 0) {
+                    std::cerr << "unknown option: -" << static_cast<char>(optopt) << '\n';
+                } else {
+                    std::cerr << "unknown option: " << argv[optind - 1] << '\n';
+                }
+                PrintUsage(argv[0]);
+                return 1;
+            default:
+                return 1;
+        }
+    }
+
+    if (optind < argc) {
+        std::cerr << "unexpected argument: " << argv[optind] << '\n';
+        PrintUsage(argv[0]);
+        return 1;
+    }
+
+    if (execute_sql != nullptr && script_file != nullptr) {
+        std::cerr << "-e and -f cannot be used together\n";
+        return 1;
+    }
+
+    // Convert a peer-closed connection into an EPIPE error from send() instead
+    // of terminating the client process.
+    std::signal(SIGPIPE, SIG_IGN);
+
+    const int sockfd = InitTcpSocket(server_host, server_port);
     if (sockfd < 0) {
         return 1;
     }
 
-    char recv_buf[MAX_MEM_BUFFER_SIZE];
-
-    while (1) {
-        char *line_read = readline("Rucbase> ");
-        if (line_read == nullptr) {
-            // EOF encountered
-            break;
-        }
-        std::string command = line_read;
-        free(line_read);
-
-        if (!command.empty()) {
-            add_history(command.c_str());
-            if (is_exit_command(command)) {
-                printf("The client will be closed.\n");
-                break;
-            }
-
-            if ((send_bytes = write(sockfd, command.c_str(), command.length() + 1)) == -1) {
-                // fprintf(stderr, "send error: %d:%s \n", errno, strerror(errno));
-                std::cerr << "send error: " << errno << ":" << strerror(errno) << " \n" << std::endl;
-                exit(1);
-            }
-            int len = recv(sockfd, recv_buf, MAX_MEM_BUFFER_SIZE, 0);
-            if (len < 0) {
-                fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
-                break;
-            } else if (len == 0) {
-                printf("Connection has been closed\n");
-                break;
-            } else {
-                for (int i = 0; i <= len; i++) {
-                    if (recv_buf[i] == '\0') {
-                        break;
-                    } else {
-                        printf("%c", recv_buf[i]);
-                    }
-                }
-                memset(recv_buf, 0, MAX_MEM_BUFFER_SIZE);
-            }
-        }
+    if (!rucbase::wire::ClientHandshake(sockfd)) {
+        std::cerr << "wire handshake failed (server must speak docs/rmdb_wire.md v3.0)\n";
+        close(sockfd);
+        return 1;
     }
+
+    const bool interactive = execute_sql == nullptr && script_file == nullptr;
+    const std::string database_name = interactive ? FetchDatabaseName(sockfd) : "";
+
+    if (!quiet && interactive) {
+        std::cout << "\n"
+                     "  ____  _   _  ____ ____    _    ____  _____ \n"
+                     " |  _ \\| | | |/ ___| __ )  / \\  / ___|| ____|\n"
+                     " | |_) | | | | |   |  _ \\ / _ \\ \\___ \\|  _|  \n"
+                     " |  _ <| |_| | |___| |_) / ___ \\ ___) | |___ \n"
+                     " |_| \\_ \\___/ \\____|____/_/   \\_\\____/|_____|\n"
+                     "\n";
+        std::cout << "Connected to " << server_host << ":" << server_port << "\n";
+        std::cout << "Database: " << database_name << "\n";
+        std::cout << "Type 'help;' for server help, 'exit;' to quit.\n\n";
+    }
+
+    int exit_code = 0;
+    if (execute_sql != nullptr) {
+        if (!IsExitCommand(Trim(execute_sql)) && !SendSql(sockfd, execute_sql, true)) {
+            exit_code = 1;
+        }
+    } else if (script_file != nullptr) {
+        if (!RunScriptFile(sockfd, script_file)) {
+            exit_code = 1;
+        }
+    } else {
+        exit_code = RunInteractive(sockfd, database_name);
+    }
+
     close(sockfd);
-    printf("Bye.\n");
-    return 0;
+    if (!quiet && interactive) {
+        std::cout << "Bye.\n";
+    }
+    return exit_code;
 }

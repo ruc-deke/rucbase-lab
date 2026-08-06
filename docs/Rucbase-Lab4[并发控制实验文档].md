@@ -3,6 +3,8 @@
 
 Rucbase并发控制模块采用的是基于封锁的并发控制协议，要求事务达到可串行化隔离级别。在本实验中，你需要实现事务管理器、锁管理器，并使用事务管理器和锁管理器提供的相关接口保证事务正确地并发执行。
 
+![Lab 4 并发控制实验流程图](../pics/Lab4流程图.png)
+
 ## 声明
 
 在完成本实验之前，需要取消`rmdb.cpp::client_handler()`函数中对如下语句的注释：
@@ -72,6 +74,8 @@ public:
 cd src/test/transaction
 python transaction_test.py
 ```
+
+该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.transaction`。
 
 本测试包含两个测试点，分别对事务的提交和回滚进行测试，测试点分数设置如下：
 
@@ -186,6 +190,8 @@ private:
 cd src/test/concurrency
 python concurrency_test.py
 ```
+
+该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.concurrency`。测试失败日志位于`build/debug/test-logs`。
 
 本测试包含六个测试点考虑，对应不同的数据异常：
 

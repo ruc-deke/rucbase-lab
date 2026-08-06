@@ -33,6 +33,8 @@
 
 其中，学生只要实现`IxIndexHandle`、`IxNodeHandle`中的接口。已提供其他类的完整源码。
 
+![Lab 2 索引管理实验流程图](../pics/Lab2流程图.png)
+
 B+树的结构如图：
 
 ![B+树的结构](../pics/B+树的结构.png)

@@ -16,6 +16,8 @@
 #include <fstream>
 #include <mutex>
 
+#include "net/wire.h"
+
 #define MAX_MEM_BUFFER_SIZE 8192
 #define PORT_DEFAULT 8765
 #define MAX_CLIENT_NUM 4    // 同时连接服务端的客户端数量
@@ -73,28 +75,24 @@ int init_tcp_sock(const char *server_host, int server_port) {
 }
 
 void send_recv_sql(int sockfd, std::string sql) {
-    int send_bytes;
-    char recv_buf[MAX_MEM_BUFFER_SIZE];
-
-    std::cout << sql << std::endl;
-
-    if((send_bytes = write(sockfd, sql.c_str(), sql.length() + 1)) == -1) {
-        std::cerr << "send error: " << errno << ":" << strerror(errno) << " \n" << std::endl;
-        exit(1);
-    }
-
-    // std::cout << "send bytes: " << send_bytes << std::endl;
-
-    int len = recv(sockfd, recv_buf, MAX_MEM_BUFFER_SIZE, 0);
-    if (len < 0) {
-        fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
-        return;
-    } else if (len == 0) {
-        printf("Connection has been closed\n");
+    const size_t first = sql.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos || sql.compare(first, 2, "--") == 0) {
         return;
     }
-
-    // printf("%s\n", recv_buf);
+    std::string response;
+    std::string diagnostic;
+    if (!rucbase::wire::ExecStream(sockfd, sql, &response, &diagnostic)) {
+        std::cerr << "EXEC_STREAM failed: "
+                  << (diagnostic.empty() ? "unknown error" : diagnostic) << std::endl;
+        std::cout << "failure\n";
+        return;
+    }
+    if (!response.empty()) {
+        std::cout << response;
+        if (response.back() != '\n') {
+            std::cout << '\n';
+        }
+    }
 }
 
 enum TestCase {
@@ -123,6 +121,12 @@ int connect_database(const char* unix_sockect_path, const char* server_host, int
     }
 
     if(sockfd < 0) {
+        exit(1);
+    }
+
+    if (!rucbase::wire::ClientHandshake(sockfd)) {
+        fprintf(stderr, "wire handshake failed\n");
+        close(sockfd);
         exit(1);
     }
 

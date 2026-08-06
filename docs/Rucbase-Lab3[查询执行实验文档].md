@@ -35,6 +35,8 @@
 
 Rucbase查询执行模块采用的是火山模型(Volcano Model),你可以通过[链接](https://www.computer.org/csdl/journal/tk/1994/01/k0120/13rRUwI5TRe)获取相应论文阅读以理解火山模型的基本概念，并结合项目结构文档理解系统查询模块的整体架构和处理流程。
 
+![Lab 3 查询执行实验流程图](../pics/Lab3流程图.png)
+
 ## 实验一：元数据管理和DDL语句 (25分)
 
 在本实验中，你需要完成src/system/sm_manager.cpp中的接口，使得系统能够支持DDL语句，具体包括create table、drop table、create index和drop index语句。
@@ -72,6 +74,8 @@ cd src/test/query
 python query_unit_test.py basic_query_test1.sql # 25分
 python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desired test file index
 ```
+
+上述兼容命令内部使用pytest运行测试，不再删除已有构建目录。也可以在仓库根目录执行`ctest --preset debug -R blackbox.query`。
 
 
 ## 实验二：DML语句实现（75分）
@@ -144,6 +148,8 @@ cd src/test/query
 python query_test_basic.py  # 100分
 ```
 
+测试失败时可在`build/debug/test-logs`中查看服务端和客户端日志。
+
 
 ## 测试说明
 
@@ -159,5 +165,6 @@ python query_test_basic.py  # 100分
 
 **注意⚠️：**
 
-在本测试中，要求把select语句的输出写入到指定文件中，写入逻辑已经在select_from函数中给出，不要修改写入格式。
-对于执行错误的SQL语句，需要打印failure到output.txt文件中。
+当前版本通过 Wire 客户端接收 `SELECT` 的类型化结果，测试客户端将格式化结果输出到
+stdout，黑盒测试直接比较客户端输出。服务端不再生成或维护 `output.txt`；执行错误以
+Wire `ERROR` 响应返回，测试客户端将其归一化为 `failure`。

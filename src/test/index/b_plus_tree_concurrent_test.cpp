@@ -1,5 +1,6 @@
 #include <chrono>  // NOLINT
 #include <cstdio>
+#include <cinttypes>
 #include <functional>
 #include <random>  // for std::default_random_engine
 #include <thread>  // NOLINT
@@ -16,8 +17,7 @@
 
 const std::string TEST_DB_NAME = "BPlusTreeConcurrentTest_db";  // 以数据库名作为根目录
 const std::string TEST_FILE_NAME = "table1";                    // 测试文件名的前缀
-const int index_no = 0;                 
-const std::vector<std::string> TEST_COL = {"col1"};             
+const std::vector<std::string> TEST_COL = {"col1"};
 // 创建的索引文件名为"table1.0.idx"（TEST_FILE_NAME + index_no + .idx）
 
 /** 注意：每个测试点只测试了单个文件！
@@ -401,7 +401,7 @@ TEST_F(BPlusTreeConcurrentTest, InsertScaleTest) {
 
     // 这里调用了insert_entry，并且用thread_num个进程并发插入（并发查找也放进去了）
     LaunchParallelTest(thread_num, InsertHelper, ih_.get(), keys);
-    printf("Insert key 1~%ld finished\n", scale);
+    printf("Insert key 1~%" PRId64 " finished\n", scale);
 
     int64_t start_key = 1;
     int64_t current_key = start_key;
@@ -438,7 +438,7 @@ TEST_F(BPlusTreeConcurrentTest, MixScaleTest) {
     }
     // 这里调用了insert_entry，并且用thread_num个进程并发插入（包括并发查找）
     LaunchParallelTest(thread_num, InsertHelper, ih_.get(), keys);
-    printf("Insert key 1~%ld finished\n", scale);
+    printf("Insert key 1~%" PRId64 " finished\n", scale);
 
     // keys to Delete
     std::vector<int64_t> delete_keys;
@@ -446,7 +446,7 @@ TEST_F(BPlusTreeConcurrentTest, MixScaleTest) {
         delete_keys.push_back(key);
     }
     LaunchParallelTest(thread_num, DeleteHelper, ih_.get(), delete_keys);
-    printf("Delete key 1~%ld finished\n", delete_scale);
+    printf("Delete key 1~%" PRId64 " finished\n", delete_scale);
 
     int64_t start_key = *delete_keys.rbegin() + 1;
     int64_t current_key = start_key;

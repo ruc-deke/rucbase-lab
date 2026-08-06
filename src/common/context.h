@@ -10,6 +10,10 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "defs.h"
 #include "transaction/transaction.h"
 #include "transaction/concurrency/lock_manager.h"
 #include "recovery/log_manager.h"
@@ -18,6 +22,28 @@ See the Mulan PSL v2 for more details. */
 
 // used for data_send
 static int const_offset = -1;
+
+// Structured SELECT result for docs/rmdb_wire.md META/ROW/RESULT_END.
+struct WireResultColumn {
+    std::string name;
+    ColType type = TYPE_STRING;
+};
+
+struct WireResultCell {
+    ColType type = TYPE_STRING;
+    int int_val = 0;
+    float float_val = 0.0f;
+    std::string str_val;
+};
+
+struct WireResultSet {
+    static constexpr size_t kMaxBufferedBytes = 16u * 1024u * 1024u;
+
+    bool has_query_result = false;
+    size_t buffered_bytes = 0;
+    std::vector<WireResultColumn> columns;
+    std::vector<std::vector<WireResultCell>> rows;
+};
 
 class Context {
 public:
@@ -35,4 +61,5 @@ public:
     char *data_send_;
     int *offset_;
     bool ellipsis_;
+    WireResultSet wire_result_;
 };

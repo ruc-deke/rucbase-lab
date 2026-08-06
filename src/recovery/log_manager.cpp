@@ -17,7 +17,8 @@ See the Mulan PSL v2 for more details. */
  * @return {lsn_t} 返回该日志的日志记录号
  */
 lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
-  
+    // Todo: assign LSN, append to log buffer, return the LSN
+    return INVALID_LSN;
 }
 
 /**

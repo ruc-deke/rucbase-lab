@@ -18,7 +18,6 @@ See the Mulan PSL v2 for more details. */
 #include "executor_seq_scan.h"
 #include "executor_update.h"
 #include "index/ix.h"
-#include "record_printer.h"
 
 const char *help_info = "Supported SQL syntax:\n"
                    "  command ;\n"
@@ -127,7 +126,7 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
     }
 }
 
-// 执行select语句，select语句的输出除了需要返回客户端外，还需要写入output.txt文件中
+// 执行 select 语句，结构化结果通过当前请求的 Wire 响应返回。
 void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols, 
                             Context *context) {
     std::vector<std::string> captions;
@@ -136,54 +135,53 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         captions.push_back(sel_col.col_name);
     }
 
-    // Print header into buffer
-    RecordPrinter rec_printer(sel_cols.size());
-    rec_printer.print_separator(context);
-    rec_printer.print_record(captions, context);
-    rec_printer.print_separator(context);
-    // print header into file
-    std::fstream outfile;
-    outfile.open("output.txt", std::ios::out | std::ios::app);
-    outfile << "|";
-    for(int i = 0; i < captions.size(); ++i) {
-        outfile << " " << captions[i] << " |";
+    // Build typed wire result (META/ROW) from executor schema + tuples.
+    // Wire clients format the typed result; data_send is not used for SELECT.
+    context->wire_result_ = WireResultSet{};
+    context->wire_result_.has_query_result = true;
+    const auto &proj_cols = executorTreeRoot->cols();
+    context->wire_result_.columns.reserve(proj_cols.size());
+    for (size_t i = 0; i < proj_cols.size(); ++i) {
+        WireResultColumn column;
+        column.name = i < captions.size() ? captions[i] : proj_cols[i].name;
+        column.type = proj_cols[i].type;
+        context->wire_result_.columns.push_back(std::move(column));
     }
-    outfile << "\n";
 
-    // Print records
-    size_t num_rec = 0;
-    // 执行query_plan
+    // Execute the query plan and collect the bounded typed result.
     for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
         auto Tuple = executorTreeRoot->Next();
-        std::vector<std::string> columns;
-        for (auto &col : executorTreeRoot->cols()) {
+        std::vector<WireResultCell> wire_row;
+        size_t wire_row_bytes = 0;
+        wire_row.reserve(proj_cols.size());
+        for (auto &col : proj_cols) {
             std::string col_str;
             char *rec_buf = Tuple->data + col.offset;
+            WireResultCell cell;
+            cell.type = col.type;
             if (col.type == TYPE_INT) {
-                col_str = std::to_string(*(int *)rec_buf);
+                cell.int_val = *reinterpret_cast<int *>(rec_buf);
+                col_str = std::to_string(cell.int_val);
+                wire_row_bytes += 1 + sizeof(int32_t);
             } else if (col.type == TYPE_FLOAT) {
-                col_str = std::to_string(*(float *)rec_buf);
+                cell.float_val = *reinterpret_cast<float *>(rec_buf);
+                col_str = std::to_string(cell.float_val);
+                wire_row_bytes += 1 + sizeof(float);
             } else if (col.type == TYPE_STRING) {
-                col_str = std::string((char *)rec_buf, col.len);
+                col_str = std::string(rec_buf, col.len);
                 col_str.resize(strlen(col_str.c_str()));
+                cell.str_val = col_str;
+                wire_row_bytes += 1 + sizeof(uint32_t) + cell.str_val.size();
             }
-            columns.push_back(col_str);
+            wire_row.push_back(std::move(cell));
         }
-        // print record into buffer
-        rec_printer.print_record(columns, context);
-        // print record into file
-        outfile << "|";
-        for(int i = 0; i < columns.size(); ++i) {
-            outfile << " " << columns[i] << " |";
+        if (context->wire_result_.buffered_bytes > WireResultSet::kMaxBufferedBytes ||
+            wire_row_bytes > WireResultSet::kMaxBufferedBytes - context->wire_result_.buffered_bytes) {
+            throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
         }
-        outfile << "\n";
-        num_rec++;
+        context->wire_result_.buffered_bytes += wire_row_bytes;
+        context->wire_result_.rows.push_back(std::move(wire_row));
     }
-    outfile.close();
-    // Print footer into buffer
-    rec_printer.print_separator(context);
-    // Print record count into buffer
-    RecordPrinter::print_record_count(num_rec, context);
 }
 
 // 执行DML语句

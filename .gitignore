@@ -19,6 +19,8 @@
 
 # python
 __pycache__/
+.pytest_cache/
+CMakeUserPresets.json
 
 # backup
 *_backup/
@@ -29,3 +31,4 @@ __pycache__/
 *.zip
 
 deps/
+.dockerignore

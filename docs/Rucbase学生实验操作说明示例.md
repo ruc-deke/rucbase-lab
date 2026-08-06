@@ -132,12 +132,12 @@ add_library(lru_replacer STATIC ${SOURCES})
 add_library(clock_replacer STATIC ${SOURCES})
 
 add_executable(lru_replacer_test lru_replacer_test.cpp)
-target_link_libraries(lru_replacer_test lru_replacer gtest_main)  # add gtest
+target_link_libraries(lru_replacer_test lru_replacer GTest::gtest_main)  # add gtest
 
 
 
 add_executable(clock_replacer_test clock_replacer_test.cpp)
-target_link_libraries(clock_replacer_test clock_replacer gtest_main)  # add gtest
+target_link_libraries(clock_replacer_test clock_replacer GTest::gtest_main)  # add gtest
 ```
 
 这里将`lru_replacer_test.cpp`生成可执行文件`lru_replacer_test`，因此你需要`make lru_replacer_test`来生成测试可执行文件，其他实验测试命名以依据此规范。
@@ -165,4 +165,3 @@ Scanning dependencies of target lru_replacer
 我们鼓励你使用`Github`或者`Gitee`的私有仓库功能，建立自己的远程代码库进行代码与报告提交，并将助教账户添加为你们仓库的协作者或者赋予访问权限。助教会定期拉取你们的仓库代码进行测试，并将测试结果贴在仓库的`issues`中。
 
 你们也可以使用压缩包的方式将自己对应实验更改的代码文件以及相关报告发送到助教邮箱或者其他系统中，请根据个人喜好选择提交方式。
-

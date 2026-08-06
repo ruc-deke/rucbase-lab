@@ -16,6 +16,8 @@
 #include <fstream>
 #include <mutex>
 
+#include "net/wire.h"
+
 #define MAX_MEM_BUFFER_SIZE 8192
 #define PORT_DEFAULT 8765
 #define MAX_CLIENT_NUM 4    // 同时连接服务端的客户端数量
@@ -73,39 +75,31 @@ int init_tcp_sock(const char *server_host, int server_port) {
 }
 
 void send_recv_sql(int sockfd, std::string sql) {
-    int send_bytes;
-    char recv_buf[MAX_MEM_BUFFER_SIZE];
-
-    if((send_bytes = write(sockfd, sql.c_str(), sql.length() + 1)) == -1) {
-        std::cerr << "send error: " << errno << ":" << strerror(errno) << " \n" << std::endl;
-        exit(1);
-    }
-
-    int len = recv(sockfd, recv_buf, MAX_MEM_BUFFER_SIZE, 0);
-    if (len < 0) {
-        fprintf(stderr, "Connection was broken: %s\n", strerror(errno));
-        return;
-    } else if (len == 0) {
-        printf("Connection has been closed\n");
+    const size_t first = sql.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos || sql.compare(first, 2, "--") == 0) {
         return;
     }
-
-    // printf("%s\n", recv_buf);
+    std::string response;
+    std::string diagnostic;
+    if (!rucbase::wire::ExecStream(sockfd, sql, &response, &diagnostic)) {
+        std::cerr << "EXEC_STREAM failed: " << (diagnostic.empty() ? "unknown error" : diagnostic)
+                  << std::endl;
+        std::cout << "failure\n";
+        return;
+    }
+    if (!response.empty()) {
+        std::cout << response;
+        if (response.back() != '\n') {
+            std::cout << '\n';
+        }
+    }
 }
 
 int main(int argc, char *argv[]) {
-    int ret = 0;  // set_terminal_noncanonical();
-                  //    if (ret < 0) {
-                  //        printf("Warning: failed to set terminal non canonical. Long command may be "
-                  //               "handled incorrect\n");
-                  //    }
-
     const char *unix_socket_path = nullptr;
     const char *server_host = "127.0.0.1";  // 127.0.0.1 192.168.31.25
     int server_port = PORT_DEFAULT;
     int opt;
-    std::string test_name = argv[1];
-    
 
     while ((opt = getopt(argc, argv, "s:h:p:")) > 0) {
         switch (opt) {
@@ -124,6 +118,12 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (optind >= argc) {
+        fprintf(stderr, "Test file needed.\n");
+        return 1;
+    }
+    std::string test_name = argv[optind];
+
     // const char *prompt_str = "RucBase > ";
 
     int sockfd;
@@ -135,6 +135,11 @@ int main(int argc, char *argv[]) {
         sockfd = init_tcp_sock(server_host, server_port);
     }
     if (sockfd < 0) {
+        return 1;
+    }
+    if (!rucbase::wire::ClientHandshake(sockfd)) {
+        fprintf(stderr, "wire handshake failed\n");
+        close(sockfd);
         return 1;
     }
 

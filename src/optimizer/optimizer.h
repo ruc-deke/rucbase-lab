@@ -23,7 +23,7 @@ See the Mulan PSL v2 for more details. */
 
 class Optimizer {
    private:
-    SmManager *sm_manager_;
+    [[maybe_unused]] SmManager *sm_manager_;
     Planner *planner_;
 
    public:

@@ -12,7 +12,6 @@
 
 constexpr int MAX_FILES = 32;
 constexpr int MAX_PAGES = 128;
-constexpr size_t TEST_BUFFER_POOL_SIZE = MAX_FILES * MAX_PAGES;
 const std::string TEST_DB_NAME = "BufferPoolManagerTest_db";  // 以TEST_DB_NAME作为存放测试文件的根目录名
 
 // Add by jiawen
