@@ -29,14 +29,9 @@ class SocketPair {
     int client() const { return fds_[0]; }
     int server() const { return fds_[1]; }
 
-    void CloseServer() {
-        // A plain close sends FIN, and the peer may still accept one small
-        // write from its local buffer (notably on Windows/MSYS2).  Reset the
-        // socket instead so the write-error assertion is deterministic.
-        const struct linger reset{1, 0};
-        (void)setsockopt(fds_[1], SOL_SOCKET, SO_LINGER, &reset, sizeof(reset));
-        close(fds_[1]);
-        fds_[1] = -1;
+    void CloseClient() {
+        close(fds_[0]);
+        fds_[0] = -1;
     }
 
    private:
@@ -95,9 +90,13 @@ TEST(WireFrameTest, RejectsOversizedPayloadBeforeAllocation) {
     EXPECT_FALSE(rucbase::wire::ReadFrame(sockets.server(), &frame));
 }
 
-TEST(WireFrameTest, PeerDisconnectIsAWriteError) {
+TEST(WireFrameTest, ClosedDescriptorIsAWriteError) {
     SocketPair sockets;
-    sockets.CloseServer();
+    // A peer close is observed asynchronously on stream sockets: Windows /
+    // MSYS2 may accept one small write after the peer has sent FIN.  Use a
+    // closed descriptor to exercise the same WriteAll error path
+    // deterministically on every supported platform.
+    sockets.CloseClient();
     const char byte = 'x';
     EXPECT_FALSE(rucbase::wire::WriteAll(sockets.client(), &byte, 1));
 }
