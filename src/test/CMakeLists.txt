@@ -1,76 +1,47 @@
-include(GoogleTest)
+function(rucbase_add_gtest target_name source dependency)
+    add_executable(${target_name} ${source})
+    target_link_libraries(${target_name} PRIVATE
+            ${dependency}
+            GTest::gtest_main
+            rucbase::project_options)
 
-function(rucbase_discover_gtests target_name)
     set(test_working_directory "${CMAKE_CURRENT_BINARY_DIR}/${target_name}")
     file(MAKE_DIRECTORY "${test_working_directory}")
-    gtest_discover_tests(${target_name}
-            TEST_PREFIX "${target_name}."
-            WORKING_DIRECTORY "${test_working_directory}"
-            PROPERTIES LABELS unit RUN_SERIAL TRUE)
+    add_test(NAME ${target_name} COMMAND ${target_name})
+    set_tests_properties(${target_name} PROPERTIES
+            LABELS unit
+            WORKING_DIRECTORY "${test_working_directory}")
 endfunction()
 
-# storage test
-add_executable(disk_manager_test storage/disk_manager_test.cpp)
-target_link_libraries(disk_manager_test PRIVATE storage GTest::gtest_main)
-rucbase_configure_target(disk_manager_test)
-rucbase_discover_gtests(disk_manager_test)
+rucbase_add_gtest(disk_manager_test storage/disk_manager_test.cpp rucbase::core)
+rucbase_add_gtest(lru_replacer_test storage/lru_replacer_test.cpp rucbase::core)
+rucbase_add_gtest(buffer_pool_manager_test storage/buffer_pool_manager_test.cpp rucbase::core)
+rucbase_add_gtest(record_manager_test storage/record_manager_test.cpp rucbase::core)
+rucbase_add_gtest(b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucbase::core)
+rucbase_add_gtest(b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core)
+rucbase_add_gtest(b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp rucbase::core)
+rucbase_add_gtest(wire_test net/wire_test.cpp rucbase::wire)
 
-add_executable(lru_replacer_test storage/lru_replacer_test.cpp)
-target_link_libraries(lru_replacer_test PRIVATE lru_replacer GTest::gtest_main)
-rucbase_configure_target(lru_replacer_test)
-rucbase_discover_gtests(lru_replacer_test)
+add_executable(test_parser ../parser/test_parser.cpp)
+target_link_libraries(test_parser PRIVATE rucbase::parser rucbase::project_options)
+add_test(NAME test_parser COMMAND test_parser
+        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+set_tests_properties(test_parser PROPERTIES LABELS unit)
 
-add_executable(buffer_pool_manager_test storage/buffer_pool_manager_test.cpp)
-target_link_libraries(buffer_pool_manager_test PRIVATE storage GTest::gtest_main)
-rucbase_configure_target(buffer_pool_manager_test)
-rucbase_discover_gtests(buffer_pool_manager_test)
+function(rucbase_add_blackbox_client target_name)
+    add_executable(${target_name} ${ARGN})
+    target_link_libraries(${target_name} PRIVATE
+            rucbase::wire
+            rucbase::project_options)
+endfunction()
 
-add_executable(record_manager_test storage/record_manager_test.cpp)
-target_link_libraries(record_manager_test PRIVATE record GTest::gtest_main)
-rucbase_configure_target(record_manager_test)
-rucbase_discover_gtests(record_manager_test)
-
-# index test
-add_executable(b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp)
-target_link_libraries(b_plus_tree_insert_test PRIVATE system index GTest::gtest_main)
-rucbase_configure_target(b_plus_tree_insert_test)
-rucbase_discover_gtests(b_plus_tree_insert_test)
-
-add_executable(b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp)
-target_link_libraries(b_plus_tree_delete_test PRIVATE system index GTest::gtest_main)
-rucbase_configure_target(b_plus_tree_delete_test)
-rucbase_discover_gtests(b_plus_tree_delete_test)
-
-add_executable(b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp)
-target_link_libraries(b_plus_tree_concurrent_test PRIVATE system index GTest::gtest_main)
-rucbase_configure_target(b_plus_tree_concurrent_test)
-rucbase_discover_gtests(b_plus_tree_concurrent_test)
-
-# wire protocol tests (independent of the storage/query lab implementations)
-add_executable(wire_test net/wire_test.cpp)
-target_link_libraries(wire_test PRIVATE rucbase_wire GTest::gtest_main Threads::Threads)
-rucbase_configure_target(wire_test)
-rucbase_discover_gtests(wire_test)
-
-# query test
-add_executable(query_test query/query_test.cpp)
-target_link_libraries(query_test PRIVATE rucbase_wire)
-rucbase_configure_target(query_test)
-
-# transaction test
-add_executable(transaction_test transaction/transaction_test.cpp)
-target_link_libraries(transaction_test PRIVATE readline rucbase_wire)
-rucbase_configure_target(transaction_test)
-
-# regress test
-add_executable(regress_test regress/regress_test_main.cpp regress/regress_test.cpp)
-target_link_libraries(regress_test PRIVATE rucbase_wire)
-rucbase_configure_target(regress_test)
-
-# concurrency test
-add_executable(concurrency_test concurrency/concurrency_test_main.cpp concurrency/concurrency_test.cpp regress/regress_test.cpp)
-target_link_libraries(concurrency_test PRIVATE rucbase_wire)
-rucbase_configure_target(concurrency_test)
+rucbase_add_blackbox_client(query_test query/query_test.cpp)
+rucbase_add_blackbox_client(transaction_test transaction/transaction_test.cpp)
+rucbase_add_blackbox_client(regress_test regress/regress_test_main.cpp regress/regress_test.cpp)
+rucbase_add_blackbox_client(concurrency_test
+        concurrency/concurrency_test_main.cpp
+        concurrency/concurrency_test.cpp
+        regress/regress_test.cpp)
 
 # The remaining C++ test programs are black-box clients. Pytest starts an rmdb
 # process, gives each test its own database and port, then invokes these clients.

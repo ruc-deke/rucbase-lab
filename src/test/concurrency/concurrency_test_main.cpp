@@ -1,13 +1,17 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include "concurrency_test.h"
 #include "../regress/regress_test.h"
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <iostream>
 
 int main(int argc, char* argv[]) {
     const char *unix_socket_path = nullptr;
     const char *server_host = "127.0.0.1";
-    int server_port = PORT_DEFAULT;
+    int server_port = kDefaultPort;
     int opt;
 
     while ((opt = getopt(argc, argv, "s:h:p:")) > 0) {
@@ -36,29 +40,32 @@ int main(int argc, char* argv[]) {
     analyzer->infile_path = argv[optind];
     analyzer->analyze_test_case();
 
-    int preload_sockfd = connect_database(unix_socket_path, server_host, server_port);
+    auto preload_client = connect_database(unix_socket_path, server_host, server_port);
     for(size_t i = 0; i < analyzer->preload.size(); ++i) {
-        if(send_sql(preload_sockfd, analyzer->preload[i]) < 0)
+        if (!execute_sql(&preload_client, analyzer->preload[i]).ok()) {
             break;
+        }
     }
-    disconnect(preload_sockfd);
+    preload_client.Close();
 
     for(size_t i = 0; i < analyzer->transactions.size(); ++i) {
-        analyzer->transactions[i]->sockfd = connect_database(unix_socket_path, server_host, server_port);
+        analyzer->transactions[i]->client = connect_database(unix_socket_path, server_host, server_port);
     }
 
     OperationPermutation* permutation = analyzer->permutation;
-    char recv_buf[MAX_MEM_BUFFER_SIZE];
     for(size_t i = 0; i < permutation->operations.size(); ++i) {
-        Transaction* txn = analyzer->transactions[permutation->operations[i]->txn_id];
-        const int response_size = send_recv_sql(txn->sockfd, permutation->operations[i]->sql, recv_buf);
-        if (response_size > 0) {
-            std::cout.write(recv_buf, response_size);
+        const auto transaction_index =
+            static_cast<size_t>(permutation->operations[i]->txn_id);
+        Transaction* txn = analyzer->transactions[transaction_index];
+        const rucbase::wire::ExecuteResult result =
+            execute_sql(&txn->client, permutation->operations[i]->sql);
+        if (result.ok()) {
+            std::cout << result.text;
+        } else {
+            std::cerr << "EXEC_STREAM failed: "
+                      << (result.diagnostic.empty() ? "unknown error" : result.diagnostic) << '\n';
+            std::cout << "failure\n";
         }
-    }
-
-    for(size_t i = 0; i < analyzer->transactions.size(); ++i) {
-        disconnect(analyzer->transactions[i]->sockfd);
     }
     return 0;
 }

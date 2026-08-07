@@ -127,6 +127,9 @@ cd build/debug
 ./bin/rmdb -p 8765 demo
 ```
 
+服务端默认只监听 `127.0.0.1`。确需允许其他主机连接时，显式增加 `-b 0.0.0.0`；
+`-t <秒>` 可调整 socket I/O 超时（默认 120 秒）。
+
 服务端启动后，在另一个终端连接：
 
 ```bash
@@ -224,5 +227,6 @@ RucBase 的实验代码用于课程学习。学生应独立完成实验，并遵
 
 ## 许可
 
-RucBase 项目源码按 [MIT License](LICENSE) 发布。Readline、GoogleTest 等第三方组件仍
-受其各自许可证约束；分发包含这些组件的二进制或镜像时，请同时遵守相应许可证要求。
+RucBase 项目源码统一按 [MulanPSL-2.0](LICENSE) 发布。源码文件使用
+`SPDX-License-Identifier: MulanPSL-2.0` 标识。Readline、GoogleTest 等第三方组件
+及生成代码仍受其各自许可证约束。

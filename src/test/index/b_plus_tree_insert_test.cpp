@@ -1,3 +1,6 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include <algorithm>
 #include <cstdio>
 #include <random>  // for std::default_random_engine

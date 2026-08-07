@@ -1,12 +1,5 @@
-/* Copyright (c) 2023 Renmin University of China
-RMDB is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-        http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
@@ -23,7 +16,7 @@ See the Mulan PSL v2 for more details. */
 // used for data_send
 static int const_offset = -1;
 
-// Structured SELECT result for docs/rmdb_wire.md META/ROW/RESULT_END.
+// Structured tabular result for META/ROW/RESULT_END wire responses.
 struct WireResultColumn {
     std::string name;
     ColType type = TYPE_STRING;
@@ -37,12 +30,22 @@ struct WireResultCell {
 };
 
 struct WireResultSet {
+    // Conservative budget for retained result objects and string contents. It
+    // bounds teaching-server memory even when a result has many tiny cells.
     static constexpr size_t kMaxBufferedBytes = 16u * 1024u * 1024u;
 
     bool has_query_result = false;
     size_t buffered_bytes = 0;
     std::vector<WireResultColumn> columns;
     std::vector<std::vector<WireResultCell>> rows;
+
+    bool try_account(size_t bytes) noexcept {
+        if (buffered_bytes > kMaxBufferedBytes || bytes > kMaxBufferedBytes - buffered_bytes) {
+            return false;
+        }
+        buffered_bytes += bytes;
+        return true;
+    }
 };
 
 class Context {
@@ -50,9 +53,7 @@ public:
     Context (LockManager *lock_mgr, LogManager *log_mgr, 
             Transaction *txn, char *data_send = nullptr, int *offset = &const_offset)
         : lock_mgr_(lock_mgr), log_mgr_(log_mgr), txn_(txn),
-          data_send_(data_send), offset_(offset) {
-            ellipsis_ = false;
-          }
+          data_send_(data_send), offset_(offset) {}
 
     // TransactionManager *txn_mgr_;
     LockManager *lock_mgr_;
@@ -60,6 +61,5 @@ public:
     Transaction *txn_;
     char *data_send_;
     int *offset_;
-    bool ellipsis_;
     WireResultSet wire_result_;
 };

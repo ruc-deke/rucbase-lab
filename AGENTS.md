@@ -1,4 +1,4 @@
-# AI Agent Guidelines for Rucbase
+# AI Agent Guidelines for RUCBase
 
 This file provides instructions for AI coding assistants (DeepSeek, Kimi, ChatGPT, Claude Code, GitHub Copilot, Cursor, Grok, etc.) working with students on the Rucbase teaching database labs.
 

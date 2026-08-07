@@ -1,14 +1,9 @@
-/* Copyright (c) 2023 Renmin University of China
-RMDB is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-        http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
 
 #include "execution_manager.h"
+
+#include <algorithm>
 
 #include "executor_delete.h"
 #include "executor_index_scan.h"
@@ -147,39 +142,53 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         column.type = proj_cols[i].type;
         context->wire_result_.columns.push_back(std::move(column));
     }
+    size_t schema_bytes = context->wire_result_.columns.size() * sizeof(WireResultColumn);
+    if (schema_bytes > WireResultSet::kMaxBufferedBytes) {
+        throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
+    }
+    for (const auto &column : context->wire_result_.columns) {
+        if (column.name.size() > WireResultSet::kMaxBufferedBytes - schema_bytes) {
+            throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
+        }
+        schema_bytes += column.name.size();
+    }
+    if (!context->wire_result_.try_account(schema_bytes)) {
+        throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
+    }
 
     // Execute the query plan and collect the bounded typed result.
     for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
         auto Tuple = executorTreeRoot->Next();
         std::vector<WireResultCell> wire_row;
-        size_t wire_row_bytes = 0;
+        // Account for the retained row vector, its cells, and conservative
+        // growth slack in the outer rows vector.
+        size_t wire_row_bytes = 2 * sizeof(std::vector<WireResultCell>) +
+                                proj_cols.size() * sizeof(WireResultCell);
+        if (wire_row_bytes > WireResultSet::kMaxBufferedBytes) {
+            throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
+        }
         wire_row.reserve(proj_cols.size());
         for (auto &col : proj_cols) {
-            std::string col_str;
             char *rec_buf = Tuple->data + col.offset;
             WireResultCell cell;
             cell.type = col.type;
             if (col.type == TYPE_INT) {
                 cell.int_val = *reinterpret_cast<int *>(rec_buf);
-                col_str = std::to_string(cell.int_val);
-                wire_row_bytes += 1 + sizeof(int32_t);
             } else if (col.type == TYPE_FLOAT) {
                 cell.float_val = *reinterpret_cast<float *>(rec_buf);
-                col_str = std::to_string(cell.float_val);
-                wire_row_bytes += 1 + sizeof(float);
             } else if (col.type == TYPE_STRING) {
-                col_str = std::string(rec_buf, col.len);
-                col_str.resize(strlen(col_str.c_str()));
-                cell.str_val = col_str;
-                wire_row_bytes += 1 + sizeof(uint32_t) + cell.str_val.size();
+                const char *string_end = std::find(rec_buf, rec_buf + col.len, '\0');
+                cell.str_val.assign(rec_buf, static_cast<size_t>(string_end - rec_buf));
+                if (cell.str_val.size() > WireResultSet::kMaxBufferedBytes - wire_row_bytes) {
+                    throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
+                }
+                wire_row_bytes += cell.str_val.size();
             }
             wire_row.push_back(std::move(cell));
         }
-        if (context->wire_result_.buffered_bytes > WireResultSet::kMaxBufferedBytes ||
-            wire_row_bytes > WireResultSet::kMaxBufferedBytes - context->wire_result_.buffered_bytes) {
+        if (!context->wire_result_.try_account(wire_row_bytes)) {
             throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
         }
-        context->wire_result_.buffered_bytes += wire_row_bytes;
         context->wire_result_.rows.push_back(std::move(wire_row));
     }
 }

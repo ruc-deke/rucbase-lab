@@ -1,7 +1,12 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include <string>
 #include <vector>
 #include <fstream>
 #include <unordered_map>
+
+#include "net/client.h"
 
 class Operation {
 public:
@@ -19,7 +24,7 @@ class Transaction {
 public:
     std::vector<Operation*> operations;
     int txn_id;
-    int sockfd;
+    rucbase::wire::Client client;
 };
 
 class TestCaseAnalyzer {
@@ -37,4 +42,3 @@ public:
     std::fstream infile;
     std::unordered_map<std::string, Operation*> operation_map;
 };
-

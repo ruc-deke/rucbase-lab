@@ -1,8 +1,9 @@
 option(RUCBASE_FETCH_DEPENDENCIES "Download missing third-party dependencies during configuration" ON)
 
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/googletest/CMakeLists.txt")
+if(EXISTS "${PROJECT_SOURCE_DIR}/deps/googletest/CMakeLists.txt")
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/googletest" "${CMAKE_BINARY_DIR}/_deps/googletest-build")
+    add_subdirectory("${PROJECT_SOURCE_DIR}/deps/googletest"
+            "${CMAKE_BINARY_DIR}/_deps/googletest-build" EXCLUDE_FROM_ALL)
 else()
     find_package(GTest CONFIG QUIET)
 

@@ -1,23 +1,80 @@
-/* Copyright (c) 2023 Renmin University of China
-RMDB is licensed under Mulan PSL v2.
-You can use this software according to the terms and conditions of the Mulan PSL v2.
-You may obtain a copy of Mulan PSL v2 at:
-        http://license.coscl.org.cn/MulanPSL2
-THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-See the Mulan PSL v2 for more details. */
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
 
 #include "sm_manager.h"
 
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <fstream>
+#include <utility>
 
 #include "index/ix.h"
 #include "record/rm.h"
-#include "record_printer.h"
+
+namespace {
+
+void SetStringResult(Context* context, std::vector<std::string> column_names,
+                     std::vector<std::vector<std::string>> row_values) {
+    WireResultSet result;
+    result.has_query_result = true;
+    result.columns.reserve(column_names.size());
+    for (auto& name : column_names) {
+        result.columns.push_back({std::move(name), TYPE_STRING});
+    }
+    size_t schema_bytes = result.columns.size() * sizeof(WireResultColumn);
+    if (schema_bytes > WireResultSet::kMaxBufferedBytes) {
+        throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
+    }
+    for (const auto& column : result.columns) {
+        if (column.name.size() > WireResultSet::kMaxBufferedBytes - schema_bytes) {
+            throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
+        }
+        schema_bytes += column.name.size();
+    }
+    if (!result.try_account(schema_bytes)) {
+        throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
+    }
+
+    if (row_values.size() > WireResultSet::kMaxBufferedBytes /
+                                (2 * sizeof(std::vector<WireResultCell>))) {
+        throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+    }
+    result.rows.reserve(row_values.size());
+    for (auto& values : row_values) {
+        if (values.size() != result.columns.size()) {
+            throw InternalError("utility result row does not match its columns");
+        }
+
+        std::vector<WireResultCell> row;
+        size_t row_bytes = 2 * sizeof(std::vector<WireResultCell>) +
+                           values.size() * sizeof(WireResultCell);
+        if (row_bytes > WireResultSet::kMaxBufferedBytes) {
+            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+        }
+        row.reserve(values.size());
+        for (auto& value : values) {
+            if (value.size() > WireResultSet::kMaxBufferedBytes - row_bytes) {
+                throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+            }
+            row_bytes += value.size();
+
+            WireResultCell cell;
+            cell.type = TYPE_STRING;
+            cell.str_val = std::move(value);
+            row.push_back(std::move(cell));
+        }
+        if (!result.try_account(row_bytes)) {
+            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+        }
+        result.rows.push_back(std::move(row));
+    }
+
+    context->wire_result_ = std::move(result);
+}
+
+}  // namespace
 
 /**
  * @description: 判断是否为一个文件夹
@@ -109,15 +166,12 @@ void SmManager::close_db() {
  * @param {Context*} context 
  */
 void SmManager::show_tables(Context* context) {
-    RecordPrinter printer(1);
-    printer.print_separator(context);
-    printer.print_record({"Tables"}, context);
-    printer.print_separator(context);
-    for (auto &entry : db_.tabs_) {
-        auto &tab = entry.second;
-        printer.print_record({tab.name}, context);
+    std::vector<std::vector<std::string>> rows;
+    rows.reserve(db_.tabs_.size());
+    for (const auto& entry : db_.tabs_) {
+        rows.push_back({entry.second.name});
     }
-    printer.print_separator(context);
+    SetStringResult(context, {"Tables"}, std::move(rows));
 }
 
 /**
@@ -126,21 +180,14 @@ void SmManager::show_tables(Context* context) {
  * @param {Context*} context 
  */
 void SmManager::desc_table(const std::string& tab_name, Context* context) {
-    TabMeta &tab = db_.get_table(tab_name);
+    const TabMeta& tab = db_.get_table(tab_name);
 
-    std::vector<std::string> captions = {"Field", "Type", "Index"};
-    RecordPrinter printer(captions.size());
-    // Print header
-    printer.print_separator(context);
-    printer.print_record(captions, context);
-    printer.print_separator(context);
-    // Print fields
-    for (auto &col : tab.cols) {
-        std::vector<std::string> field_info = {col.name, coltype2str(col.type), col.index ? "YES" : "NO"};
-        printer.print_record(field_info, context);
+    std::vector<std::vector<std::string>> rows;
+    rows.reserve(tab.cols.size());
+    for (const auto& col : tab.cols) {
+        rows.push_back({col.name, coltype2str(col.type), col.index ? "YES" : "NO"});
     }
-    // Print footer
-    printer.print_separator(context);
+    SetStringResult(context, {"Field", "Type", "Index"}, std::move(rows));
 }
 
 /**

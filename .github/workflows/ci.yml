@@ -83,7 +83,7 @@ jobs:
       - name: Run parser and Wire smoke tests
         run: |
           ctest --preset debug --output-on-failure \
-            -R '^(test_parser|wire_test\.)'
+            -R '^(test_parser|wire_test)$'
 
       - name: Run teaching-lab black-box tests (manual)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lab_tests && runner.os == 'Linux' }}
@@ -144,7 +144,7 @@ jobs:
         shell: msys2 {0}
         run: |
           ctest --preset debug --output-on-failure \
-            -R '^(test_parser|wire_test\.)'
+            -R '^(test_parser|wire_test)$'
 
       - name: Upload test logs
         if: ${{ always() }}

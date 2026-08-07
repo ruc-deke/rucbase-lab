@@ -1,11 +1,15 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "regress_test.h"
 
 int main(int argc, char** argv) {
     const char *unix_socket_path = nullptr;
     const char *server_host = "127.0.0.1";
-    int server_port = PORT_DEFAULT;
+    int server_port = kDefaultPort;
     int opt;
 
     while ((opt = getopt(argc, argv, "s:h:p:")) > 0) {
@@ -31,7 +35,6 @@ int main(int argc, char** argv) {
     }
     std::string infile = argv[optind];
 
-    int sockfd = connect_database(unix_socket_path, server_host, server_port);
-    start_test(sockfd, infile);
-    disconnect(sockfd);
+    auto client = connect_database(unix_socket_path, server_host, server_port);
+    start_test(&client, infile);
 }

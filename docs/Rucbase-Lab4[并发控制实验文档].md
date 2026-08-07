@@ -7,18 +7,24 @@ Rucbase并发控制模块采用的是基于封锁的并发控制协议，要求�
 
 ## 声明
 
-在完成本实验之前，需要取消`rmdb.cpp::client_handler()`函数中对如下语句的注释：
-- 第121行：
+在完成本实验之前，需要在
+`src/server/server.cpp` 的 `Server::execute_statement()` 中启用两处事务教学开关。
+请按注释锚点搜索，不要依赖会随重构变化的行号。
+
+- `RUCBASE_LAB4_BEGIN_TRANSACTION`：
 ```
-SetTransaction(&txn_id, context);
+prepare_transaction(session, &context);
 ```
-- 第183～186行：
+
+- `RUCBASE_LAB4_AUTO_COMMIT`：
 ```
-if(context->txn_->get_txn_mode() == false)
-{
-    txn_manager->commit(context->txn_, context->log_mgr_);
+if (context.txn_->get_txn_mode() == false) {
+    transaction_manager_.commit(context.txn_, context.log_mgr_);
 }
 ```
+
+这两处代码默认保持注释状态，以便 Lab3 与 Lab4 使用同一套服务端基础设施；进入
+Lab4 后再按照实验要求取消注释。
 
 ## 实验一 事务管理器实验（40分）
 

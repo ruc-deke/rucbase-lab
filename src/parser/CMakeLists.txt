@@ -1,28 +1,26 @@
 find_package(BISON REQUIRED)
 find_package(FLEX REQUIRED)
 
-bison_target(yacc yacc.y ${CMAKE_CURRENT_BINARY_DIR}/yacc.tab.cpp
-        DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/yacc.tab.h)
-flex_target(lex lex.l ${CMAKE_CURRENT_BINARY_DIR}/lex.yy.cpp)
-add_flex_bison_dependency(lex yacc)
+set(RUCBASE_PARSER_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${RUCBASE_PARSER_GENERATED_DIR}")
 
-set(SOURCES ${BISON_yacc_OUTPUT_SOURCE} ${FLEX_lex_OUTPUTS} ast.cpp)
-add_library(parser STATIC ${SOURCES})
-target_include_directories(parser PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR})
-rucbase_configure_target(parser)
+bison_target(rucbase_yacc yacc.y "${RUCBASE_PARSER_GENERATED_DIR}/yacc.tab.cpp"
+        DEFINES_FILE "${RUCBASE_PARSER_GENERATED_DIR}/yacc.tab.h")
+flex_target(rucbase_lex lex.l "${RUCBASE_PARSER_GENERATED_DIR}/lex.yy.cpp")
+add_flex_bison_dependency(rucbase_lex rucbase_yacc)
+
+add_library(rucbase_parser STATIC
+        ast.cpp
+        ${BISON_rucbase_yacc_OUTPUT_SOURCE}
+        ${FLEX_rucbase_lex_OUTPUTS})
+add_library(rucbase::parser ALIAS rucbase_parser)
+target_include_directories(rucbase_parser
+        PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>"
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${RUCBASE_PARSER_GENERATED_DIR}")
+target_link_libraries(rucbase_parser PRIVATE rucbase::project_options)
+
 # Bison-generated yacc.tab.cpp sets yynerrs without reading it under our options.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU")
-    set_source_files_properties(${BISON_yacc_OUTPUT_SOURCE} PROPERTIES
+    set_source_files_properties(${BISON_rucbase_yacc_OUTPUT_SOURCE} PROPERTIES
             COMPILE_OPTIONS "-Wno-unused-but-set-variable")
-endif()
-
-if(BUILD_TESTING)
-    add_executable(test_parser test_parser.cpp)
-    target_link_libraries(test_parser PRIVATE parser)
-    rucbase_configure_target(test_parser)
-    add_test(NAME test_parser COMMAND test_parser
-            WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-    set_tests_properties(test_parser PROPERTIES LABELS unit)
 endif()

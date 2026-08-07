@@ -1,3 +1,6 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include "concurrency_test.h"
 #include <sstream>
 #include <string.h>
@@ -32,7 +35,7 @@ void TestCaseAnalyzer::analyze_test_case() {
             Transaction* txn = new Transaction();
 
             transactions.push_back(txn);
-            txn->txn_id = transactions.size() - 1;
+            txn->txn_id = static_cast<int>(transactions.size() - 1);
 
             int count = atoi(line.substr(line.find(" ") + 1).c_str());
             while(count) {

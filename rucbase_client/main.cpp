@@ -1,14 +1,11 @@
-#include <netdb.h>
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
 #include <getopt.h>
 #include <cstdio>
 #include <readline/history.h>
 #include <readline/readline.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
 
-#include <cerrno>
-#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -17,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#include "net/wire.h"
+#include "net/client.h"
 
 namespace {
 
@@ -67,80 +64,44 @@ bool LooksComplete(const std::string &sql) {
     return !trimmed.empty() && trimmed.back() == ';';
 }
 
-int InitTcpSocket(const char *server_host, int server_port) {
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
+struct SendResult {
+    bool statement_ok = false;
+    bool connection_reusable = false;
+};
 
-    addrinfo *result = nullptr;
-    const std::string port = std::to_string(server_port);
-    const int rc = getaddrinfo(server_host, port.c_str(), &hints, &result);
-    if (rc != 0) {
-        std::cerr << "getaddrinfo(" << server_host << ":" << server_port << ") failed: " << gai_strerror(rc)
-                  << '\n';
-        return -1;
-    }
-
-    int sockfd = -1;
-    for (addrinfo *rp = result; rp != nullptr; rp = rp->ai_next) {
-        sockfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (sockfd < 0) {
-            continue;
-        }
-        if (connect(sockfd, rp->ai_addr, rp->ai_addrlen) == 0) {
-            break;
-        }
-        close(sockfd);
-        sockfd = -1;
-    }
-    freeaddrinfo(result);
-
-    if (sockfd < 0) {
-        std::cerr << "failed to connect to " << server_host << ":" << server_port << " (" << strerror(errno)
-                  << ")\n"
-                  << "Hint: start the server first, e.g.\n"
-                  << "  ./bin/rmdb -p " << server_port << " <database_name>\n";
-        return -1;
-    }
-    return sockfd;
-}
-
-bool SendSql(int sockfd, const std::string &sql, bool print_response) {
+SendResult SendSql(rucbase::wire::Client *client, const std::string &sql, bool print_response) {
     const std::string command = Trim(sql);
     if (command.empty()) {
-        return true;
+        return {true, true};
     }
 
-    std::string response;
-    std::string diagnostic;
-    if (!rucbase::wire::ExecStream(sockfd, command, &response, &diagnostic)) {
-        if (!diagnostic.empty()) {
-            std::cerr << diagnostic;
-            if (diagnostic.back() != '\n') {
+    rucbase::wire::ExecuteResult result = client->Execute(command);
+    if (!result.ok()) {
+        if (!result.diagnostic.empty()) {
+            std::cerr << result.diagnostic;
+            if (result.diagnostic.back() != '\n') {
                 std::cerr << '\n';
             }
         } else {
             std::cerr << "EXEC_STREAM failed\n";
         }
-        return false;
+        return {false, result.connection_reusable()};
     }
-    if (print_response && !response.empty()) {
-        std::cout << response;
-        if (response.back() != '\n') {
+    if (print_response && !result.text.empty()) {
+        std::cout << result.text;
+        if (result.text.back() != '\n') {
             std::cout << '\n';
         }
     }
-    return true;
+    return {true, true};
 }
 
-std::string FetchDatabaseName(int sockfd) {
-    std::string database;
-    std::string diagnostic;
-    if (!rucbase::wire::ExecStream(sockfd, rucbase::wire::kDatabaseNameRequest, &database, &diagnostic) ||
-        Trim(database).empty()) {
+std::string FetchDatabaseName(rucbase::wire::Client *client) {
+    rucbase::wire::ExecuteResult result = client->Execute(rucbase::wire::kDatabaseNameRequest);
+    if (!result.ok() || Trim(result.text).empty()) {
         return "?";
     }
-    return Trim(database);
+    return Trim(result.text);
 }
 
 std::vector<std::string> SplitStatements(const std::string &script) {
@@ -221,7 +182,7 @@ std::vector<std::string> SplitStatements(const std::string &script) {
     return statements;
 }
 
-bool RunScriptFile(int sockfd, const std::string &path) {
+bool RunScriptFile(rucbase::wire::Client *client, const std::string &path) {
     std::ifstream file(path);
     if (!file) {
         std::cerr << "failed to open SQL file: " << path << '\n';
@@ -233,14 +194,14 @@ bool RunScriptFile(int sockfd, const std::string &path) {
         if (IsExitCommand(stmt)) {
             return true;
         }
-        if (!SendSql(sockfd, stmt, true)) {
+        if (!SendSql(client, stmt, true).statement_ok) {
             return false;
         }
     }
     return true;
 }
 
-int RunInteractive(int sockfd, const std::string &database_name) {
+int RunInteractive(rucbase::wire::Client *client, const std::string &database_name) {
     std::string pending;
     const std::string primary_prompt = "Rucbase(" + database_name + ")> ";
     const std::string continuation_prompt(primary_prompt.size() - 3, ' ');
@@ -278,7 +239,8 @@ int RunInteractive(int sockfd, const std::string &database_name) {
             std::cout << "The client will be closed.\n";
             break;
         }
-        if (!SendSql(sockfd, command, true)) {
+        const SendResult send_result = SendSql(client, command, true);
+        if (!send_result.statement_ok && !send_result.connection_reusable) {
             return 1;
         }
     }
@@ -360,23 +322,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Convert a peer-closed connection into an EPIPE error from send() instead
-    // of terminating the client process.
-    std::signal(SIGPIPE, SIG_IGN);
-
-    const int sockfd = InitTcpSocket(server_host, server_port);
-    if (sockfd < 0) {
-        return 1;
-    }
-
-    if (!rucbase::wire::ClientHandshake(sockfd)) {
-        std::cerr << "wire handshake failed (server must speak docs/rmdb_wire.md v3.0)\n";
-        close(sockfd);
+    rucbase::wire::Client client;
+    const rucbase::wire::ClientStatus connect_status =
+        client.ConnectTcp(server_host, static_cast<uint16_t>(server_port));
+    if (!connect_status.ok()) {
+        std::cerr << connect_status.message << "\n"
+                  << "Hint: start the server first, e.g.\n"
+                  << "  ./bin/rmdb -p " << server_port << " <database_name>\n";
         return 1;
     }
 
     const bool interactive = execute_sql == nullptr && script_file == nullptr;
-    const std::string database_name = interactive ? FetchDatabaseName(sockfd) : "";
+    const std::string database_name = interactive ? FetchDatabaseName(&client) : "";
 
     if (!quiet && interactive) {
         std::cout << "\n"
@@ -393,18 +350,17 @@ int main(int argc, char *argv[]) {
 
     int exit_code = 0;
     if (execute_sql != nullptr) {
-        if (!IsExitCommand(Trim(execute_sql)) && !SendSql(sockfd, execute_sql, true)) {
+        if (!IsExitCommand(Trim(execute_sql)) && !SendSql(&client, execute_sql, true).statement_ok) {
             exit_code = 1;
         }
     } else if (script_file != nullptr) {
-        if (!RunScriptFile(sockfd, script_file)) {
+        if (!RunScriptFile(&client, script_file)) {
             exit_code = 1;
         }
     } else {
-        exit_code = RunInteractive(sockfd, database_name);
+        exit_code = RunInteractive(&client, database_name);
     }
 
-    close(sockfd);
     if (!quiet && interactive) {
         std::cout << "Bye.\n";
     }

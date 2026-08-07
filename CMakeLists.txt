@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(RMDB LANGUAGES C CXX)
+project(RMDB LANGUAGES CXX)
 
 if(POLICY CMP0135)
     cmake_policy(SET CMP0135 NEW)
@@ -9,10 +9,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
     message(FATAL_ERROR "Rucbase requires GCC 11 or newer (GCC 13 is recommended).")
@@ -30,19 +28,13 @@ if(RUCBASE_ENABLE_TSAN AND (RUCBASE_ENABLE_ASAN OR RUCBASE_ENABLE_UBSAN))
     message(FATAL_ERROR "ThreadSanitizer must use a separate build from ASan/UBSan.")
 endif()
 
-add_library(rucbase_build_options INTERFACE)
-target_compile_features(rucbase_build_options INTERFACE cxx_std_17)
-target_compile_options(rucbase_build_options INTERFACE
+add_library(rucbase_project_options INTERFACE)
+add_library(rucbase::project_options ALIAS rucbase_project_options)
+target_compile_features(rucbase_project_options INTERFACE cxx_std_17)
+target_compile_options(rucbase_project_options INTERFACE
         $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
         # Lab skeletons intentionally leave members unused until students implement them.
         $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-unused-private-field>)
-
-# Circular static deps (system ↔ record ↔ transaction) cause Apple ld to re-list
-# the same archives; the warning is noise for this teaching graph.
-if(APPLE)
-    target_link_options(rucbase_build_options INTERFACE
-            "LINKER:-no_warn_duplicate_libraries")
-endif()
 
 if(RUCBASE_ENABLE_ASAN OR RUCBASE_ENABLE_UBSAN OR RUCBASE_ENABLE_TSAN)
     if(NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
@@ -61,22 +53,20 @@ if(RUCBASE_ENABLE_ASAN OR RUCBASE_ENABLE_UBSAN OR RUCBASE_ENABLE_TSAN)
     endif()
     list(JOIN RUCBASE_SANITIZERS "," RUCBASE_SANITIZER_FLAGS)
 
-    target_compile_options(rucbase_build_options INTERFACE
+    target_compile_options(rucbase_project_options INTERFACE
             -fno-omit-frame-pointer "-fsanitize=${RUCBASE_SANITIZER_FLAGS}")
-    target_link_options(rucbase_build_options INTERFACE
+    target_link_options(rucbase_project_options INTERFACE
             -fno-omit-frame-pointer "-fsanitize=${RUCBASE_SANITIZER_FLAGS}")
 endif()
-
-function(rucbase_configure_target target_name)
-    target_link_libraries(${target_name} PRIVATE rucbase_build_options)
-endfunction()
 
 find_package(Threads REQUIRED)
 include(CTest)
 
 if(BUILD_TESTING)
-    include(deps/CMakeLists.txt)
+    include(cmake/Dependencies.cmake)
 endif()
+
 add_subdirectory(src)
+
 # Staff-provided interactive client; also buildable via --target rucbase_client.
 add_subdirectory(rucbase_client)

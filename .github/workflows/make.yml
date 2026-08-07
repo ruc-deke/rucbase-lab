@@ -48,4 +48,4 @@ jobs:
       - name: Run parser and Wire smoke tests
         run: |
           ctest --test-dir build/make --output-on-failure \
-            -R '^(test_parser|wire_test\.)'
+            -R '^(test_parser|wire_test)$'

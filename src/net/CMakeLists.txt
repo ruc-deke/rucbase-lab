@@ -1,4 +1,7 @@
-add_library(rucbase_wire STATIC wire.cpp)
-target_include_directories(rucbase_wire PUBLIC ${CMAKE_SOURCE_DIR}/src)
-target_compile_features(rucbase_wire PUBLIC cxx_std_17)
-rucbase_configure_target(rucbase_wire)
+add_library(rucbase_wire STATIC wire.cpp client.cpp)
+add_library(rucbase::wire ALIAS rucbase_wire)
+target_include_directories(rucbase_wire PUBLIC
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>")
+target_link_libraries(rucbase_wire
+        PUBLIC Threads::Threads
+        PRIVATE rucbase::project_options)

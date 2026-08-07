@@ -36,8 +36,8 @@ docker run --rm rucbase-dev:test bash -lc \
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --build-arg BUILD_DATE=2026-08-06T00:00:00Z \
-  --build-arg VCS_REF=3a49f3daefc94dea2653dd7b03f43b11428b36aa \
+  --build-arg BUILD_DATE=2026-08-06T09:12:02Z \
+  --build-arg VCS_REF=7eaa2418052553207b75d409b480082e80b6bc8e \
   -f docker/Dockerfile \
   -t crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:ubuntu24.04-20260806 \
   -t crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:24.04 \
