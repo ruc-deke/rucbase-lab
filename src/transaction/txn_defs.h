@@ -6,7 +6,7 @@
 #include <atomic>
 
 #include "common/config.h"
-#include "defs.h"
+#include "common/defs.h"
 #include "record/rm_defs.h"
 
 /* 标识事务状态 */

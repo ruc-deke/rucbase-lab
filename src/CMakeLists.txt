@@ -9,6 +9,7 @@ set(RUCBASE_CORE_SOURCES
         index/ix_index_handle.cpp
         index/ix_scan.cpp
         optimizer/planner.cpp
+        portal/portal.cpp
         record/rm_file_handle.cpp
         record/rm_scan.cpp
         recovery/log_manager.cpp

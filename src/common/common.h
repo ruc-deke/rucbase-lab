@@ -8,7 +8,8 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "defs.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "record/rm_defs.h"
 
 

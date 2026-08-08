@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "errors.h"
+#include "common/errors.h"
 #include "sm_defs.h"
 
 /* 字段元数据 */

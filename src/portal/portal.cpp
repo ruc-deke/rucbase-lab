@@ -1,0 +1,130 @@
+// Copyright (c) 2023-2026 Renmin University of China
+// SPDX-License-Identifier: MulanPSL-2.0
+
+#include "portal/portal.h"
+
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "common/errors.h"
+#include "execution/execution_manager.h"
+#include "execution/execution_sort.h"
+#include "execution/executor_abstract.h"
+#include "execution/executor_delete.h"
+#include "execution/executor_index_scan.h"
+#include "execution/executor_insert.h"
+#include "execution/executor_nestedloop_join.h"
+#include "execution/executor_projection.h"
+#include "execution/executor_seq_scan.h"
+#include "execution/executor_update.h"
+#include "optimizer/plan.h"
+
+namespace {
+
+std::vector<Rid> collect_rids(AbstractExecutor* scan) {
+    std::vector<Rid> rids;
+    for (scan->beginTuple(); !scan->is_end(); scan->nextTuple()) {
+        rids.push_back(scan->rid());
+    }
+    return rids;
+}
+
+}  // namespace
+
+PortalStmt::PortalStmt(PortalType type_,
+                       std::vector<TabCol> sel_cols_,
+                       std::unique_ptr<AbstractExecutor> root_,
+                       std::shared_ptr<Plan> plan_)
+    : type(type_),
+      sel_cols(std::move(sel_cols_)),
+      root(std::move(root_)),
+      plan(std::move(plan_)) {}
+
+PortalStmt::~PortalStmt() = default;
+
+std::unique_ptr<PortalStmt> Portal::start(std::shared_ptr<Plan> plan, Context* context) {
+    if (std::dynamic_pointer_cast<OtherPlan>(plan)) {
+        return std::make_unique<PortalStmt>(PortalType::Utility, std::vector<TabCol>{}, nullptr, std::move(plan));
+    }
+    if (std::dynamic_pointer_cast<DDLPlan>(plan)) {
+        return std::make_unique<PortalStmt>(PortalType::Ddl, std::vector<TabCol>{}, nullptr, std::move(plan));
+    }
+
+    const auto dml = std::dynamic_pointer_cast<DMLPlan>(plan);
+    if (dml == nullptr) {
+        throw InternalError("unexpected plan type");
+    }
+
+    switch (dml->tag) {
+        case T_select: {
+            auto projection = std::dynamic_pointer_cast<ProjectionPlan>(dml->subplan_);
+            auto root = convert_plan_executor(projection, context);
+            return std::make_unique<PortalStmt>(PortalType::Select, std::move(projection->sel_cols_), std::move(root),
+                                                std::move(plan));
+        }
+        case T_Update: {
+            auto scan = convert_plan_executor(dml->subplan_, context);
+            auto root = std::make_unique<UpdateExecutor>(sm_manager_, dml->tab_name_, dml->set_clauses_, dml->conds_,
+                                                         collect_rids(scan.get()), context);
+            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
+                                                std::move(plan));
+        }
+        case T_Delete: {
+            auto scan = convert_plan_executor(dml->subplan_, context);
+            auto root = std::make_unique<DeleteExecutor>(sm_manager_, dml->tab_name_, dml->conds_,
+                                                         collect_rids(scan.get()), context);
+            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
+                                                std::move(plan));
+        }
+        case T_Insert: {
+            auto root = std::make_unique<InsertExecutor>(sm_manager_, dml->tab_name_, dml->values_, context);
+            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
+                                                std::move(plan));
+        }
+        default:
+            throw InternalError("unexpected DML plan type");
+    }
+}
+
+void Portal::run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* txn_id, Context* context) {
+    switch (portal->type) {
+        case PortalType::Select:
+            ql->select_from(std::move(portal->root), std::move(portal->sel_cols), context);
+            return;
+        case PortalType::Dml:
+            ql->run_dml(std::move(portal->root));
+            return;
+        case PortalType::Ddl:
+            ql->run_mutli_query(std::move(portal->plan), context);
+            return;
+        case PortalType::Utility:
+            ql->run_cmd_utility(std::move(portal->plan), txn_id, context);
+            return;
+    }
+    throw InternalError("unexpected portal type");
+}
+
+std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(std::shared_ptr<Plan> plan, Context* context) {
+    if (auto projection = std::dynamic_pointer_cast<ProjectionPlan>(plan)) {
+        return std::make_unique<ProjectionExecutor>(convert_plan_executor(projection->subplan_, context),
+                                                    projection->sel_cols_);
+    }
+    if (auto scan = std::dynamic_pointer_cast<ScanPlan>(plan)) {
+        if (scan->tag == T_SeqScan) {
+            return std::make_unique<SeqScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, context);
+        }
+        return std::make_unique<IndexScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, scan->index_col_names_,
+                                                   context);
+    }
+    if (auto join = std::dynamic_pointer_cast<JoinPlan>(plan)) {
+        return std::make_unique<NestedLoopJoinExecutor>(convert_plan_executor(join->left_, context),
+                                                        convert_plan_executor(join->right_, context),
+                                                        std::move(join->conds_));
+    }
+    if (auto sort = std::dynamic_pointer_cast<SortPlan>(plan)) {
+        return std::make_unique<SortExecutor>(convert_plan_executor(sort->subplan_, context), sort->sel_col_,
+                                              sort->is_desc_);
+    }
+    throw NotImplementedError("executor conversion for this query plan");
+}

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "defs.h"
+#include "common/defs.h"
 #include "transaction/transaction.h"
 #include "transaction/concurrency/lock_manager.h"
 #include "recovery/log_manager.h"

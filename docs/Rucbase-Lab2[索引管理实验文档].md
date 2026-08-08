@@ -33,11 +33,11 @@
 
 其中，学生只要实现`IxIndexHandle`、`IxNodeHandle`中的接口。已提供其他类的完整源码。
 
-![Lab 2 索引管理实验流程图](../pics/Lab2流程图.png)
+![Lab 2 索引管理实验流程图](pics/Lab2流程图.png)
 
 B+树的结构如图：
 
-![B+树的结构](../pics/B+树的结构.png)
+![B+树的结构](pics/B+树的结构.png)
 
 注意：
 
@@ -254,7 +254,7 @@ class IxIndexHandle {
 B+树插入的整体流程如下图：
 
 
-![B+树插入流程](../pics/B+树插入流程.png)
+![B+树插入流程](pics/B+树插入流程.png)
 
 ### 任务3 B+树的删除
 
@@ -345,7 +345,7 @@ class IxIndexHandle {
 
 B+树删除的整体流程如下图：
 
-![B+树删除流程](../pics/B+树删除流程.png)
+![B+树删除流程](pics/B+树删除流程.png)
 
 ### 任务4 B+树索引并发控制
 

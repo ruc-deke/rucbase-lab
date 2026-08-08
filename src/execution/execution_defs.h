@@ -3,5 +3,5 @@
 
 #pragma once
 
-#include "defs.h"
-#include "errors.h"
+#include "common/defs.h"
+#include "common/errors.h"

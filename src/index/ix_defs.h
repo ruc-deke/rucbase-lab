@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "defs.h"
+#include "common/defs.h"
 #include "storage/buffer_pool_manager.h"
 
 constexpr int IX_NO_PAGE = -1;

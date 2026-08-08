@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "disk_manager.h"
-#include "errors.h"
+#include "common/errors.h"
 #include "page.h"
 #include "replacer/lru_replacer.h"
 #include "replacer/replacer.h"

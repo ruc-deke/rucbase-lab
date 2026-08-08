@@ -5,7 +5,7 @@
 
 #include <map>
 
-#include "errors.h"
+#include "common/errors.h"
 #include "execution/execution.h"
 #include "parser/parser.h"
 #include "system/sm.h"

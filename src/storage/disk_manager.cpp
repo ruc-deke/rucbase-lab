@@ -8,7 +8,7 @@
 #include <sys/stat.h>  // for stat
 #include <unistd.h>    // for lseek
 
-#include "defs.h"
+#include "common/defs.h"
 
 DiskManager::DiskManager() { memset(fd2pageno_, 0, MAX_FD * (sizeof(std::atomic<page_id_t>) / sizeof(char))); }
 

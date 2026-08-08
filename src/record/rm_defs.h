@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "defs.h"
+#include "common/defs.h"
 #include "storage/buffer_pool_manager.h"
 
 constexpr int RM_NO_PAGE = -1;

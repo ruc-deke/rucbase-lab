@@ -14,7 +14,7 @@
 
 # 查询执行实验指导
 
-![Lab 3 查询执行实验流程图](../pics/Lab3流程图.png)
+![Lab 3 查询执行实验流程图](pics/Lab3流程图.png)
 
 ## 任务一指导：DDL
 
@@ -269,7 +269,6 @@ if (col.index) {
 ### Delete 操作思路
 
 回顾Insert的思路，与之类似，构造方法中的`std::vector<Rid> rids`是根据扫描算子得到的应该删除的记录组，你可以先获取`IxIndexHandle`删除对应的索引`entry`，再获取`RmFileHandle`删除记录。
-
 
 
 

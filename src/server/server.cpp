@@ -1,163 +1,100 @@
 // Copyright (c) 2023-2026 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
+/**
+ * @file server.cpp
+ * @brief 实现 Rucbase 服务端的启动、连接处理与 SQL 调度流程。
+ */
+
 #include "server/server.h"
 
-#include <netdb.h>
-#include <poll.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <csignal>
-#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
-#include <system_error>
-#include <thread>
-#include <unordered_set>
 #include <utility>
-#include <vector>
 
-#include "analyze/analyze.h"
 #include "common/config.h"
-#include "errors.h"
-#include "execution/execution_manager.h"
-#include "index/ix_manager.h"
+#include "common/context.h"
+#include "common/errors.h"
 #include "net/wire.h"
-#include "optimizer/optimizer.h"
-#include "optimizer/planner.h"
 #include "parser/parser.h"
-#include "portal.h"
-#include "record/rm_manager.h"
-#include "recovery/log_manager.h"
-#include "recovery/log_recovery.h"
-#include "storage/buffer_pool_manager.h"
-#include "storage/disk_manager.h"
-#include "system/sm_manager.h"
-#include "transaction/concurrency/lock_manager.h"
-#include "transaction/transaction_manager.h"
 
 namespace rucbase {
 namespace {
 
-constexpr int kListenBacklog = 64;
-constexpr int kListenerPollMilliseconds = 250;
+constexpr int kDefaultPort = 8765;
+constexpr int kListenBacklog = 8;
 
-volatile sig_atomic_t g_stop_requested = 0;
+volatile sig_atomic_t stop_requested = 0;
+volatile sig_atomic_t listening_fd = -1;
 
-void handle_interrupt(int) { g_stop_requested = 1; }
+void handle_interrupt(int) {
+    stop_requested = 1;
+    if (listening_fd >= 0) {
+        ::close(listening_fd);  // close() 可以安全地在信号处理函数中调用
+        listening_fd = -1;
+    }
+}
 
 void print_usage(const char* program) {
-    std::cerr << "Usage: " << program << " [-b bind_address] [-p port] [-t io_timeout_seconds] <database>\n";
+    std::cerr << "Usage: " << program << " [-b ipv4_address] [-p port] <database>\n";
 }
 
-bool parse_number(const char* text, const long minimum, const long maximum, long* value) {
-    char* end = nullptr;
-    const long parsed = std::strtol(text, &end, 10);
-    if (*text == '\0' || *end != '\0' || parsed < minimum || parsed > maximum) {
-        return false;
-    }
-    *value = parsed;
-    return true;
-}
+bool parse_options(int argc, char** argv, std::string* database, std::string* address, int* port) {
+    *address = "127.0.0.1";
+    *port = kDefaultPort;
 
-bool parse_options(const int argc, char** argv, ServerOptions* options) {
-    int option = 0;
-    while ((option = ::getopt(argc, argv, "b:p:t:")) != -1) {
-        long value = 0;
-        switch (option) {
-            case 'b':
-                options->bind_address = optarg;
-                break;
-            case 'p':
-                if (!parse_number(optarg, 1, 65535, &value)) {
-                    std::cerr << "Invalid port: " << optarg << '\n';
-                    return false;
-                }
-                options->port = static_cast<int>(value);
-                break;
-            case 't':
-                if (!parse_number(optarg, 1, 3600, &value)) {
-                    std::cerr << "Invalid I/O timeout: " << optarg << '\n';
-                    return false;
-                }
-                options->io_timeout_ms = static_cast<uint32_t>(value) * 1000u;
-                break;
-            default:
-                print_usage(argv[0]);
+    int option;
+    while ((option = ::getopt(argc, argv, "b:p:")) != -1) {
+        if (option == 'b') {
+            *address = optarg;
+        } else if (option == 'p') {
+            char* end = nullptr;
+            const long value = std::strtol(optarg, &end, 10);
+            if (*optarg == '\0' || *end != '\0' || value < 1 || value > 65535) {
+                std::cerr << "Invalid port: " << optarg << '\n';
                 return false;
+            }
+            *port = static_cast<int>(value);
+        } else {
+            print_usage(argv[0]);
+            return false;
         }
     }
-
     if (optind != argc - 1) {
         print_usage(argv[0]);
         return false;
     }
-    options->database_name = argv[optind];
+    *database = argv[optind];
     return true;
 }
-
-std::string errno_message(const std::string& prefix) { return prefix + ": " + std::strerror(errno); }
-
-std::string limit_diagnostic(std::string diagnostic) {
-    if (diagnostic.size() > wire::kMaxDiagnosticBytes) {
-        diagnostic.resize(wire::kMaxDiagnosticBytes);
-    }
-    return diagnostic;
-}
-
-class Socket {
-   public:
-    explicit Socket(const int fd = -1) : fd_(fd) {}
-    ~Socket() {
-        if (fd_ >= 0) {
-            ::close(fd_);
-        }
-    }
-
-    Socket(const Socket&) = delete;
-    Socket& operator=(const Socket&) = delete;
-
-    [[nodiscard]] int get() const { return fd_; }
-
-    int release() {
-        const int fd = fd_;
-        fd_ = -1;
-        return fd;
-    }
-
-   private:
-    int fd_;
-};
 
 }  // namespace
 
 struct Server::ClientSession {
-    explicit ClientSession(const int client_fd) : fd(client_fd), text_buffer(BUFFER_LENGTH, '\0') {}
+    explicit ClientSession(int client_fd) : fd(client_fd) { text_buffer.fill('\0'); }
 
     int fd;
     txn_id_t txn_id = INVALID_TXN_ID;
-    std::vector<char> text_buffer;
+    std::array<char, BUFFER_LENGTH> text_buffer;
     int text_offset = 0;
 };
 
-struct Server::StatementResult {
-    enum class Status { Ok, Abort, Error };
-
-    Status status = Status::Ok;
-    std::string diagnostic;
-    WireResultSet query_result;
-    std::string text;
-};
-
-Server::Server(ServerOptions options)
-    : options_(std::move(options)),
+Server::Server(std::string database_name, std::string bind_address, int port)
+    : database_name_(std::move(database_name)),
+      bind_address_(std::move(bind_address)),
+      port_(port),
       buffer_pool_manager_(BUFFER_POOL_SIZE, &disk_manager_),
       rm_manager_(&disk_manager_, &buffer_pool_manager_),
       ix_manager_(&disk_manager_, &buffer_pool_manager_),
@@ -169,250 +106,144 @@ Server::Server(ServerOptions options)
       planner_(&sm_manager_),
       optimizer_(&sm_manager_, &planner_),
       portal_(&sm_manager_),
-      analyze_(&sm_manager_) {
-    const char* test_crash = std::getenv("RUCBASE_ALLOW_TEST_CRASH");
-    allow_test_crash_ = test_crash != nullptr && std::strcmp(test_crash, "1") == 0;
-}
+      analyze_(&sm_manager_) {}
 
 int Server::run() {
     int exit_code = 0;
+    bool database_open = false;
+
     try {
-        install_signal_handlers();
-        open_database();
+        std::signal(SIGINT, handle_interrupt);
+        std::signal(SIGPIPE, SIG_IGN);
+
+        if (!sm_manager_.is_dir(database_name_)) {
+            sm_manager_.create_db(database_name_);
+        }
+        sm_manager_.open_db(database_name_);
+        database_open = true;
+
+        recovery_manager_.analyze();
+        recovery_manager_.redo();
+        recovery_manager_.undo();
         serve();
-    } catch (const RMDBError& error) {
-        log_error(error.what());
-        exit_code = 1;
     } catch (const std::exception& error) {
-        log_error(error.what());
-        exit_code = 1;
-    } catch (...) {
-        log_error("unknown server error");
+        std::cerr << error.what() << std::endl;
         exit_code = 1;
     }
 
     stop_clients();
-    if (!close_database()) {
-        exit_code = 1;
+    if (database_open) {
+        try {
+            log_manager_.flush_log_to_disk();
+        } catch (const std::exception& error) {
+            std::cerr << "Failed to flush log: " << error.what() << std::endl;
+            exit_code = 1;
+        }
+        try {
+            sm_manager_.close_db();
+        } catch (const std::exception& error) {
+            std::cerr << "Failed to close database: " << error.what() << std::endl;
+            exit_code = 1;
+        }
     }
-    if (exit_code == 0) {
-        log_info("Rucbase(" + options_.database_name + ") stopped");
-    }
+
+    std::cout << "Rucbase(" << database_name_ << ") stopped" << std::endl;
     return exit_code;
 }
 
-void Server::install_signal_handlers() {
-    struct sigaction interrupt_action{};
-    interrupt_action.sa_handler = handle_interrupt;
-    sigemptyset(&interrupt_action.sa_mask);
-    if (::sigaction(SIGINT, &interrupt_action, nullptr) != 0) {
-        throw std::runtime_error(errno_message("failed to install SIGINT handler"));
-    }
-
-    struct sigaction pipe_action{};
-    pipe_action.sa_handler = SIG_IGN;
-    sigemptyset(&pipe_action.sa_mask);
-    if (::sigaction(SIGPIPE, &pipe_action, nullptr) != 0) {
-        throw std::runtime_error(errno_message("failed to ignore SIGPIPE"));
-    }
-}
-
-void Server::open_database() {
-    if (!sm_manager_.is_dir(options_.database_name)) {
-        sm_manager_.create_db(options_.database_name);
-    }
-    sm_manager_.open_db(options_.database_name);
-    database_open_ = true;
-
-    recovery_manager_.analyze();
-    recovery_manager_.redo();
-    recovery_manager_.undo();
-}
-
-bool Server::close_database() {
-    if (!database_open_) {
-        return true;
-    }
-
-    bool success = true;
-    try {
-        log_manager_.flush_log_to_disk();
-    } catch (const std::exception& error) {
-        log_error("failed to flush log: " + std::string(error.what()));
-        success = false;
-    }
-    try {
-        sm_manager_.close_db();
-    } catch (const std::exception& error) {
-        log_error("failed to close database: " + std::string(error.what()));
-        success = false;
-    }
-    database_open_ = false;
-    return success;
-}
-
 int Server::create_listening_socket() const {
-    addrinfo hints{};
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-    hints.ai_flags = AI_PASSIVE;
-
-    addrinfo* addresses = nullptr;
-    const std::string port = std::to_string(options_.port);
-    if (const int result = ::getaddrinfo(options_.bind_address.c_str(), port.c_str(), &hints, &addresses);
-        result != 0) {
-        throw std::runtime_error("failed to resolve bind address: " + std::string(::gai_strerror(result)));
+    const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) {
+        throw std::runtime_error("Failed to create listening socket");
     }
 
-    int listener = -1;
-    int last_error = EADDRNOTAVAIL;
-    for (const addrinfo* address = addresses; address != nullptr; address = address->ai_next) {
-        const int fd = ::socket(address->ai_family, address->ai_socktype, address->ai_protocol);
-        if (fd < 0) {
-            last_error = errno;
-            continue;
-        }
-
-        constexpr int reuse_address = 1;
-        if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(reuse_address)) == 0 &&
-            ::bind(fd, address->ai_addr, address->ai_addrlen) == 0 && ::listen(fd, kListenBacklog) == 0) {
-            listener = fd;
-            break;
-        }
-        last_error = errno;
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(static_cast<uint16_t>(port_));
+    if (::inet_pton(AF_INET, bind_address_.c_str(), &address.sin_addr) != 1) {
         ::close(fd);
+        throw std::runtime_error("Invalid IPv4 bind address: " + bind_address_);
     }
-    ::freeaddrinfo(addresses);
 
-    if (listener < 0) {
-        throw std::runtime_error("failed to listen on " + options_.bind_address + ":" + port + ": " +
-                                 std::strerror(last_error));
+    const int reuse_address = 1;
+    if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(reuse_address)) != 0 ||
+        ::bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 || ::listen(fd, kListenBacklog) != 0) {
+        const std::string message =
+            "Failed to listen on " + bind_address_ + ":" + std::to_string(port_) + ": " + std::strerror(errno);
+        ::close(fd);
+        throw std::runtime_error(message);
     }
-    return listener;
+    return fd;
 }
 
 void Server::serve() {
-    const Socket listener(create_listening_socket());
-    log_info("Rucbase(" + options_.database_name + ") listening on " + options_.bind_address + ":" +
-             std::to_string(options_.port));
+    listening_fd = create_listening_socket();
+    std::cout << "Rucbase(" << database_name_ << ") listening on " << bind_address_ << ':' << port_ << std::endl;
 
-    while (g_stop_requested == 0) {
-        reap_client_threads();
-
-        pollfd descriptor{listener.get(), POLLIN, 0};
-        const int poll_result = ::poll(&descriptor, 1, kListenerPollMilliseconds);
-        if (poll_result < 0) {
-            if (errno == EINTR) {
-                continue;
+    while (!stop_requested) {
+        const int client_fd = ::accept(listening_fd, nullptr, nullptr);
+        if (client_fd < 0) {
+            if (stop_requested) {
+                break;
             }
-            throw std::runtime_error(errno_message("listener poll failed"));
-        }
-        if (poll_result == 0) {
-            continue;
-        }
-        if ((descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
-            throw std::runtime_error("listener stopped unexpectedly");
-        }
-        if ((descriptor.revents & POLLIN) == 0) {
-            continue;
-        }
-
-        Socket client(::accept(listener.get(), nullptr, nullptr));
-        if (client.get() < 0) {
             if (errno != EINTR) {
-                log_error(errno_message("accept failed"));
+                std::cerr << "Accept failed: " << std::strerror(errno) << std::endl;
             }
             continue;
         }
-        if (!wire::ConfigureConnectedSocket(client.get(), options_.io_timeout_ms)) {
-            log_error(errno_message("failed to configure client socket"));
+        if (!wire::ConfigureConnectedSocket(client_fd)) {
+            ::close(client_fd);
             continue;
         }
 
-        const int client_fd = client.release();
         {
             std::lock_guard<std::mutex> lock(clients_mutex_);
-            client_fds_.insert(client_fd);
+            client_fds_.push_back(client_fd);
         }
         try {
             client_threads_.emplace_back(&Server::handle_client, this, client_fd);
-        } catch (const std::system_error& error) {
+        } catch (const std::exception& error) {
+            std::cerr << "Failed to create client thread: " << error.what() << std::endl;
             close_client(client_fd);
-            log_error("failed to create client thread: " + std::string(error.what()));
-        }
-    }
-}
-
-void Server::reap_client_threads() {
-    std::vector<std::thread> finished_threads;
-    {
-        std::lock_guard<std::mutex> lock(clients_mutex_);
-        auto thread = client_threads_.begin();
-        while (thread != client_threads_.end()) {
-            if (finished_client_threads_.erase(thread->get_id()) == 0) {
-                ++thread;
-                continue;
-            }
-            finished_threads.push_back(std::move(*thread));
-            thread = client_threads_.erase(thread);
         }
     }
 
-    for (std::thread& thread : finished_threads) {
-        thread.join();
+    if (listening_fd >= 0) {
+        ::close(listening_fd);
+        listening_fd = -1;
     }
 }
 
 void Server::stop_clients() {
     {
         std::lock_guard<std::mutex> lock(clients_mutex_);
-        for (const int fd : client_fds_) {
+        for (int fd : client_fds_) {
             ::shutdown(fd, SHUT_RDWR);
         }
     }
     for (std::thread& thread : client_threads_) {
-        if (thread.joinable()) {
-            thread.join();
-        }
+        thread.join();
     }
-    client_threads_.clear();
-    finished_client_threads_.clear();
 }
 
-void Server::close_client(const int fd) {
+void Server::close_client(int fd) {
     std::lock_guard<std::mutex> lock(clients_mutex_);
     ::close(fd);
-    client_fds_.erase(fd);
+    client_fds_.erase(std::remove(client_fds_.begin(), client_fds_.end(), fd), client_fds_.end());
 }
 
-void Server::handle_client(const int fd) {
+void Server::handle_client(int fd) {
     ClientSession session(fd);
-    log_info("Client connected (fd=" + std::to_string(fd) + ")");
+    std::cout << "Client connected (fd=" << fd << ")" << std::endl;
 
-    try {
-        if (!wire::ReadAndCheckHandshake(fd)) {
-            log_error("Wire handshake failed (fd=" + std::to_string(fd) + ")");
-        } else {
-            while (g_stop_requested == 0) {
-                wire::Frame request;
-                if (!wire::ReadFrame(fd, &request) || !handle_request(&session, request)) {
-                    break;
-                }
-            }
+    if (wire::ReadAndCheckHandshake(fd)) {
+        wire::Frame request;
+        while (wire::ReadFrame(fd, &request) && handle_request(&session, request)) {
         }
-    } catch (const std::exception& error) {
-        log_error("client handler failed (fd=" + std::to_string(fd) + "): " + error.what());
-    } catch (...) {
-        log_error("client handler failed (fd=" + std::to_string(fd) + ")");
     }
 
     close_client(fd);
-    log_info("Client disconnected (fd=" + std::to_string(fd) + ")");
-    {
-        std::lock_guard<std::mutex> lock(clients_mutex_);
-        finished_client_threads_.insert(std::this_thread::get_id());
-    }
+    std::cout << "Client disconnected (fd=" << fd << ")" << std::endl;
 }
 
 bool Server::handle_request(ClientSession* session, const wire::Frame& request) {
@@ -423,99 +254,70 @@ bool Server::handle_request(ClientSession* session, const wire::Frame& request) 
         return send_error(session->fd, "empty SQL");
     }
     if (request.payload == wire::kDatabaseNameRequest) {
-        return send_text_result(session->fd, "database", options_.database_name);
+        return send_text_result(session->fd, "database", database_name_);
     }
     if (request.payload == "crash") {
-        if (allow_test_crash_) {
-            log_info("Server crash requested by test hook");
+        const char* enabled = std::getenv("RUCBASE_ALLOW_TEST_CRASH");
+        if (enabled != nullptr && std::strcmp(enabled, "1") == 0) {
             std::_Exit(1);
         }
         return send_error(session->fd, "test crash command is disabled");
     }
 
-    log_info("[fd=" + std::to_string(session->fd) + "] " + request.payload);
-    return send_result(session->fd, process_sql(session, request.payload));
+    std::cout << "[fd=" << session->fd << "] " << request.payload << std::endl;
+    return execute_sql(session, request.payload);
 }
 
-std::shared_ptr<Query> Server::parse_and_analyze(const std::string& sql, std::string* diagnostic) {
-    rucbase::parser::ParseResult parse_result = rucbase::parser::Parse(sql);
-    if (!parse_result.ok()) {
-        *diagnostic = rucbase::parser::FormatError(sql, *parse_result.error);
-        return nullptr;
-    }
-    return analyze_.do_analyze(std::move(parse_result.statement));
-}
-
-// rucbase处理sql核心流程
-Server::StatementResult Server::process_sql(ClientSession* session, const std::string& sql) {
-    StatementResult result;
-    std::fill(session->text_buffer.begin(), session->text_buffer.end(), '\0');
+// 一条 SQL 的完整的处理主线：parse/analyze -> plan -> portal/executor。
+bool Server::execute_sql(ClientSession* session, const std::string& sql) {
+    session->text_buffer.fill('\0');
     session->text_offset = 0;
     Context context(&lock_manager_, &log_manager_, nullptr, session->text_buffer.data(), &session->text_offset);
 
     try {
-        // Lab 3: keep transaction setup disabled.
-        // Lab 4: uncomment the marked call below when the handout asks for it.
+        // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一行。
         // RUCBASE_LAB4_BEGIN_TRANSACTION
         // prepare_transaction(session, &context);
 
-        // 拿到原始的sql语句后，先送入语法解析，解析成功后进行分析
-        std::shared_ptr<Query> query = parse_and_analyze(sql, &result.diagnostic);
-        if (query == nullptr) {
-            result.status = StatementResult::Status::Error;
-            return result;
+        auto parse_result = parser::Parse(sql);
+        if (!parse_result.ok()) {
+            return send_error(session->fd, parser::FormatError(sql, *parse_result.error));
         }
-
-        // The central teaching path: parse/analyze -> plan -> portal -> executor.
-        std::shared_ptr<Plan> plan = optimizer_.plan_query(std::move(query), &context);
-        std::shared_ptr<PortalStmt> statement = portal_.start(std::move(plan), &context);
+        auto query = analyze_.do_analyze(std::move(parse_result.statement));
+        auto plan = optimizer_.plan_query(std::move(query), &context);
+        auto statement = portal_.start(std::move(plan), &context);
         portal_.run(std::move(statement), &ql_manager_, &session->txn_id, &context);
-        portal_.drop();
 
-        // Lab 3: keep implicit transaction commit disabled.
-        // Lab 4: uncomment the marked block below when the handout asks for it.
+        // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一段。
         // RUCBASE_LAB4_AUTO_COMMIT
         // if (context.txn_->get_txn_mode() == false) {
         //     transaction_manager_.commit(context.txn_, context.log_mgr_);
         // }
 
-        if (session->text_offset < 0 || static_cast<size_t>(session->text_offset) > session->text_buffer.size()) {
-            throw InternalError("legacy result buffer offset is out of range");
+        if (context.wire_result_.has_query_result) {
+            return send_query_result(session->fd, context.wire_result_);
         }
-        result.query_result = std::move(context.wire_result_);
+        if (session->text_offset < 0 || session->text_offset > static_cast<int>(session->text_buffer.size())) {
+            throw InternalError("result buffer offset is out of range");
+        }
         if (session->text_offset > 0) {
-            result.text.assign(session->text_buffer.data(), static_cast<size_t>(session->text_offset));
+            return send_text_result(session->fd, "output",
+                                    std::string(session->text_buffer.data(), session->text_offset));
         }
+        return wire::WriteFrame(session->fd, wire::kTagCommandOk, 0, "");
     } catch (TransactionAbortException& error) {
-        result.status = StatementResult::Status::Abort;
-        result.diagnostic = "abort";
         if (context.txn_ != nullptr) {
-            try {
-                transaction_manager_.abort(context.txn_, &log_manager_);
-            } catch (const std::exception& abort_error) {
-                log_error("failed to roll back aborted transaction: " + std::string(abort_error.what()));
-            }
+            transaction_manager_.abort(context.txn_, &log_manager_);
         }
-        log_info(error.GetInfo());
+        std::cout << error.GetInfo() << std::endl;
+        return wire::WriteFrame(session->fd, wire::kTagTransactionAbort, 0, "abort");
     } catch (const RMDBError& error) {
-        result.status = StatementResult::Status::Error;
-        result.diagnostic = error.what();
-        if (!result.diagnostic.empty() && result.diagnostic.back() != '\n') {
-            result.diagnostic.push_back('\n');
-        }
-        log_error(error.what());
+        std::cerr << error.what() << std::endl;
+        return send_error(session->fd, error.what());
     } catch (const std::exception& error) {
-        result.status = StatementResult::Status::Error;
-        result.diagnostic = std::string("internal server error: ") + error.what() + "\n";
-        log_error(result.diagnostic);
-    } catch (...) {
-        result.status = StatementResult::Status::Error;
-        result.diagnostic = "unknown internal server error\n";
-        log_error(result.diagnostic);
+        std::cerr << error.what() << std::endl;
+        return send_error(session->fd, std::string("internal server error: ") + error.what());
     }
-
-    result.diagnostic = limit_diagnostic(std::move(result.diagnostic));
-    return result;
 }
 
 void Server::prepare_transaction(ClientSession* session, Context* context) {
@@ -528,48 +330,31 @@ void Server::prepare_transaction(ClientSession* session, Context* context) {
     }
 }
 
-bool Server::send_result(const int fd, const StatementResult& result) {
-    if (result.status == StatementResult::Status::Abort) {
-        return wire::WriteFrame(fd, wire::kTagTransactionAbort, 0, result.diagnostic);
-    }
-    if (result.status == StatementResult::Status::Error) {
-        return send_error(fd, result.diagnostic);
-    }
-    if (result.query_result.has_query_result) {
-        return send_query_result(fd, result.query_result);
-    }
-    if (!result.text.empty()) {
-        return send_text_result(fd, "output", result.text);
-    }
-    return wire::WriteFrame(fd, wire::kTagCommandOk, 0, "");
-}
-
-bool Server::send_query_result(const int fd, const WireResultSet& result) {
+bool Server::send_query_result(int fd, const WireResultSet& result) {
     std::vector<wire::ColumnDef> columns;
-    columns.reserve(result.columns.size());
-    for (const auto& [name, type] : result.columns) {
+    for (const auto& source : result.columns) {
         wire::ColumnDef column;
-        column.name = name;
-        if (!wire::ColTypeToWire(static_cast<int>(type), &column.sql_type)) {
-            return send_error(fd, "query result contains an unsupported column type");
+        column.name = source.name;
+        if (!wire::ColTypeToWire(static_cast<int>(source.type), &column.sql_type)) {
+            return send_error(fd, "unsupported query result type");
         }
         columns.push_back(std::move(column));
     }
 
-    // Check the table shape before beginning a multi-frame response.
-    for (const std::vector<WireResultCell>& row : result.rows) {
+    // 在发送 META 前检查表格形状，避免把不完整的响应写到网络上。
+    for (const auto& row : result.rows) {
         if (row.size() != columns.size()) {
             return send_error(fd, "query result row does not match its schema");
         }
-        for (size_t index = 0; index < row.size(); ++index) {
-            if (row[index].type != result.columns[index].type) {
+        for (size_t i = 0; i < row.size(); ++i) {
+            if (row[i].type != result.columns[i].type) {
                 return send_error(fd, "query result cell type does not match its schema");
             }
         }
     }
 
-    std::string diagnostic;
     std::string payload;
+    std::string diagnostic;
     if (!wire::TryEncodeMeta(columns, &payload, &diagnostic)) {
         return send_error(fd, diagnostic);
     }
@@ -577,70 +362,50 @@ bool Server::send_query_result(const int fd, const WireResultSet& result) {
         return false;
     }
 
-    for (const std::vector<WireResultCell>& row : result.rows) {
+    for (const auto& row : result.rows) {
         std::vector<wire::Cell> cells;
-        cells.reserve(row.size());
-        for (size_t index = 0; index < row.size(); ++index) {
+        for (size_t i = 0; i < row.size(); ++i) {
             wire::Cell cell;
-            cell.sql_type = columns[index].sql_type;
-            if (cell.sql_type == wire::kTypeInt32) {
-                cell.int_val = static_cast<int32_t>(row[index].int_val);
-            } else if (cell.sql_type == wire::kTypeFloat32) {
-                cell.float_val = row[index].float_val;
-            } else {
-                cell.str_val = row[index].str_val;
-            }
+            cell.sql_type = columns[i].sql_type;
+            cell.int_val = row[i].int_val;
+            cell.float_val = row[i].float_val;
+            cell.str_val = row[i].str_val;
             cells.push_back(std::move(cell));
         }
-
         if (!wire::TryEncodeRow(cells, &payload, &diagnostic) || !wire::WriteFrame(fd, wire::kTagRow, 0, payload)) {
             return false;
         }
     }
-    return wire::WriteFrame(fd, wire::kTagResultEnd, 0,
-                            wire::EncodeResultEnd(static_cast<uint64_t>(result.rows.size())));
+    return wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(result.rows.size()));
 }
 
-bool Server::send_text_result(const int fd, const std::string& column_name, const std::string& text) {
-    wire::ColumnDef column{.name = column_name, .sql_type = wire::kTypeChar};
-    wire::Cell cell;
-    cell.sql_type = wire::kTypeChar;
-    cell.str_val = text;
-
-    std::string diagnostic;
-    std::string meta;
-    std::string row;
-    if (!wire::TryEncodeMeta({column}, &meta, &diagnostic) || !wire::TryEncodeRow({cell}, &row, &diagnostic)) {
-        return send_error(fd, diagnostic);
-    }
-    return wire::WriteFrame(fd, wire::kTagMeta, 0, meta) && wire::WriteFrame(fd, wire::kTagRow, 0, row) &&
+bool Server::send_text_result(int fd, const std::string& column_name, const std::string& text) {
+    return wire::WriteFrame(fd, wire::kTagMeta, 0, wire::EncodeMetaSingleCharColumn(column_name)) &&
+           wire::WriteFrame(fd, wire::kTagRow, 0, wire::EncodeRowSingleChar(text)) &&
            wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(1));
 }
 
-bool Server::send_error(const int fd, const std::string& diagnostic) {
-    return wire::WriteFrame(fd, wire::kTagError, 0, limit_diagnostic(diagnostic));
+bool Server::send_error(int fd, std::string diagnostic) {
+    if (!diagnostic.empty() && diagnostic.back() != '\n') {
+        diagnostic.push_back('\n');
+    }
+    if (diagnostic.size() > wire::kMaxDiagnosticBytes) {
+        diagnostic.resize(wire::kMaxDiagnosticBytes);
+    }
+    return wire::WriteFrame(fd, wire::kTagError, 0, diagnostic);
 }
 
-void Server::log_info(const std::string& message) {
-    std::lock_guard<std::mutex> lock(output_mutex_);
-    std::cout << message << std::endl;
-}
-
-void Server::log_error(const std::string& message) {
-    std::lock_guard<std::mutex> lock(output_mutex_);
-    std::cerr << message << std::endl;
-}
-
-int Server::start(const int argc, char** argv) {
-    ServerOptions options;
-    if (!parse_options(argc, argv, &options)) {
+int Server::start(int argc, char** argv) {
+    std::string database;
+    std::string address;
+    int port;
+    if (!parse_options(argc, argv, &database, &address, &port)) {
         return 1;
     }
 
-    g_stop_requested = 0;
-    // BufferPoolManager owns a large page array, so the Server must not live on
-    // the small main-thread stack.
-    const std::unique_ptr<Server> server(new Server(std::move(options)));
+    stop_requested = 0;
+    // BufferPoolManager 含有较大的页数组，因此 Server 放在堆上。
+    std::unique_ptr<Server> server(new Server(std::move(database), std::move(address), port));
     return server->run();
 }
 

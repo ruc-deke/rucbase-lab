@@ -205,6 +205,7 @@ ctest --preset debug -L blackbox --output-on-failure
 │   ├── parser/           # flex/bison 词法和语法分析
 │   ├── analyze/          # 语义分析
 │   ├── optimizer/        # 查询计划和优化
+│   ├── portal/           # 计划到执行器的转换与分发
 │   ├── execution/        # 执行器和查询执行
 │   ├── transaction/      # 事务与并发控制
 │   ├── recovery/         # 日志与恢复

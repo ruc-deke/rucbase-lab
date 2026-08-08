@@ -6,7 +6,11 @@ IndentWidth: 4
 ContinuationIndentWidth: 4
 TabWidth: 4
 UseTab: Never
+AccessModifierOffset: -4
 
 ColumnLimit: 120
+BinPackParameters: false
+PackConstructorInitializers: CurrentLine
+
 DerivePointerAlignment: false
 PointerAlignment: Left
