@@ -15,8 +15,7 @@
 
 class Query{
     public:
-    std::shared_ptr<ast::TreeNode> parse;
-    // TODO jointree
+    std::shared_ptr<ast::Statement> parse;
     // where条件
     std::vector<Condition> conds;
     // 投影列
@@ -40,7 +39,7 @@ public:
     Analyze(SmManager *sm_manager) : sm_manager_(sm_manager){}
     ~Analyze(){}
 
-    std::shared_ptr<Query> do_analyze(std::shared_ptr<ast::TreeNode> root);
+    std::shared_ptr<Query> do_analyze(std::shared_ptr<ast::Statement> root);
 
 private:
     TabCol check_column(const std::vector<ColMeta> &all_cols, TabCol target);
@@ -50,4 +49,3 @@ private:
     Value convert_sv_value(const std::shared_ptr<ast::Value> &sv_val);
     CompOp convert_sv_comp_op(ast::SvCompOp op);
 };
-

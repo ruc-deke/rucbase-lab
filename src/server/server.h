@@ -98,9 +98,6 @@ class Server final {
     Portal portal_;
     Analyze analyze_;
 
-    // flex/bison uses global parser state, so parsing itself must be serialized.
-    std::mutex parser_mutex_;
-
     // Each connection has one thread. Finished threads are reaped by the main
     // loop; active threads are joined before the database components above are
     // destroyed.

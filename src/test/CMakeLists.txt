@@ -21,12 +21,7 @@ rucbase_add_gtest(b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucb
 rucbase_add_gtest(b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core)
 rucbase_add_gtest(b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp rucbase::core)
 rucbase_add_gtest(wire_test net/wire_test.cpp rucbase::wire)
-
-add_executable(test_parser ../parser/test_parser.cpp)
-target_link_libraries(test_parser PRIVATE rucbase::parser rucbase::project_options)
-add_test(NAME test_parser COMMAND test_parser
-        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
-set_tests_properties(test_parser PROPERTIES LABELS unit)
+rucbase_add_gtest(test_parser parser/parser_test.cpp rucbase::parser)
 
 function(rucbase_add_blackbox_client target_name)
     add_executable(${target_name} ${ARGN})

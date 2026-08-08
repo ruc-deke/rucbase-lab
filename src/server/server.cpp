@@ -438,32 +438,12 @@ bool Server::handle_request(ClientSession* session, const wire::Frame& request) 
 }
 
 std::shared_ptr<Query> Server::parse_and_analyze(const std::string& sql, std::string* diagnostic) {
-    std::shared_ptr<ast::TreeNode> parse_tree;
-    {
-        // 目前没有实现可重入，全局只有一个语法解析器，多线程连接会出现严重争抢
-        std::lock_guard<std::mutex> lock(parser_mutex_);
-        ast::parse_tree.reset();
-        YY_BUFFER_STATE buffer = yy_scan_string(sql.c_str());
-        if (buffer == nullptr) {
-            throw std::runtime_error("failed to allocate parser buffer");
-        }
-
-        rucbase::parser::ResetParseError();
-        const int parse_result = yyparse();
-        parse_tree = ast::parse_tree;
-        yy_delete_buffer(buffer);
-
-        if (parse_result != 0) {
-            *diagnostic = rucbase::parser::FormatParseError(sql, rucbase::parser::GetParseError());
-            return nullptr;
-        }
-    }
-
-    if (parse_tree == nullptr) {
-        *diagnostic = "empty parse tree\n";
+    rucbase::parser::ParseResult parse_result = rucbase::parser::Parse(sql);
+    if (!parse_result.ok()) {
+        *diagnostic = rucbase::parser::FormatError(sql, *parse_result.error);
         return nullptr;
     }
-    return analyze_.do_analyze(std::move(parse_tree));
+    return analyze_.do_analyze(std::move(parse_result.statement));
 }
 
 // rucbase处理sql核心流程

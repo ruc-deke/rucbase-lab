@@ -1,41 +1,57 @@
-/* Copyright (c) 2023-2026 Renmin University of China
+/**
+ * @file yacc.y
+ * @brief 将 Bison token 组合成一条 SQL 语句 AST 的语法规则。
+ *
+ * 语法动作只负责构造语法对象；目录查找、列绑定和类型兼容性检查由 Analyze
+ * 完成。解析成功要求输入中恰好有一条以分号结束的语句，并且随后到达真正的
+ * 输入末尾。
+ *
+ * Copyright (c) 2023-2026 Renmin University of China
  * SPDX-License-Identifier: MulanPSL-2.0
  */
 
 %{
-#include "ast.h"
-#include "parser_defs.h"
+#include "parser_internal.h"
 #include "yacc.tab.h"
 #include <memory>
 
-int yylex(YYSTYPE *yylval, YYLTYPE *yylloc);
+int yylex(YYSTYPE *yylval, YYLTYPE *yylloc, rucbase::parser::ParseContext *context);
 
-void yyerror(YYLTYPE *locp, const char* s) {
-    rucbase::parser::RecordParseError(locp->first_line, locp->first_column, s);
+/** @brief 将 Bison 报告的首个语法错误写入本次解析上下文。 */
+void yyerror(YYLTYPE *locp, rucbase::parser::ParseContext *context, const char* message) {
+    context->RecordError(locp->first_line, locp->first_column,
+                         message == nullptr ? "syntax error" : message);
 }
 
 using namespace ast;
 %}
 
-// request a pure (reentrant) parser
+%code requires {
+#include "parser_internal.h"
+}
+
+// Bison 的解析状态是局部的；不可重入的 Flex scanner 在 parser.cpp 内部
+// 串行执行，并且不会暴露给调用方。
 %define api.pure full
-// enable location in error handler
+// 启用源码位置跟踪。
 %locations
-// enable verbose syntax error message
+// 生成包含实际 token 和期望 token 的详细语法错误。
 %define parse.error verbose
+%parse-param {rucbase::parser::ParseContext *context}
+%lex-param {rucbase::parser::ParseContext *context}
 
-// keywords
+// SQL 关键字。
 %token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
-WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY
-// non-keywords
-%token LEQ NEQ GEQ T_EOF INVALID
+WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK
+// 运算符和错误 token。
+%token LEQ NEQ GEQ INVALID
 
-// type-specific tokens
+// 携带语义值的 token。
 %token <sv_str> IDENTIFIER VALUE_STRING
 %token <sv_int> VALUE_INT
 %token <sv_float> VALUE_FLOAT
 
-// specify types for non-terminal symbol
+// 指定各非终结符使用的 SemanticValue 成员。
 %type <sv_node> stmt dbStmt ddl dml txnStmt
 %type <sv_field> field
 %type <sv_fields> fieldList
@@ -59,23 +75,7 @@ WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_CO
 start:
         stmt ';'
     {
-        parse_tree = $1;
-        YYACCEPT;
-    }
-    |   HELP
-    {
-        parse_tree = std::make_shared<Help>();
-        YYACCEPT;
-    }
-    |   EXIT
-    {
-        parse_tree = nullptr;
-        YYACCEPT;
-    }
-    |   T_EOF
-    {
-        parse_tree = nullptr;
-        YYACCEPT;
+        context->statement = std::move($1);
     }
     ;
 
@@ -109,6 +109,10 @@ dbStmt:
         SHOW TABLES
     {
         $$ = std::make_shared<ShowTables>();
+    }
+    |   HELP
+    {
+        $$ = std::make_shared<Help>();
     }
     ;
 
@@ -157,11 +161,11 @@ dml:
 fieldList:
         field
     {
-        $$ = std::vector<std::shared_ptr<Field>>{$1};
+        $$ = std::vector<ColDef>{std::move($1)};
     }
     |   fieldList ',' field
     {
-        $$.push_back($3);
+        $$.push_back(std::move($3));
     }
     ;
 
@@ -179,22 +183,22 @@ colNameList:
 field:
         colName type
     {
-        $$ = std::make_shared<ColDef>($1, $2);
+        $$ = ColDef(std::move($1), $2);
     }
     ;
 
 type:
         INT
     {
-        $$ = std::make_shared<TypeLen>(SV_TYPE_INT, sizeof(int));
+        $$ = TypeLen(SV_TYPE_INT, sizeof(int));
     }
     |   CHAR '(' VALUE_INT ')'
     {
-        $$ = std::make_shared<TypeLen>(SV_TYPE_STRING, $3);
+        $$ = TypeLen(SV_TYPE_STRING, $3);
     }
     |   FLOAT
     {
-        $$ = std::make_shared<TypeLen>(SV_TYPE_FLOAT, sizeof(float));
+        $$ = TypeLen(SV_TYPE_FLOAT, sizeof(float));
     }
     ;
 
@@ -232,7 +236,10 @@ condition:
     ;
 
 optWhereClause:
-        /* epsilon */ { /* ignore*/ }
+        /* epsilon */
+    {
+        $$ = {};
+    }
     |   WHERE whereClause
     {
         $$ = $2;
@@ -334,6 +341,9 @@ selector:
         $$ = {};
     }
     |   colList
+    {
+        $$ = std::move($1);
+    }
     ;
 
 tableList:
@@ -356,7 +366,10 @@ opt_order_clause:
     { 
         $$ = $3; 
     }
-    |   /* epsilon */ { /* ignore*/ }
+    |   /* epsilon */
+    {
+        $$ = nullptr;
+    }
     ;
 
 order_clause:
@@ -369,10 +382,14 @@ order_clause:
 opt_asc_desc:
     ASC          { $$ = OrderBy_ASC;     }
     |  DESC      { $$ = OrderBy_DESC;    }
-    |       { $$ = OrderBy_DEFAULT; }
+    |  /* epsilon */ { $$ = OrderBy_DEFAULT; }
     ;    
 
-tbName: IDENTIFIER;
+tbName:
+    IDENTIFIER { $$ = std::move($1); }
+    ;
 
-colName: IDENTIFIER;
+colName:
+    IDENTIFIER { $$ = std::move($1); }
+    ;
 %%

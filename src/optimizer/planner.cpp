@@ -161,7 +161,6 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     std::shared_ptr<Plan> table_join_executors;
     
     std::vector<int> scantbl(tables.size(), -1);
-    // 假设在ast中已经添加了jointree，这里需要修改的逻辑是，先处理jointree，然后再考虑剩下的部分
     if(conds.size() >= 1)
     {
         // 有连接条件
@@ -240,7 +239,7 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
 std::shared_ptr<Plan> Planner::generate_sort_plan(std::shared_ptr<Query> query, std::shared_ptr<Plan> plan)
 {
     auto x = std::dynamic_pointer_cast<ast::SelectStmt>(query->parse);
-    if(!x->has_sort) {
+    if (x->order == nullptr) {
         return plan;
     }
     std::vector<std::string> tables = query->tables;
@@ -252,11 +251,11 @@ std::shared_ptr<Plan> Planner::generate_sort_plan(std::shared_ptr<Query> query, 
     }
     TabCol sel_col;
     for (auto &col : all_cols) {
-        if(col.name.compare(x->order->cols->col_name) == 0 )
+        if(col.name.compare(x->order->column->col_name) == 0 )
         sel_col = {.tab_name = col.tab_name, .col_name = col.name};
     }
     return std::make_shared<SortPlan>(T_Sort, std::move(plan), sel_col, 
-                                    x->order->orderby_dir == ast::OrderBy_DESC);
+                                    x->order->direction == ast::OrderBy_DESC);
 }
 
 
@@ -288,14 +287,10 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
         // create table;
         std::vector<ColDef> col_defs;
         for (auto &field : x->fields) {
-            if (auto sv_col_def = std::dynamic_pointer_cast<ast::ColDef>(field)) {
-                ColDef col_def = {.name = sv_col_def->col_name,
-                                  .type = interp_sv_type(sv_col_def->type_len->type),
-                                  .len = sv_col_def->type_len->len};
-                col_defs.push_back(col_def);
-            } else {
-                throw InternalError("Unexpected field type");
-            }
+            ColDef col_def = {.name = field.col_name,
+                              .type = interp_sv_type(field.type_len.type),
+                              .len = field.type_len.len};
+            col_defs.push_back(col_def);
         }
         plannerRoot = std::make_shared<DDLPlan>(T_CreateTable, x->tab_name, std::vector<std::string>(), col_defs);
     } else if (auto x = std::dynamic_pointer_cast<ast::DropTable>(query->parse)) {

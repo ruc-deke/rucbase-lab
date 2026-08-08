@@ -22,6 +22,14 @@ cmake --preset debug
 cmake --build --preset debug -j 4
 ```
 
+Parser 对外只提供 `parser.h` 中的 `Parse(sql)` 接口，调用者不需要了解 `yyparse` 或 Flex buffer。各文件的职责如下：
+
+- `ast.h`：SQL 抽象语法树。
+- `lex.l`：把 SQL 文本转换为 token。
+- `yacc.y`：把 token 组合成 AST。
+- `parser.h/.cpp`：统一的解析入口和错误诊断。
+- `parser_internal.h`：Flex/Bison 共用的内部数据，其他模块不应包含该文件。
+
 ## 代码规范
 > 以VScode format配置为例
 

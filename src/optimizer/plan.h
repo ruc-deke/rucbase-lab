@@ -10,8 +10,6 @@
 #include <vector>
 #include "parser/ast.h"
 
-#include "parser/parser.h"
-
 typedef enum PlanTag{
     T_Invalid = 1,
     T_Help,
@@ -79,7 +77,7 @@ class JoinPlan : public Plan
             left_ = std::move(left);
             right_ = std::move(right);
             conds_ = std::move(conds);
-            type = INNER_JOIN;
+            type = ast::JoinType::Inner;
         }
         ~JoinPlan(){}
         // 左节点
@@ -89,7 +87,7 @@ class JoinPlan : public Plan
         // 连接条件
         std::vector<Condition> conds_;
         // future TODO: 后续可以支持的连接类型
-        JoinType type;
+        ast::JoinType type;
         
 };
 
