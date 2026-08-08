@@ -24,7 +24,7 @@
 struct yy_buffer_state;
 using YY_BUFFER_STATE = yy_buffer_state*;
 
-YY_BUFFER_STATE yy_scan_bytes(const char* bytes, std::size_t length);
+YY_BUFFER_STATE yy_scan_string(const char* text);
 void yy_delete_buffer(YY_BUFFER_STATE buffer);
 
 namespace rucbase::parser {
@@ -32,7 +32,7 @@ namespace {
 
 std::mutex parser_mutex;
 
-/** @brief 通过 RAII 管理由 yy_scan_bytes() 创建的 buffer。 */
+/** @brief 通过 RAII 管理由 yy_scan_string() 创建的 buffer。 */
 class ScannerBuffer {
    public:
     explicit ScannerBuffer(YY_BUFFER_STATE buffer) : buffer_(buffer) {
@@ -109,7 +109,8 @@ ParseResult Parse(const std::string_view sql) {
     // 调用方获得的 Parse() 接口仍然是线程安全的。（PS：可以实现可重入，开启并行解析）
     std::lock_guard<std::mutex> lock(parser_mutex);
     ParseContext context;
-    ScannerBuffer buffer(yy_scan_bytes(sql.data(), sql.size()));
+    const std::string input(sql);
+    ScannerBuffer buffer(yy_scan_string(input.c_str()));
     const int status = yyparse(&context);
 
     if (status != 0 && !context.error.has_value()) {
