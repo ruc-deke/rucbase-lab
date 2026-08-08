@@ -63,11 +63,13 @@ jobs:
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
 
       - name: Set up Python
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lab_tests && runner.os == 'Linux' }}
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install Python test dependency
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lab_tests && runner.os == 'Linux' }}
         run: python -m pip install --upgrade pip pytest
 
       - name: Configure Debug
@@ -77,8 +79,8 @@ jobs:
         run: cmake --build --preset debug --parallel 2
 
       # Storage/index/transaction tests intentionally cover unfinished lab TODOs.
-      # Keep protocol, parser, and staff-client input tests required while the skeleton is taught.
-      - name: Run parser, Wire, and client scanner smoke tests
+      # Keep protocol and parser tests required while the skeleton is taught.
+      - name: Run parser and Wire smoke tests
         run: |
           ctest --preset debug --output-on-failure \
             -R '^(test_parser|wire_test)$'
@@ -137,7 +139,7 @@ jobs:
         shell: msys2 {0}
         run: cmake --build --preset debug --parallel 2
 
-      - name: Run parser, Wire, and client scanner smoke tests
+      - name: Run parser and Wire smoke tests
         shell: msys2 {0}
         run: |
           ctest --preset debug --output-on-failure \
