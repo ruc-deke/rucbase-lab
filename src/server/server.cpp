@@ -260,8 +260,8 @@ int Server::create_listening_socket() const {
 
     addrinfo* addresses = nullptr;
     const std::string port = std::to_string(options_.port);
-    const int result = ::getaddrinfo(options_.bind_address.c_str(), port.c_str(), &hints, &addresses);
-    if (result != 0) {
+    if (const int result = ::getaddrinfo(options_.bind_address.c_str(), port.c_str(), &hints, &addresses);
+        result != 0) {
         throw std::runtime_error("failed to resolve bind address: " + std::string(::gai_strerror(result)));
     }
 
@@ -448,12 +448,13 @@ std::shared_ptr<Query> Server::parse_and_analyze(const std::string& sql, std::st
             throw std::runtime_error("failed to allocate parser buffer");
         }
 
+        rucbase::parser::ResetParseError();
         const int parse_result = yyparse();
         parse_tree = ast::parse_tree;
         yy_delete_buffer(buffer);
 
         if (parse_result != 0) {
-            *diagnostic = "parse error\n";
+            *diagnostic = rucbase::parser::FormatParseError(sql, rucbase::parser::GetParseError());
             return nullptr;
         }
     }
@@ -620,8 +621,8 @@ bool Server::send_query_result(const int fd, const WireResultSet& result) {
                             wire::EncodeResultEnd(static_cast<uint64_t>(result.rows.size())));
 }
 
-bool Server::send_text_result(int fd, const std::string& column_name, const std::string& text) {
-    wire::ColumnDef column{column_name, wire::kTypeChar};
+bool Server::send_text_result(const int fd, const std::string& column_name, const std::string& text) {
+    wire::ColumnDef column{.name = column_name, .sql_type = wire::kTypeChar};
     wire::Cell cell;
     cell.sql_type = wire::kTypeChar;
     cell.str_val = text;
@@ -636,7 +637,7 @@ bool Server::send_text_result(int fd, const std::string& column_name, const std:
            wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(1));
 }
 
-bool Server::send_error(int fd, const std::string& diagnostic) {
+bool Server::send_error(const int fd, const std::string& diagnostic) {
     return wire::WriteFrame(fd, wire::kTagError, 0, limit_diagnostic(diagnostic));
 }
 
@@ -650,7 +651,7 @@ void Server::log_error(const std::string& message) {
     std::cerr << message << std::endl;
 }
 
-int Server::start(int argc, char** argv) {
+int Server::start(const int argc, char** argv) {
     ServerOptions options;
     if (!parse_options(argc, argv, &options)) {
         return 1;
@@ -659,7 +660,7 @@ int Server::start(int argc, char** argv) {
     g_stop_requested = 0;
     // BufferPoolManager owns a large page array, so the Server must not live on
     // the small main-thread stack.
-    std::unique_ptr<Server> server(new Server(std::move(options)));
+    const std::unique_ptr<Server> server(new Server(std::move(options)));
     return server->run();
 }
 

@@ -30,8 +30,7 @@ jobs:
             build-essential \
             cmake \
             flex \
-            bison \
-            libreadline-dev
+            bison
 
       - name: Configure Release
         run: cmake --preset release -DBUILD_TESTING=OFF

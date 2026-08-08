@@ -58,15 +58,25 @@ class IndexScanExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-        
+        throw NotImplementedError("IndexScanExecutor::beginTuple");
     }
 
     void nextTuple() override {
-        
+        throw NotImplementedError("IndexScanExecutor::nextTuple");
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        throw NotImplementedError("IndexScanExecutor::Next");
+    }
+
+    size_t tupleLen() const override { throw NotImplementedError("Lab 3 index scan executor"); }
+
+    const std::vector<ColMeta> &cols() const override {
+        throw NotImplementedError("Lab 3 index scan executor");
+    }
+
+    ColMeta get_col_offset(const TabCol &target) override {
+        throw NotImplementedError("Lab 3 index scan executor");
     }
 
     Rid &rid() override { return rid_; }

@@ -89,7 +89,7 @@ cmake --build --preset debug-client -j 4
 | 操作系统 | Ubuntu 24.04 LTS；macOS 可用于本地开发 |
 | C++ 编译器 | GCC 11+（推荐 GCC 13）或 Clang 14+ |
 | CMake | 3.22+ |
-| 其他依赖 | flex、bison、readline、Python 3 和 pytest |
+| 其他依赖 | flex、bison、Python 3 和 pytest |
 | C++ 标准 | C++17 |
 
 下载项目（建议递归获取 GoogleTest 子模块）：
@@ -228,5 +228,5 @@ RucBase 的实验代码用于课程学习。学生应独立完成实验，并遵
 ## 许可
 
 RucBase 项目源码统一按 [MulanPSL-2.0](LICENSE) 发布。源码文件使用
-`SPDX-License-Identifier: MulanPSL-2.0` 标识。Readline、GoogleTest 等第三方组件
+`SPDX-License-Identifier: MulanPSL-2.0` 标识。GoogleTest 等第三方组件
 及生成代码仍受其各自许可证约束。

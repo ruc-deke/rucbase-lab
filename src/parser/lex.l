@@ -17,7 +17,6 @@
 %{
 #include "ast.h"
 #include "yacc.tab.h"
-#include <iostream>
 
 // automatically update location
 #define YY_USER_ACTION \
@@ -115,5 +114,5 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
     /* EOF */
 <<EOF>> { return T_EOF; }
     /* unexpected char */
-. { std::cerr << "Lexer Error: unexpected character " << yytext[0] << std::endl; }
+. { return INVALID; }
 %%

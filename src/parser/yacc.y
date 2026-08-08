@@ -4,14 +4,14 @@
 
 %{
 #include "ast.h"
+#include "parser_defs.h"
 #include "yacc.tab.h"
-#include <iostream>
 #include <memory>
 
 int yylex(YYSTYPE *yylval, YYLTYPE *yylloc);
 
 void yyerror(YYLTYPE *locp, const char* s) {
-    std::cerr << "Parser Error at line " << locp->first_line << " column " << locp->first_column << ": " << s << std::endl;
+    rucbase::parser::RecordParseError(locp->first_line, locp->first_column, s);
 }
 
 using namespace ast;
@@ -28,7 +28,7 @@ using namespace ast;
 %token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
 WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ORDER_BY
 // non-keywords
-%token LEQ NEQ GEQ T_EOF
+%token LEQ NEQ GEQ T_EOF INVALID
 
 // type-specific tokens
 %token <sv_str> IDENTIFIER VALUE_STRING

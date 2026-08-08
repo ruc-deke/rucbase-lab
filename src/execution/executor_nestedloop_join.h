@@ -37,15 +37,15 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override {
-
+        throw NotImplementedError("NestedLoopJoinExecutor::beginTuple");
     }
 
     void nextTuple() override {
-        
+        throw NotImplementedError("NestedLoopJoinExecutor::nextTuple");
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        throw NotImplementedError("NestedLoopJoinExecutor::Next");
     }
 
     Rid &rid() override { return _abstract_rid; }

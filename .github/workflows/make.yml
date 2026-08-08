@@ -33,8 +33,7 @@ jobs:
             build-essential \
             cmake \
             flex \
-            bison \
-            libreadline-dev
+            bison
 
       - name: Configure Make build tree
         run: |
@@ -45,7 +44,7 @@ jobs:
       - name: Build with make
         run: make -C build/make -j2
 
-      - name: Run parser and Wire smoke tests
+      - name: Run parser, Wire, and client scanner smoke tests
         run: |
           ctest --test-dir build/make --output-on-failure \
             -R '^(test_parser|wire_test)$'

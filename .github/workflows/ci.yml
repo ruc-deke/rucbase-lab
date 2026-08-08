@@ -53,16 +53,14 @@ jobs:
             build-essential \
             cmake \
             flex \
-            bison \
-            libreadline-dev
+            bison
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
         run: |
-          brew install flex bison readline
+          brew install flex bison
           echo "$(brew --prefix flex)/bin" >> "$GITHUB_PATH"
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
-          echo "CMAKE_PREFIX_PATH=$(brew --prefix readline)" >> "$GITHUB_ENV"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -79,8 +77,8 @@ jobs:
         run: cmake --build --preset debug --parallel 2
 
       # Storage/index/transaction tests intentionally cover unfinished lab TODOs.
-      # Keep the protocol and parser smoke tests required while the skeleton is taught.
-      - name: Run parser and Wire smoke tests
+      # Keep protocol, parser, and staff-client input tests required while the skeleton is taught.
+      - name: Run parser, Wire, and client scanner smoke tests
         run: |
           ctest --preset debug --output-on-failure \
             -R '^(test_parser|wire_test)$'
@@ -129,7 +127,6 @@ jobs:
             cmake
             flex
             bison
-            libreadline-devel
 
       - name: Configure Debug
         shell: msys2 {0}
@@ -140,7 +137,7 @@ jobs:
         shell: msys2 {0}
         run: cmake --build --preset debug --parallel 2
 
-      - name: Run parser and Wire smoke tests
+      - name: Run parser, Wire, and client scanner smoke tests
         shell: msys2 {0}
         run: |
           ctest --preset debug --output-on-failure \
@@ -175,8 +172,7 @@ jobs:
             build-essential \
             cmake \
             flex \
-            bison \
-            libreadline-dev
+            bison
 
       - name: Configure Release
         run: cmake --preset release

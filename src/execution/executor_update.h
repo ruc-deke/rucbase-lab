@@ -31,8 +31,7 @@ class UpdateExecutor : public AbstractExecutor {
         context_ = context;
     }
     std::unique_ptr<RmRecord> Next() override {
-        
-        return nullptr;
+        throw NotImplementedError("UpdateExecutor::Next");
     }
 
     Rid &rid() override { return _abstract_rid; }

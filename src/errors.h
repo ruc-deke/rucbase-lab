@@ -26,6 +26,12 @@ class InternalError : public RMDBError {
     InternalError(const std::string &msg) : RMDBError(msg) {}
 };
 
+class NotImplementedError : public RMDBError {
+   public:
+    explicit NotImplementedError(const std::string &component)
+        : RMDBError(component + " is not implemented") {}
+};
+
 // PF errors
 class UnixError : public RMDBError {
    public:

@@ -51,7 +51,6 @@ RUN apt-get update \
         gnupg \
         jq \
         less \
-        libreadline-dev \
         lsb-release \
         nano \
         ninja-build \

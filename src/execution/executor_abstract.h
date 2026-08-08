@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "errors.h"
 #include "execution_defs.h"
 #include "common/common.h"
 #include "index/ix.h"
@@ -16,26 +17,27 @@ class AbstractExecutor {
 
     virtual ~AbstractExecutor() = default;
 
-    virtual size_t tupleLen() const { return 0; };
+    virtual size_t tupleLen() const { throw NotImplementedError("AbstractExecutor::tupleLen"); };
 
     virtual const std::vector<ColMeta> &cols() const {
-        std::vector<ColMeta> *_cols = nullptr;
-        return *_cols;
+        throw NotImplementedError("AbstractExecutor::cols");
     };
 
     virtual std::string getType() { return "AbstractExecutor"; };
 
-    virtual void beginTuple(){};
+    virtual void beginTuple() { throw NotImplementedError("AbstractExecutor::beginTuple"); };
 
-    virtual void nextTuple(){};
+    virtual void nextTuple() { throw NotImplementedError("AbstractExecutor::nextTuple"); };
 
-    virtual bool is_end() const { return true; };
+    virtual bool is_end() const { throw NotImplementedError("AbstractExecutor::is_end"); };
 
     virtual Rid &rid() = 0;
 
     virtual std::unique_ptr<RmRecord> Next() = 0;
 
-    virtual ColMeta get_col_offset(const TabCol &target) { return ColMeta();};
+    virtual ColMeta get_col_offset(const TabCol &target) {
+        throw NotImplementedError("AbstractExecutor::get_col_offset");
+    };
 
     std::vector<ColMeta>::const_iterator get_col(const std::vector<ColMeta> &rec_cols, const TabCol &target) {
         auto pos = std::find_if(rec_cols.begin(), rec_cols.end(), [&](const ColMeta &col) {

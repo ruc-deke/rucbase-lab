@@ -11,6 +11,7 @@ add_flex_bison_dependency(rucbase_lex rucbase_yacc)
 
 add_library(rucbase_parser STATIC
         ast.cpp
+        parser_defs.cpp
         ${BISON_rucbase_yacc_OUTPUT_SOURCE}
         ${FLEX_rucbase_lex_OUTPUTS})
 add_library(rucbase::parser ALIAS rucbase_parser)

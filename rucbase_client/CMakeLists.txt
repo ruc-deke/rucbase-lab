@@ -20,18 +20,8 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     target_link_libraries(rucbase_wire PUBLIC Threads::Threads)
 endif()
 
-find_library(READLINE_LIBRARY readline REQUIRED)
-find_path(READLINE_INCLUDE_DIR readline/readline.h REQUIRED)
-if(NOT TARGET Readline::Readline)
-    add_library(Readline::Readline UNKNOWN IMPORTED)
-    set_target_properties(Readline::Readline PROPERTIES
-            IMPORTED_LOCATION "${READLINE_LIBRARY}"
-            INTERFACE_INCLUDE_DIRECTORIES "${READLINE_INCLUDE_DIR}")
-endif()
-mark_as_advanced(READLINE_LIBRARY READLINE_INCLUDE_DIR)
-
 add_executable(rucbase_client main.cpp)
-target_link_libraries(rucbase_client PRIVATE rucbase::wire Readline::Readline)
+target_link_libraries(rucbase_client PRIVATE rucbase::wire)
 if(TARGET rucbase::project_options)
     target_link_libraries(rucbase_client PRIVATE rucbase::project_options)
 else()

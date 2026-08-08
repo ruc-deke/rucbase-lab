@@ -30,7 +30,7 @@ class DeleteExecutor : public AbstractExecutor {
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        throw NotImplementedError("DeleteExecutor::Next");
     }
 
     Rid &rid() override { return _abstract_rid; }

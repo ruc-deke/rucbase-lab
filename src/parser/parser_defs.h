@@ -3,7 +3,25 @@
 
 #pragma once
 
+#include <string>
+#include <string_view>
+
 #include "defs.h"
+
+namespace rucbase::parser {
+
+struct ParseError {
+    int line = 1;
+    int column = 1;
+    std::string message;
+};
+
+void ResetParseError();
+void RecordParseError(int line, int column, const char* message);
+ParseError GetParseError();
+std::string FormatParseError(std::string_view sql, const ParseError& error);
+
+}  // namespace rucbase::parser
 
 int yyparse();
 

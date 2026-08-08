@@ -27,15 +27,15 @@ class SortExecutor : public AbstractExecutor {
     }
 
     void beginTuple() override { 
-        
+        throw NotImplementedError("SortExecutor::beginTuple");
     }
 
     void nextTuple() override {
-        
+        throw NotImplementedError("SortExecutor::nextTuple");
     }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        throw NotImplementedError("SortExecutor::Next");
     }
 
     Rid &rid() override { return _abstract_rid; }

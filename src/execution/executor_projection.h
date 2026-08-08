@@ -32,12 +32,12 @@ class ProjectionExecutor : public AbstractExecutor {
         len_ = curr_offset;
     }
 
-    void beginTuple() override {}
+    void beginTuple() override { throw NotImplementedError("ProjectionExecutor::beginTuple"); }
 
-    void nextTuple() override {}
+    void nextTuple() override { throw NotImplementedError("ProjectionExecutor::nextTuple"); }
 
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        throw NotImplementedError("ProjectionExecutor::Next");
     }
 
     Rid &rid() override { return _abstract_rid; }

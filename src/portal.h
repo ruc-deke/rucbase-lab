@@ -167,7 +167,7 @@ class Portal
             return std::make_unique<SortExecutor>(convert_plan_executor(x->subplan_, context), 
                                             x->sel_col_, x->is_desc_);
         }
-        return nullptr;
+        throw NotImplementedError("executor conversion for this query plan");
     }
 
 };

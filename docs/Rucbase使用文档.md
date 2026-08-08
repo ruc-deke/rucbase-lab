@@ -27,7 +27,6 @@ Rucbase需要以下依赖环境库配置：
 - CMake 3.22及以上版本
 - flex
 - bison
-- readline
 
 可以通过命令完成环境配置(以Debian/Ubuntu-apt为例)
 
@@ -35,7 +34,6 @@ Rucbase需要以下依赖环境库配置：
 sudo apt-get install build-essential  # build-essential packages, including gcc, g++, make and so on
 sudo apt-get install cmake            # cmake package
 sudo apt-get install flex bison       # flex & bison packages
-sudo apt-get install libreadline-dev  # readline package
 sudo apt-get install python3-pytest   # Python black-box tests
 ```
 
@@ -132,10 +130,10 @@ cd build/debug
 # 连接指定主机/端口：./bin/rucbase_client -h 127.0.0.1 -p 9000
 # 执行单条语句：./bin/rucbase_client -e "show tables;"
 # 执行脚本文件：./bin/rucbase_client -f demo.sql
-# 查看全部选项：./bin/rucbase_client -?
+# 查看全部选项：./bin/rucbase_client --help
 ```
 
-交互模式下支持多行输入（以`;`结束一条语句）。用户可以通过`exit;` / `bye;` 或 Ctrl-D 关闭客户端：
+交互模式下支持多行输入（以`;`结束一条语句）和一次粘贴多条语句；字符串或注释中的`;`不会被当作语句结尾。用户可以通过`exit;` / `bye;` 或 Ctrl-D 关闭客户端：
 
 ```bash
 Rucbase(<database_name>)> exit;

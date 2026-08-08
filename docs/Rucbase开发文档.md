@@ -12,10 +12,14 @@
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## flex && bison文件的修改
-在parser子文件夹下涉及flex和bison文件的修改，开发者修改lex.l和yacc.y文件之后，需要通过以下命令重新生成对应文件：
+
+Parser 只保留 `lex.l` 和 `yacc.y` 作为词法、语法的源文件。CMake 会在构建目录中调用 Flex/Bison 生成并编译 `lex.yy.cpp` 和 `yacc.tab.cpp`，不要手动生成到 `src/parser/`，也不要提交生成文件。
+
+修改 `lex.l` 或 `yacc.y` 后，正常构建即可：
+
 ```bash
-flex --header-file=lex.yy.hpp -o lex.yy.cpp lex.l
-bison --defines=yacc.tab.hpp -o yacc.tab.cpp yacc.y
+cmake --preset debug
+cmake --build --preset debug -j 4
 ```
 
 ## 代码规范
