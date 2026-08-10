@@ -13,11 +13,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11)
-    message(FATAL_ERROR "Rucbase requires GCC 11 or newer (GCC 13 is recommended).")
+    message(FATAL_ERROR "RUCBase requires GCC 11 or newer (GCC 13 is recommended).")
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
         AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
-    message(FATAL_ERROR "Rucbase requires Clang 14 or newer.")
+    message(FATAL_ERROR "RUCBase requires Clang 14 or newer.")
 endif()
 
 option(RUCBASE_ENABLE_ASAN "Enable AddressSanitizer" OFF)

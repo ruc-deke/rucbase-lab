@@ -8,6 +8,9 @@
 #include <sstream>
 #include <string>
 
+#include "common/context.h"
+#include "system/sm_manager.h"
+
 TEST(SmMetaTest, WritesReadableEmptyDatabaseJson) {
     std::istringstream input(R"({"database":"demo","tables":[]})");
     DbMeta db;
@@ -16,6 +19,23 @@ TEST(SmMetaTest, WritesReadableEmptyDatabaseJson) {
     std::ostringstream output;
     output << db;
     EXPECT_EQ(output.str(), "{\n  \"database\": \"demo\",\n  \"tables\": []\n}\n");
+}
+
+TEST(SmMetaTest, ShowDatabaseReturnsStructuredCurrentName) {
+    SmManager sm_manager(nullptr, nullptr, nullptr, nullptr);
+    std::istringstream input(R"({"database":"demo","tables":[]})");
+    input >> sm_manager.db_;
+
+    Context context(nullptr, nullptr, nullptr);
+    sm_manager.show_database(&context);
+
+    ASSERT_TRUE(context.wire_result_.has_query_result);
+    ASSERT_EQ(context.wire_result_.columns.size(), 1U);
+    EXPECT_EQ(context.wire_result_.columns[0].name, "Database");
+    EXPECT_EQ(context.wire_result_.columns[0].type, TYPE_STRING);
+    ASSERT_EQ(context.wire_result_.rows.size(), 1U);
+    ASSERT_EQ(context.wire_result_.rows[0].size(), 1U);
+    EXPECT_EQ(context.wire_result_.rows[0][0].str_val, "demo");
 }
 
 TEST(SmMetaTest, DefaultMetadataIsInitialized) {

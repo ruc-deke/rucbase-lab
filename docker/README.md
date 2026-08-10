@@ -1,6 +1,6 @@
-# Rucbase 教学开发镜像
+# RUCBase 教学开发镜像
 
-镜像基于 Ubuntu 24.04 LTS，同时发布 `linux/amd64` 与 `linux/arm64` 两种架构。镜像包含 Rucbase 编译、调试和测试工具链，以及 Codex CLI 和 Claude Code。账号凭据不会写入镜像，首次运行 AI 工具时需要用户自行登录。
+镜像基于 Ubuntu 24.04 LTS，同时发布 `linux/amd64` 与 `linux/arm64` 两种架构。镜像包含 RUCBase 编译、调试和测试工具链，以及 Codex CLI 和 Claude Code。账号凭据不会写入镜像，首次运行 AI 工具时需要用户自行登录。
 
 ## 构建参数
 
@@ -54,4 +54,4 @@ docker buildx imagetools inspect \
 
 ## 升级 AI 工具
 
-镜像每次构建都会安装 npm 仓库当时提供的最新版 Codex CLI 和 Claude Code，不固定版本号。发布前应确认两种架构均可启动、Rucbase 可编译，并记录 `codex --version`、`claude --version` 的实际输出，再更新正式标签。
+镜像每次构建都会安装 npm 仓库当时提供的最新版 Codex CLI 和 Claude Code，不固定版本号。发布前应确认两种架构均可启动、RUCBase 可编译，并记录 `codex --version`、`claude --version` 的实际输出，再更新正式标签。

@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "analyze/analyze.h"
+#include "optimizer/optimizer.h"
 #include "optimizer/planner.h"
 #include "parser/parser.h"
 
@@ -49,7 +50,10 @@ std::shared_ptr<ScanPlan> FindScan(const std::shared_ptr<Plan>& plan, const std:
 
 class AnalyzePlannerTest : public ::testing::Test {
   protected:
-    AnalyzePlannerTest() : analyze_(&sm_manager_), planner_(&sm_manager_) { AddTestTables(sm_manager_); }
+    AnalyzePlannerTest()
+        : analyze_(&sm_manager_), planner_(&sm_manager_), optimizer_(&sm_manager_, &planner_) {
+        AddTestTables(sm_manager_);
+    }
 
     std::shared_ptr<DDLPlan> PlanCreateTable(const std::string& sql) {
         auto parsed = rucbase::parser::Parse(sql);
@@ -64,7 +68,18 @@ class AnalyzePlannerTest : public ::testing::Test {
     SmManager sm_manager_{nullptr, nullptr, nullptr, nullptr};
     Analyze analyze_;
     Planner planner_;
+    Optimizer optimizer_;
 };
+
+TEST_F(AnalyzePlannerTest, PlansShowDatabaseAsUtility) {
+    auto parsed = rucbase::parser::Parse("show database;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto query = analyze_.do_analyze(std::move(parsed.statement));
+    auto utility = std::dynamic_pointer_cast<OtherPlan>(optimizer_.plan_query(query, nullptr));
+    ASSERT_NE(utility, nullptr);
+    EXPECT_EQ(utility->tag, T_ShowDatabase);
+}
 
 TEST_F(AnalyzePlannerTest, RejectsQualifiedColumnOutsideFromScope) {
     auto parsed = rucbase::parser::Parse("select b.id from a;");

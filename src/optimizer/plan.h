@@ -14,6 +14,7 @@
 typedef enum PlanTag{
     T_Invalid = 1,
     T_Help,
+    T_ShowDatabase,
     T_ShowTable,
     T_DescTable,
     T_CreateTable,

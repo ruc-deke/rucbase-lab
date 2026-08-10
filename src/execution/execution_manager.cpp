@@ -19,6 +19,9 @@ constexpr char help_info[] =
     "Supported SQL syntax:\n"
     "  command ;\n"
     "command:\n"
+    "  SHOW DATABASE\n"
+    "  SHOW TABLES\n"
+    "  DESC table_name\n"
     "  CREATE TABLE table_name (column_name type [, column_name type ...])\n"
     "  DROP TABLE table_name\n"
     "  CREATE INDEX table_name (column_name)\n"
@@ -69,13 +72,17 @@ void QlManager::run_mutli_query(const std::shared_ptr<Plan>& plan, Context* cont
     }
 }
 
-// 执行help; show tables; desc table; begin; commit; abort;语句
+// 执行 help; show database; show tables; desc table; begin; commit; abort; 语句。
 void QlManager::run_cmd_utility(const std::shared_ptr<Plan>& plan, txn_id_t* txn_id, Context* context) {
     if (const auto utility_plan = std::dynamic_pointer_cast<OtherPlan>(plan)) {
         switch (utility_plan->tag) {
             case T_Help: {
                 memcpy(context->data_send_ + *(context->offset_), help_info, help_info_size);
                 *(context->offset_) = help_info_size;
+                break;
+            }
+            case T_ShowDatabase: {
+                sm_manager_->show_database(context);
                 break;
             }
             case T_ShowTable: {

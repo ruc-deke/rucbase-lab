@@ -41,7 +41,7 @@ using namespace ast;
 %lex-param {rucbase::parser::ParseContext *context}
 
 // SQL 关键字。
-%token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
+%token SHOW DATABASE TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
 WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK
 // 运算符和错误 token。
 %token LEQ NEQ GEQ INVALID
@@ -106,7 +106,11 @@ txnStmt:
     ;
 
 dbStmt:
-        SHOW TABLES
+        SHOW DATABASE
+    {
+        $$ = std::make_shared<ShowDatabase>();
+    }
+    |   SHOW TABLES
     {
         $$ = std::make_shared<ShowTables>();
     }

@@ -1,4 +1,4 @@
-name: RucBase CI
+name: RUCBase CI
 
 on:
   push:

@@ -1,7 +1,8 @@
-# Rucbase并发控制实验指南
+# Lab 4：并发控制
 
+开始实验前，请先按照 [RUCBase 使用文档](RUCBase使用文档.md) 完成构建和测试环境配置。
 
-Rucbase并发控制模块采用的是基于封锁的并发控制协议，要求事务达到可串行化隔离级别。在本实验中，你需要实现事务管理器、锁管理器，并使用事务管理器和锁管理器提供的相关接口保证事务正确地并发执行。
+RUCBase 并发控制模块采用基于封锁的并发控制协议，要求事务达到可串行化隔离级别。在本实验中，你需要实现事务管理器、锁管理器，并使用它们提供的接口保证事务正确地并发执行。
 
 ![Lab 4 并发控制实验流程图](pics/Lab4流程图.png)
 
@@ -30,7 +31,7 @@ Lab4 后再按照实验要求取消注释。
 
 在本实验中，你需要实现系统中的事务管理器，即`TransactionManager`类。
 
-相关数据结构包括`Transaction`类、`WriteRecord`类等，分别位于`txn_def.h`和`transaction.h`文件中。
+相关数据结构包括 `Transaction` 类、`WriteRecord` 类等，分别位于 `transaction.h` 和 `txn_defs.h` 中。
 
 本实验要求完成事务管理器中的三个接口：事务的开始、提交和终止方法。
 
@@ -53,32 +54,32 @@ public:
 - 静态成员变量`txn_map`：维护全局事务映射表
 
 - `Transaction *get_transaction(txn_id_t txn_id);`
-  
+
   根据事务ID获取事务指针
 
 你需要完成`src/transaction/transaction_manager.cpp`文件中的以下接口：
 
 - `begin(Transaction*, LogManager*)`：该接口提供事务的开始方法。
-  
+
   **提示**：如果是新事务，需要创建一个`Transaction`对象，并把该对象的指针加入到全局事务表中。
 
 - `commit(Transaction*, LogManager*)`：该接口提供事务的提交方法。
-  
+
   **提示**：如果并发控制算法需要申请和释放锁，那么你需要在提交阶段完成锁的释放。
 
 - `abort(Transaction*, LogManager*)`：该接口提供事务的终止方法。
-  
+
   在事务的终止方法中，你需要对需要对事务的所有写操作进行撤销，事务的写操作都存储在Transaction类的write_set_中，因此，你可以通过修改存储层或执行层的相关代码来维护write_set_，并在终止阶段遍历write_set_，撤销所有的写操作。
-  
+
   **提示**：需要对事务的所有写操作进行撤销，如果并发控制算法需要申请和释放锁，那么你需要在终止阶段完成锁的释放。
-  
+
   **思考**：在回滚删除操作的时候，是否必须插入到record的原位置，如果没有插入到原位置，会存在哪些问题？
 
 ### 测试点及分数
 
 ```bash
 cd src/test/transaction
-python transaction_test.py
+python3 transaction_test.py
 ```
 
 该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.transaction`。
@@ -94,7 +95,7 @@ python transaction_test.py
 
 ```bash
 cd src/test/transaction
-python transaction_unit_test.py <test_case_name>
+python3 transaction_unit_test.py <test_case_name>
 # The <test_case_name> should be one of the following options from the TESTS array:
 # 'commit_test', 'abort_test', 'commit_index_test', 'abort_index_test'
 # Replace <test_case_name> with the desired test case name to run that specific test.
@@ -102,10 +103,10 @@ python transaction_unit_test.py <test_case_name>
 
 ## 实验二 并发控制实验（60分）
 
-在本实验中，你需要实现锁管理器，即`Lockanager`类，并调用锁管理器的相关接口实现两阶段封锁并发控制算法，死锁的解决办法要求为no-wait算法。
+在本实验中，你需要实现 `LockManager` 类，并调用锁管理器接口实现两阶段封锁并发控制算法；死锁处理采用 no-wait 策略。
 
 ### 任务1：锁管理器实现
-首先要求完成锁管理器`LockManager`类。相关数据结构包括`LockDataId`、`TransactionAbortException`、`LockRequest`、`LockRequestQueue`等，位于`txn_def.h`和`Lockanager.h`文件中。
+首先要求完成锁管理器 `LockManager` 类。相关数据结构包括 `LockDataId`、`TransactionAbortException`、`LockRequest`、`LockRequestQueue` 等，位于 `txn_defs.h` 和 `concurrency/lock_manager.h` 中。
 
 `LockManager`类的接口和重要成员变量如下：
 
@@ -132,7 +133,7 @@ private:
 
 - `lock_table`：锁表，维护系统当前状态下的所有锁
 
-在本实验中，你需要完成锁管理器的加锁、解锁和死锁预防功能。锁管理器提供了行级读写锁、表级读写锁、表级意向锁，相关的数据结构在项目结构文档中进行了介绍。
+在本实验中，你需要完成锁管理器的加锁、解锁和死锁预防功能。锁管理器提供行级读写锁、表级读写锁和表级意向锁，相关数据结构以 `txn_defs.h` 和 `concurrency/lock_manager.h` 为准。
 
 在完成本任务之前，可以先画出锁相容矩阵，再进行加锁解锁流程的梳理。在申请锁时，需要考虑死锁问题，本实验要求通过**no-wait**算法来完成死锁预防。
 
@@ -141,29 +142,29 @@ private:
 #### （1）行级锁加锁
 
 - `lock_shared_on_record(Transaction *, const Rid, int)`：用于申请指定元组上的读锁。
-  
+
   事务要对表中的某个指定元组申请行级读锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 - `lock_exclusive_on_record(Transaction *, const Rid, int)`：用于申请指定元组上的写锁。
-  
+
   事务要对表中的某个指定元组申请行级写锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 #### （2）表级锁加锁
 
 - `lock_shared_on_table(Transaction *txn, int tab_fd)`：用于申请指定表上的读锁。
-  
+
   事务要对表中的某个指定元组申请表级读锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 - `lock_exclusive_on_table(Transaction *txn, int tab_fd)`：用于申请指定表上的写锁。
-  
+
   事务要对表中的某个指定元组申请表级写锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 - `lock_IS_on_table(Transaction *txn, int tab_fd)`：用于申请指定表上的意向读锁。
-  
+
   事务要对表中的某个指定元组申请表级意向读锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 - `lock_IX_on_table(Transaction *txn, int tab_fd)`：用于申请指定表上的意向写锁。
-  
+
   事务要对表中的某个指定元组申请表级意向写锁，该操作需要被阻塞直到申请成功或失败，如果申请成功则返回true，否则返回false。
 
 #### （3）解锁
@@ -181,7 +182,7 @@ private:
 - `delete_record(const Rid, Context *)`：在该接口中，你需要申请对应元组上的行级锁。
 - `update_record(const Rid, Context *)`：在该接口中，你需要申请对应元组上的行级锁。
 
-同时还需要修改`src/system/sm_manager.cpp`和`executor_manager.cpp`中的相关接口，在合适的地方申请行级锁和意向锁。主要涉及以下接口：
+同时还需要修改 `src/system/sm_manager.cpp` 和 `src/execution/execution_manager.cpp` 中的相关接口，在合适的地方申请行级锁和意向锁。主要涉及以下接口：
 
 - `create_table(const std::string, const std::vector<ColDef>, Context *)`
 - `drop_table(const std::string, Context *)`
@@ -194,7 +195,7 @@ private:
 
 ```bash
 cd src/test/concurrency
-python concurrency_test.py
+python3 concurrency_test.py
 ```
 
 该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.concurrency`。测试失败日志位于`build/debug/test-logs`。
@@ -214,11 +215,11 @@ python concurrency_test.py
 
 ```bash
 cd src/test/concurrency
-python concurrency_unit_test.py <test_case_name>
+python3 concurrency_unit_test.py <test_case_name>
 # Run the unit test script with a specific test case name
 # The <test_case_name> should be one of the following options from the TESTS dictionary:
-# 'concurrency_read_test', 'dirty_write_test', 'dirty_read_test', 
-# 'lost_update_test', 'unrepeatable_read_test', 'unrepeatable_read_test_hard', 
+# 'concurrency_read_test', 'dirty_write_test', 'dirty_read_test',
+# 'lost_update_test', 'unrepeatable_read_test', 'unrepeatable_read_test_hard',
 # 'phantom_read_test_1', 'phantom_read_test_2', 'phantom_read_test_3', 'phantom_read_test_4'
 # Each test case has an associated check method and score as defined in the TESTS dictionary.
 # Replace <test_case_name> with the desired test case name to run that specific test.
@@ -239,7 +240,7 @@ python concurrency_unit_test.py <test_case_name>
 
 ```bash
 cd src/test/transaction
-python transaction_test_bonus.py
+python3 transaction_test_bonus.py
 ```
 
 本测试包含两个测试点，分别对事务的提交和回滚进行测试，测试点分数设置如下：
@@ -256,7 +257,7 @@ python transaction_test_bonus.py
 
 ```bash
 cd src/test/concurrency
-python concurrency_test_bonus.py
+python3 concurrency_test_bonus.py
 ```
 
 本测试中包含四个测试点，每个分数点为5分，如果通过表锁的方式规避幻读数据异常，则最终得分为`(通过测试点数量)*5/2`，如果通过间隙锁的方式规避幻读数据异常，则最终得分为`(通过测试点数量)*5`

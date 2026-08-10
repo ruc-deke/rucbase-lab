@@ -68,6 +68,10 @@ struct Help : public Statement {
 struct ShowTables : public Statement {
 };
 
+/** @brief SHOW DATABASE 辅助语句，返回当前打开的数据库名。 */
+struct ShowDatabase : public Statement {
+};
+
 /** @brief BEGIN 事务语句。 */
 struct TxnBegin : public Statement {
 };

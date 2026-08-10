@@ -1,6 +1,6 @@
-# RMDB Wire Protocol v3.1
+# RUCBase 通信协议 v3.1
 
-RMDB Wire 是 Rucbase 服务端、课程客户端和黑盒测试之间的稳定二进制协议。学生代码通常不需要处理协议细节；推荐直接使用 `net/client.h` 中的 `rucbase::wire::Client`。
+RUCBase 通信协议是服务端、课程客户端和黑盒测试之间的稳定二进制协议。学生代码通常不需要处理协议细节；推荐直接使用 `net/client.h` 中的 `rucbase::wire::Client`。
 
 协议中的多字节整数均使用网络字节序（big-endian）。一条连接同一时间只能执行一个请求，不支持流水线复用。
 
@@ -113,15 +113,7 @@ TRANSACTION_ABORT
 未知 tag、非法 flags、帧顺序错误、截断帧或行数不一致属于协议错误；客户端必须将连接视为不可复用并关闭。
 除 `META` 可使用 `0x01` 原始文本标志外，其他响应帧的 flags 必须为 `0`。
 
-## 6. 教学扩展
-
-客户端可发送以下 `EXEC_STREAM` payload 查询当前数据库名：
-
-```text
-__RUCBASE_DATABASE_NAME__
-```
-
-服务端以带 `META 0x01` 标志的单列 `CHAR` 结果返回数据库名。该扩展用于交互式客户端提示符，不进入 SQL 解析器。
+## 6. 测试扩展
 
 测试用 `crash` 控制命令默认关闭。只有服务端进程显式设置 `RUCBASE_ALLOW_TEST_CRASH=1` 时才启用。
 

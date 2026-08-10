@@ -157,6 +157,10 @@ void SmManager::open_db(const std::string& db_name) {
 
 void SmManager::flush_meta() const { write_meta_file(DB_META_NAME, db_); }
 
+void SmManager::show_database(Context* context) const {
+    set_string_result(context, {"Database"}, {{db_.name_}});
+}
+
 void SmManager::close_db() {
     // TODO(Lab 3): 刷盘并关闭所有表、索引和数据库元数据。
     throw NotImplementedError("SmManager::close_db (Lab 3)");

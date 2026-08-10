@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     }
     std::string test_name = argv[optind];
 
-    // const char *prompt_str = "RucBase > ";
+    // const char *prompt_str = "RUCBase > ";
 
     const rucbase::wire::Endpoint endpoint =
         unix_socket_path != nullptr

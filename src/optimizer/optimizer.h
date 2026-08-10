@@ -29,6 +29,9 @@ class Optimizer {
         if (std::dynamic_pointer_cast<ast::Help>(query->parse)) {
             // help;
             return std::make_shared<OtherPlan>(T_Help, std::string());
+        } else if (std::dynamic_pointer_cast<ast::ShowDatabase>(query->parse)) {
+            // show database;
+            return std::make_shared<OtherPlan>(T_ShowDatabase, std::string());
         } else if (std::dynamic_pointer_cast<ast::ShowTables>(query->parse)) {
             // show tables;
             return std::make_shared<OtherPlan>(T_ShowTable, std::string());

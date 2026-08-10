@@ -1,20 +1,6 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+# Lab 1：存储管理
 
-- [存储管理实验文档](#%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86%E5%AE%9E%E9%AA%8C%E6%96%87%E6%A1%A3)
-  - [任务一 缓冲池管理器](#%E4%BB%BB%E5%8A%A1%E4%B8%80-%E7%BC%93%E5%86%B2%E6%B1%A0%E7%AE%A1%E7%90%86%E5%99%A8)
-    - [任务1.1 磁盘存储管理器](#%E4%BB%BB%E5%8A%A111-%E7%A3%81%E7%9B%98%E5%AD%98%E5%82%A8%E7%AE%A1%E7%90%86%E5%99%A8)
-    - [任务1.2 缓冲池替换策略](#%E4%BB%BB%E5%8A%A112-%E7%BC%93%E5%86%B2%E6%B1%A0%E6%9B%BF%E6%8D%A2%E7%AD%96%E7%95%A5)
-    - [任务1.3 缓冲池管理器](#%E4%BB%BB%E5%8A%A113-%E7%BC%93%E5%86%B2%E6%B1%A0%E7%AE%A1%E7%90%86%E5%99%A8)
-  - [任务二 记录管理器](#%E4%BB%BB%E5%8A%A1%E4%BA%8C-%E8%AE%B0%E5%BD%95%E7%AE%A1%E7%90%86%E5%99%A8)
-    - [任务2.1 记录操作](#%E4%BB%BB%E5%8A%A121-%E8%AE%B0%E5%BD%95%E6%93%8D%E4%BD%9C)
-    - [任务2.2 记录迭代器](#%E4%BB%BB%E5%8A%A122-%E8%AE%B0%E5%BD%95%E8%BF%AD%E4%BB%A3%E5%99%A8)
-  - [实验计分](#%E5%AE%9E%E9%AA%8C%E8%AE%A1%E5%88%86)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-# 存储管理实验文档
+开始实验前，请先按照 [RUCBase 使用文档](RUCBase使用文档.md) 完成构建和测试环境配置。
 
 ![Lab 1 存储管理实验流程图](pics/Lab1流程图.png)
 
@@ -28,7 +14,7 @@
 
 ### 任务1.1 磁盘存储管理器
 
-本任务要求补全`DiskManager`类，其负责读写指定页面、分配页面编号，以及对文件进行操作。  
+本任务要求补全`DiskManager`类，其负责读写指定页面、分配页面编号，以及对文件进行操作。
 
 `DiskManager`类的接口如下：
 
@@ -58,45 +44,45 @@ class DiskManager {
 - `void write_page(int fd, page_id_t page_no, const char *offset, int num_bytes);`
 
 - `void read_page(int fd, page_id_t page_no, char *offset, int num_bytes);`
-  
+
     提示：可以调用`read()`或`write()`函数。通过(fd,page_no)可以定位指定页面及其在磁盘文件中的偏移量。注意：这里支持读写的字节长度为`num_bytes`，上层调用此函数读写页面时，其值一般为页面大小`PAGE_SIZE`。但有时也可以小于`PAGE_SIZE`，比如只读写页头数据。
 
 （2）分配页面编号
 
 - `page_id_t allocate_page(int fd);`
-  
+
     目前采取简单的自增分配策略：指定文件的页面编号加1。
 
 （3）文件操作
 
 - `bool is_file(const std::string &path);`
-  
+
     用于判断指定路径文件是否存在。
-  
+
     提示：用`struct stat`获取文件信息。
 
 - `void create_file(const std::string &path);`
-  
+
     用于创建指定路径文件。
-  
+
     提示：调用`open()`函数，使用`O_CREAT`模式。注意不能重复创建相同文件。
 
 - `void open_file(const std::string &path);`
-  
+
     用于打开指定路径文件。
-  
+
     提示：调用`open()`函数，使用`O_RDWR`模式。注意不能重复打开相同文件，并且需要更新文件打开列表。
 
 - `void close_file(int fd);`
-  
+
     用于关闭指定路径文件。
-  
+
     提示：调用`close()`函数。注意不能关闭未打开的文件，并且需要更新文件打开列表。
 
 - `void destroy_file(const std::string &path);`
-  
+
     用于删除指定路径文件。
-  
+
     提示：调用`unlink()`函数。注意不能删除未关闭的文件。
 
 ### 任务1.2 缓冲池替换策略
@@ -119,32 +105,32 @@ class Replacer {
 注意需要保证每个函数都是原子性的操作，可以使用`std::mutex`对每个函数上锁。
 
 - `Replacer(size_t num_pages);`
-  
+
     构造函数，初始化`LRUlist`的最大容量`max_size`。
 
 - `bool victim(frame_id_t *frame_id);`
-  
+
     当缓冲池要淘汰一个页面所在的帧，调用此函数。
-  
+
     需要删除`LRUlist`中最远被unpin的帧，并传出该帧的编号。
 
 - `void pin(frame_id_t frame_id);`
-  
+
     当缓冲池要固定一个页面所在的帧，调用此函数。
-  
+
     需要删除`LRUlist`中指定的帧，若该帧不存在则无任何操作。
 
 - `void unpin(frame_id_t frame_id);`
-  
+
     当缓冲池要取消固定一个页面所在的帧（该页面的`pin_count`变为0），调用此函数。
-  
+
     需要将指定帧插入到`LRUlist`中最近被unpin的位置。
 
 ### 任务1.3 缓冲池管理器
 
 本任务要求补全`BufferPoolManager`类，其负责管理缓冲池中的页面与磁盘文件中的页面之间的来回移动。
 
-`BufferPoolManager`类的接口如下：        
+`BufferPoolManager`类的接口如下：
 
 ```cpp
 class BufferPoolManager {
@@ -181,57 +167,57 @@ class BufferPoolManager {
 然后实现public函数：
 
 - `BufferPoolManager(size_t pool_size, DiskManager *disk_manager);`
-  
+
     构造函数，需要初始化缓冲池的最大容量`pool_size`，以及分配`replacer`和`pages`的地址空间。
-  
+
     初始时`free_list`中帧编号的范围为[0,pool_size)。
 
 - `Page *new_page(PageId *page_id);`
-  
+
     用于在内存申请创建一个新的页面。
-  
+
     内部实现逻辑包括更新页表和页面、固定页面、寻找淘汰页等。
-  
+
     此外，需要用`DiskManager`分配页面编号，并传出这个新页面的编号。
-  
+
     提示：需要用到之前实现的接口`Replacer::pin()`、`Replacer::victim()`、`DiskManager::allocate_page()`等。
 
 - `Page *fetch_page(PageId page_id);`
-  
+
     用于获取缓冲池中的指定页面。
-  
+
     内部实现逻辑包括更新页表和页面、固定页面、寻找淘汰页等。
-  
+
     此外，如果缓冲池中不存在该页面，需要用`DiskManager`从磁盘中读取。
-  
+
     提示：需要用到之前实现的接口`Replacer::pin()`、`Replacer::victim()`、`DiskManager::read_page()`等。
 
 - `bool unpin_page(PageId page_id, bool is_dirty);`
-  
+
     用于使用完页面后，对该页面取消固定。
-  
+
     内部实现逻辑较简单，先减少页面的一次引用次数，由于页面可能同时被多个线程使用，调用一次`unpin_page()`只会减少一次引用次数，只有当引用次数减少到0时，才能调用`Replacer::unpin()`来取消固定页面所在的帧。
-  
+
     参数`is_dirty`决定是否对页面置脏，如果上层修改了页面，就将该页面的脏标志置`true`。
 
 - `bool delete_page(PageId page_id);`
-  
+
     用于删除指定页面。
-  
+
     内部实现逻辑包括更新页表和页面、更新空闲帧列表等。
-  
+
     注意：只有引用次数为0的页面才能被删除。
 
 - `bool flush_page(PageId page_id);`
-  
+
     用于强制刷新（写入）缓冲池中的指定页面到磁盘。
-  
+
     此处的"强制"指的是无论该页的引用次数是否大于0，无论该页是否为脏页，都将其刷新到磁盘。
 
 - `void flush_all_pages(int fd);`
-  
+
     用于将指定文件中的存在于缓冲池的所有页面都刷新到磁盘。
-  
+
   注意，在上述所有函数的实现中，淘汰脏页之前，都要将脏页写入磁盘。
 
 ## 任务二 记录管理器
@@ -246,7 +232,7 @@ class BufferPoolManager {
 
 `RMManager`类提供了创建/打开/关闭/删除记录文件的接口，其内部实现调用了任务一实现的`DiskManager`和`BufferPoolManager`类的接口。
 
-`RMPageHandle`类的介绍参见项目结构文档。
+`RMPageHandle`将一个缓冲池页面解释为记录页面，并提供页头、bitmap 和记录槽位的访问。
 
 ### 任务2.1 记录操作
 
@@ -254,7 +240,7 @@ class BufferPoolManager {
 
 进行操作。
 
-每个`RMFileHandle`对应一个记录文件，当`RMManager`执行打开文件操作时，便会创建一个指向`RMFileHandle`的指针。 
+每个`RMFileHandle`对应一个记录文件，当`RMManager`执行打开文件操作时，便会创建一个指向`RMFileHandle`的指针。
 
 `RMFileHandle`类的接口如下：
 
@@ -313,7 +299,7 @@ class RmFileHandle {
 
 ​	用于获取一条指定记录。由Rid得到record。
 
-​	内部实现逻辑是把位于指定slot的record拷贝一份，然后返回给上层。		
+​	内部实现逻辑是把位于指定slot的record拷贝一份，然后返回给上层。
 
 （7）`Rid insert_record(char *buf, Context *context);`
 
@@ -398,20 +384,13 @@ public:
 | 任务1.3 缓冲池管理器   | src/test/storage/buffer_pool_manager_test.cpp | 40   |
 | 任务2 记录管理器       | src/test/storage/record_manager_test.cpp                  | 30   |
 
-编译生成可执行文件进行测试：
+在仓库根目录编译并运行本实验的测试：
 
 ```bash
-cd build
-
-make disk_manager_test
-./bin/disk_manager_test
-
-make lru_replacer_test
-./bin/lru_replacer_test
-
-make buffer_pool_manager_test
-./bin/buffer_pool_manager_test
-
-make record_manager_test
-./bin/record_manager_test
+cmake --preset debug
+cmake --build --preset debug --target \
+  disk_manager_test lru_replacer_test buffer_pool_manager_test record_manager_test -j 4
+ctest --preset debug \
+  -R '^(disk_manager_test|lru_replacer_test|buffer_pool_manager_test|record_manager_test)$' \
+  --output-on-failure
 ```

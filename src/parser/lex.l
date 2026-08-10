@@ -80,6 +80,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 {new_line} { /* 忽略换行。 */ }
     /* 关键字 */
 "SHOW" { return SHOW; }
+"DATABASE" { return DATABASE; }
 "BEGIN" { return TXN_BEGIN; }
 "COMMIT" { return TXN_COMMIT; }
 "ABORT" { return TXN_ABORT; }

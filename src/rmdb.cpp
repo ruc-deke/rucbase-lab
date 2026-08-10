@@ -14,7 +14,7 @@ constexpr char kRucbaseBanner[] = R"(
  |  _ <| |_| | |___| |_) / ___ \ ___) | |___
  |_| \_ \___/ \____|____/_/   \_\____/|_____|
 
-Welcome to Rucbase!
+Welcome to RUCBase!
 Type 'help;' for help.
 
 )";

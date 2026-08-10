@@ -9,8 +9,8 @@ ARG RUCBASE_REF=main
 ARG BUILD_DATE
 ARG VCS_REF
 
-LABEL org.opencontainers.image.title="Rucbase development environment" \
-      org.opencontainers.image.description="Ubuntu 24.04 teaching environment for Rucbase" \
+LABEL org.opencontainers.image.title="RUCBase development environment" \
+      org.opencontainers.image.description="Ubuntu 24.04 teaching environment for RUCBase" \
       org.opencontainers.image.source="${RUCBASE_REPOSITORY}" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
@@ -32,7 +32,7 @@ RUN architecture="$(dpkg --print-architecture)" \
         "s#https?://(archive|security).ubuntu.com/ubuntu/?#${repository}#g; s#https?://ports.ubuntu.com/ubuntu-ports/?#${repository}#g" \
         /etc/apt/sources.list.d/ubuntu.sources
 
-# Rucbase toolchain plus common debugging and command-line tools used in labs.
+# RUCBase toolchain plus common debugging and command-line tools used in labs.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bison \
@@ -108,7 +108,7 @@ RUN architecture="$(dpkg --print-architecture)" \
 WORKDIR /workspace
 
 # Keep the existing classroom experience: the container opens directly in a
-# complete Rucbase checkout, including the GoogleTest submodule.
+# complete RUCBase checkout, including the GoogleTest submodule.
 RUN git -c http.version=HTTP/1.1 clone --branch "${RUCBASE_REF}" --recursive \
         "${RUCBASE_REPOSITORY}" rucbase-lab
 

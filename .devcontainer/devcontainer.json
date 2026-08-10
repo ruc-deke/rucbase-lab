@@ -1,5 +1,5 @@
 {
-  "name": "Rucbase",
+  "name": "RUCBase",
   "image": "crpi-i42psj2r9mqzm5eq.cn-wulanchabu.personal.cr.aliyuncs.com/daojiagban2026/rucbase-dev:latest",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace/rucbase-lab,type=bind",
   "workspaceFolder": "/workspace/rucbase-lab"

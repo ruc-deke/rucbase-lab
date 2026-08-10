@@ -1,27 +1,6 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+# Lab 2：索引管理
 
-- [存储系统实验文档（实验二 索引管理器）](#%E5%AD%98%E5%82%A8%E7%B3%BB%E7%BB%9F%E5%AE%9E%E9%AA%8C%E6%96%87%E6%A1%A3%E5%AE%9E%E9%AA%8C%E4%BA%8C-%E7%B4%A2%E5%BC%95%E7%AE%A1%E7%90%86%E5%99%A8)
-  - [实验二 索引管理器](#%E5%AE%9E%E9%AA%8C%E4%BA%8C-%E7%B4%A2%E5%BC%95%E7%AE%A1%E7%90%86%E5%99%A8)
-    - [任务1 B+树的查找](#%E4%BB%BB%E5%8A%A11-b%E6%A0%91%E7%9A%84%E6%9F%A5%E6%89%BE)
-      - [（1）结点内的查找](#1%E7%BB%93%E7%82%B9%E5%86%85%E7%9A%84%E6%9F%A5%E6%89%BE)
-      - [（2）B+树的查找](#2b%E6%A0%91%E7%9A%84%E6%9F%A5%E6%89%BE)
-    - [任务2 B+树的插入](#%E4%BB%BB%E5%8A%A12-b%E6%A0%91%E7%9A%84%E6%8F%92%E5%85%A5)
-      - [（1）结点内的插入](#1%E7%BB%93%E7%82%B9%E5%86%85%E7%9A%84%E6%8F%92%E5%85%A5)
-      - [（2）B+树的插入](#2b%E6%A0%91%E7%9A%84%E6%8F%92%E5%85%A5)
-    - [任务3 B+树的删除](#%E4%BB%BB%E5%8A%A13-b%E6%A0%91%E7%9A%84%E5%88%A0%E9%99%A4)
-      - [（1）结点内的删除](#1%E7%BB%93%E7%82%B9%E5%86%85%E7%9A%84%E5%88%A0%E9%99%A4)
-      - [（2）B+树的删除](#2b%E6%A0%91%E7%9A%84%E5%88%A0%E9%99%A4)
-    - [任务4 B+树索引并发控制](#%E4%BB%BB%E5%8A%A14-b%E6%A0%91%E7%B4%A2%E5%BC%95%E5%B9%B6%E5%8F%91%E6%8E%A7%E5%88%B6)
-      - [方法一、粗粒度并发（Tree级）](#%E6%96%B9%E6%B3%95%E4%B8%80%E7%B2%97%E7%B2%92%E5%BA%A6%E5%B9%B6%E5%8F%91tree%E7%BA%A7)
-      - [方法二、细粒度并发（Page级）【选做】](#%E6%96%B9%E6%B3%95%E4%BA%8C%E7%BB%86%E7%B2%92%E5%BA%A6%E5%B9%B6%E5%8F%91page%E7%BA%A7%E9%80%89%E5%81%9A)
-    - [实验计分](#%E5%AE%9E%E9%AA%8C%E8%AE%A1%E5%88%86)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-#  存储系统实验文档（实验二 索引管理器）
-
-## 实验二 索引管理器
+开始实验前，请先按照 [RUCBase 使用文档](RUCBase使用文档.md) 完成构建和测试环境配置。
 
 在本实验中，学生需要实现存储系统中的索引管理器，它主要由`IxManager`类、`IxIndexHandle`类、`IxNodeHandle`类、`IxScan`类组成。本实验将索引的底层数据结构选取为B+树。
 
@@ -41,9 +20,9 @@ B+树的结构如图：
 
 注意：
 
-（1）本系统设计的B+树索引不支持重复键，即唯一索引（索引列不包含重复的值）。 
+（1）本系统设计的B+树索引不支持重复键，即唯一索引（索引列不包含重复的值）。
 
-（2）结点能容纳的键值对数量小于最大值，大于等于最小值。这相当于留出了一个多余的空位，方便B+树进行插入和删除操作。 
+（2）结点能容纳的键值对数量小于最大值，大于等于最小值。这相当于留出了一个多余的空位，方便B+树进行插入和删除操作。
 
 （3）在上图中，value的数量比key的数量多一个，而为了体现”键值对“的概念，实际上应该将key和value的数量设为相等。为了做到这一点，在每个内部结点的第一个值前面额外加上第一个键，这样就能让键和值的数量保持一致，即具有 k+1 个键的内部结点能索引 k+1 个子树。这个键（内部结点的第一个键）存储的key设置为其第一个孩子结点的第一个key，当结点分裂或合并时，可能需要更新其信息；同样地，在每个叶子结点的第一个值前面也额外加上第一个键，它存储当前结点中插入的最小key。（**每个结点的第一个key，存储的都是以该结点为根结点的子树中的所有key的最小值**）
 
@@ -381,7 +360,7 @@ B+树删除的整体流程如下图：
 
 ​		与之前实现不同的是，此处经过`find_leaf_page()`找到的叶结点被加上了读锁，且其祖先结点无任何读锁。最后释放叶结点的读锁即可。
 
-（3）插入函数`insert_entry()`、`split()`、`insert_into_parent()` 
+（3）插入函数`insert_entry()`、`split()`、`insert_into_parent()`
 
 删除函数`delete_entry()`、`coalesce_or_redistribute()`、`coalesce()`、`redistribute()`、`adjust_root()`
 
@@ -399,19 +378,15 @@ B+树删除的整体流程如下图：
 | 任务3 B+树的删除               | src/test/index/b_plus_tree_delete_test.cpp     | 40   |
 | 任务4 B+树的并发控制           | src/test/index/b_plus_tree_concurrent_test.cpp  | 30   |
 
-编译生成可执行文件进行测试：
+在仓库根目录编译并运行本实验的测试：
 
 ```bash
-cd build
-
-make b_plus_tree_insert_test
-./bin/b_plus_tree_insert_test
-
-make b_plus_tree_delete_test
-./bin/b_plus_tree_delete_test
-
-make b_plus_tree_concurrent_test
-./bin/b_plus_tree_concurrent_test
+cmake --preset debug
+cmake --build --preset debug --target \
+  b_plus_tree_insert_test b_plus_tree_delete_test b_plus_tree_concurrent_test -j 4
+ctest --preset debug \
+  -R '^(b_plus_tree_insert_test|b_plus_tree_delete_test|b_plus_tree_concurrent_test)$' \
+  --output-on-failure
 ```
 
 注意：

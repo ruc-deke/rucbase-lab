@@ -3,7 +3,7 @@
 
 /**
  * @file server.h
- * @brief 定义 Rucbase 的顶层服务器及数据库内核组件的组合关系。
+ * @brief 定义 RUCBase 的顶层服务器及数据库内核组件的组合关系。
  */
 
 #pragma once

@@ -17,7 +17,11 @@ using rucbase::parser::Parse;
 using rucbase::parser::ParseResult;
 
 TEST(ParserTest, ParsesUtilityAndDdlStatements) {
-    ParseResult result = Parse("show tables;");
+    ParseResult result = Parse("show database;");
+    ASSERT_TRUE(result.ok());
+    EXPECT_NE(std::dynamic_pointer_cast<ast::ShowDatabase>(result.statement), nullptr);
+
+    result = Parse("show tables;");
     ASSERT_TRUE(result.ok());
     EXPECT_NE(std::dynamic_pointer_cast<ast::ShowTables>(result.statement), nullptr);
 

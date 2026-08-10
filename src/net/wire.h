@@ -3,7 +3,7 @@
 
 #pragma once
 
-// Minimal RMDB wire protocol (docs/rmdb_wire.md), EXEC_STREAM path only.
+// Minimal RUCBase wire protocol (docs/RUCBase通信协议.md), EXEC_STREAM path only.
 // Byte order: big-endian for multi-byte integers.
 
 #include <cstddef>
@@ -16,7 +16,7 @@ namespace rucbase::wire {
 
 constexpr uint16_t kMajor = 3;
 constexpr uint16_t kMinor = 1;
-// docs/rmdb_wire.md §1: 4-byte ASCII magic + major + minor (8 bytes total).
+// docs/RUCBase通信协议.md §1: 4-byte ASCII magic + major + minor (8 bytes total).
 constexpr char kMagic[4] = {'R', 'U', 'C', 'B'};
 constexpr uint32_t kMaxPayloadBytes = 1U << 20U;      // 1 MiB
 constexpr uint32_t kMaxDiagnosticBytes = 64U << 10U;  // 64 KiB
@@ -40,9 +40,6 @@ constexpr uint8_t kFlagRawText = 0x01;
 constexpr uint8_t kTypeInt32 = 0x01;
 constexpr uint8_t kTypeFloat32 = 0x02;
 constexpr uint8_t kTypeChar = 0x03;
-
-// Teaching extension: EXEC_STREAM SQL equal to this string returns the open DB name.
-constexpr char kDatabaseNameRequest[] = "__RUCBASE_DATABASE_NAME__";
 
 struct Frame {
     uint8_t tag = 0;

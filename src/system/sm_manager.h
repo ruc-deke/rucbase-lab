@@ -83,6 +83,9 @@ public:
     /** @brief 将当前数据库元数据写入磁盘。 @pre 当前工作目录是已打开的数据库目录。 */
     void flush_meta() const;
 
+    /** @brief 返回当前打开的数据库名。 @pre context != nullptr */
+    void show_database(Context* context) const;
+
     /** @brief 返回当前数据库中的所有表。 @pre context != nullptr */
     void show_tables(Context* context);
 

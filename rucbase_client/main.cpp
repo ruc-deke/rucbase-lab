@@ -21,7 +21,7 @@ constexpr int kDefaultPort = 8765;
 void PrintUsage(std::ostream& output, const char* prog) {
     output << "Usage: " << prog << " [options]\n"
            << "\n"
-           << "Rucbase interactive SQL client (staff-provided).\n"
+           << "RUCBase interactive SQL client (staff-provided).\n"
            << "\n"
            << "Options:\n"
            << "  -h <host>     Server host (default: 127.0.0.1)\n"
@@ -157,11 +157,22 @@ rucbase::wire::ExecuteResult SendSql(rucbase::wire::Client& client,
 }
 
 std::string FetchDatabaseName(rucbase::wire::Client& client) {
-    const rucbase::wire::ExecuteResult result = client.Execute(rucbase::wire::kDatabaseNameRequest);
-    if (!result.ok()) {
+    std::string database_name;
+    rucbase::wire::ExecuteOptions options;
+    options.format_text = false;
+    options.on_row = [&database_name](const std::vector<rucbase::wire::Cell>& row) {
+        if (row.size() == 1 && !row[0].is_null && row[0].sql_type == rucbase::wire::kTypeChar) {
+            database_name = row[0].str_val;
+        }
+        return true;
+    };
+
+    const rucbase::wire::ExecuteResult result = client.Execute("show database;", options);
+    if (!result.ok() || result.row_count != 1 || result.columns.size() != 1 ||
+        result.columns[0].sql_type != rucbase::wire::kTypeChar) {
         return "?";
     }
-    const std::string name = Trim(result.text);
+    const std::string name = Trim(database_name);
     return name.empty() ? "?" : name;
 }
 
@@ -195,7 +206,7 @@ bool RunScriptFile(rucbase::wire::Client& client, const std::string& path) {
 
 int RunInteractive(rucbase::wire::Client& client, const std::string& database_name) {
     std::string pending;
-    const std::string primary_prompt = "Rucbase(" + database_name + ")> ";
+    const std::string primary_prompt = "RUCBase(" + database_name + ")> ";
     const std::string continuation_prompt(primary_prompt.size() - 3, ' ');
 
     while (true) {

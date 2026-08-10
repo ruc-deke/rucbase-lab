@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     }
     std::string test_name = argv[optind];
 
-    // const char *prompt_str = "RucBase > ";
+    // const char *prompt_str = "RUCBase > ";
 
     auto client = connect_database(unix_socket_path, server_host, server_port);
 

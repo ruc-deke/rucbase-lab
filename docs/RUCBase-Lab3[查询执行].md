@@ -1,39 +1,8 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+# Lab 3：查询执行
 
-- [查询执行文档](#%E6%9F%A5%E8%AF%A2%E6%89%A7%E8%A1%8C%E6%96%87%E6%A1%A3)
-  - [任务一：元数据管理和DDL实现 (5-7Days)](#%E4%BB%BB%E5%8A%A1%E4%B8%80%E5%85%83%E6%95%B0%E6%8D%AE%E7%AE%A1%E7%90%86%E5%92%8Cddl%E5%AE%9E%E7%8E%B0-5-7days)
-    - [元数据管理 (1-2Days)](#%E5%85%83%E6%95%B0%E6%8D%AE%E7%AE%A1%E7%90%86-1-2days)
-    - [DDL语句实现* (2-3Days)](#ddl%E8%AF%AD%E5%8F%A5%E5%AE%9E%E7%8E%B0-2-3days)
-    - [任务完成功能](#%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E5%8A%9F%E8%83%BD)
-  - [任务二：DQL—— select_from语句和相关算子实现(10-15Days)](#%E4%BB%BB%E5%8A%A1%E4%BA%8Cdql-select_from%E8%AF%AD%E5%8F%A5%E5%92%8C%E7%9B%B8%E5%85%B3%E7%AE%97%E5%AD%90%E5%AE%9E%E7%8E%B010-15days)
-    - [算子实现](#%E7%AE%97%E5%AD%90%E5%AE%9E%E7%8E%B0)
-      - [扫描算子(顺序* & 索引) (2-3Days)](#%E6%89%AB%E6%8F%8F%E7%AE%97%E5%AD%90%E9%A1%BA%E5%BA%8F--%E7%B4%A2%E5%BC%95-2-3days)
-      - [连接算子(Nested Loop Join)* (2-3Days)](#%E8%BF%9E%E6%8E%A5%E7%AE%97%E5%AD%90nested-loop-join-2-3days)
-      - [投影算子 (1-2Days)](#%E6%8A%95%E5%BD%B1%E7%AE%97%E5%AD%90-1-2days)
-      - [select_from语句补全 (3Days)](#select_from%E8%AF%AD%E5%8F%A5%E8%A1%A5%E5%85%A8-3days)
-        - [可选任务(5-7Days)](#%E5%8F%AF%E9%80%89%E4%BB%BB%E5%8A%A15-7days)
-    - [任务完成功能](#%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E5%8A%9F%E8%83%BD-1)
-  - [任务三：DML—— INSERT/DELETE/UPDATE语句和算子实现(10-15Days)](#%E4%BB%BB%E5%8A%A1%E4%B8%89dml-insertdeleteupdate%E8%AF%AD%E5%8F%A5%E5%92%8C%E7%AE%97%E5%AD%90%E5%AE%9E%E7%8E%B010-15days)
-    - [Insert 插入操作的实现(5Days)](#insert-%E6%8F%92%E5%85%A5%E6%93%8D%E4%BD%9C%E7%9A%84%E5%AE%9E%E7%8E%B05days)
-      - [插入算子](#%E6%8F%92%E5%85%A5%E7%AE%97%E5%AD%90)
-      - [insert_into()语句补全](#insert_into%E8%AF%AD%E5%8F%A5%E8%A1%A5%E5%85%A8)
-      - [任务完成功能](#%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E5%8A%9F%E8%83%BD-2)
-    - [Delete 删除操作的实现(5Days)](#delete-%E5%88%A0%E9%99%A4%E6%93%8D%E4%BD%9C%E7%9A%84%E5%AE%9E%E7%8E%B05days)
-      - [删除算子](#%E5%88%A0%E9%99%A4%E7%AE%97%E5%AD%90)
-      - [delete_from语句补全](#delete_from%E8%AF%AD%E5%8F%A5%E8%A1%A5%E5%85%A8)
-      - [任务完成功能](#%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E5%8A%9F%E8%83%BD-3)
-    - [Update 更新操作的实现(5Days)](#update-%E6%9B%B4%E6%96%B0%E6%93%8D%E4%BD%9C%E7%9A%84%E5%AE%9E%E7%8E%B05days)
-      - [更新算子](#%E6%9B%B4%E6%96%B0%E7%AE%97%E5%AD%90)
-      - [update_set 语句补全](#update_set-%E8%AF%AD%E5%8F%A5%E8%A1%A5%E5%85%A8)
-      - [任务完成功能](#%E4%BB%BB%E5%8A%A1%E5%AE%8C%E6%88%90%E5%8A%9F%E8%83%BD-4)
-  - [分数说明](#%E5%88%86%E6%95%B0%E8%AF%B4%E6%98%8E)
+开始实验前，请先按照 [RUCBase 使用文档](RUCBase使用文档.md) 完成构建和测试环境配置，并阅读 [RUCBase 项目结构](RUCBase项目结构.md) 了解查询路径。
 
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-# 查询执行文档
-
-Rucbase查询执行模块采用的是火山模型(Volcano Model),你可以通过[链接](https://www.computer.org/csdl/journal/tk/1994/01/k0120/13rRUwI5TRe)获取相应论文阅读以理解火山模型的基本概念，并结合项目结构文档理解系统查询模块的整体架构和处理流程。
+RUCBase 查询执行模块采用火山模型（Volcano Model）。可以通过[论文](https://www.computer.org/csdl/journal/tk/1994/01/k0120/13rRUwI5TRe)了解其基本概念。
 
 ![Lab 3 查询执行实验流程图](pics/Lab3流程图.png)
 
@@ -67,12 +36,11 @@ Rucbase查询执行模块采用的是火山模型(Volcano Model),你可以通过
 
 ### 测试点及分数
 
-在完成本任务后，你需要使用src/test文件夹下的query_unit_test.py单元测试文件来进行basic_query_test1.sql的测试
+在完成本任务后，可以使用 `src/test/query/query_unit_test.py` 单独运行一个查询测试：
 
 ```bash
 cd src/test/query
-python query_unit_test.py basic_query_test1.sql # 25分
-python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desired test file index
+python3 query_unit_test.py basic_query_test1.sql # 25分
 ```
 
 上述兼容命令内部使用pytest运行测试，不再删除已有构建目录。也可以在仓库根目录执行`ctest --preset debug -R blackbox.query`。
@@ -92,11 +60,11 @@ python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desire
 - `Delete`算子：你需要实现该算子的`Next()`接口，该算子用于删除操作；
 - `Update`算子：你需要实现该算子的`Next()`接口，该算子用于更新操作。
 
-所有算子都继承了抽象算子类`execuotr_abstract`，它给出了各个算子继承的基类抽象算子的声明和相应方法。
+所有算子都继承自抽象算子类 `AbstractExecutor`，基类声明了各执行器需要实现的统一接口。
 
 **注意⚠️：**
 
-**有些`execuotr_abstract中定义的虚函数在子类中没有添加TODO，但也是需要implement的，否则会导致程序无法正确运行。**
+**部分基类虚函数在子类中没有标记 `Todo`，但仍需根据接口契约完成，否则程序无法正确运行。**
 
 
 ### 连接算子实现提示
@@ -104,7 +72,7 @@ python query_unit_test.py basic_query_test{i}.sql  # replace {i} with the desire
 多表连接语句的语法如下：
 
 ```sql
-select [col..] from TbName join TbName ... where cond; 
+select [col..] from TbName join TbName ... where cond;
 ```
 
 连接算子不能够作为算子树的叶子节点，它的结构中有两个指向左右孩子算子的指针
@@ -136,7 +104,7 @@ void beginTuple() override {}
 void nextTuple() override {}
 
 std::unique_ptr<RmRecord> Next() override{}
-    
+
 ```
 
 ### 测试点及分数
@@ -145,7 +113,7 @@ std::unique_ptr<RmRecord> Next() override{}
 
 ```bash
 cd src/test/query
-python query_test_basic.py  # 100分
+python3 query_test_basic.py  # 100分
 ```
 
 测试失败时可在`build/debug/test-logs`中查看服务端和客户端日志。

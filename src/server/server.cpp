@@ -3,7 +3,7 @@
 
 /**
  * @file server.cpp
- * @brief 实现 Rucbase 服务端的启动、连接处理与 SQL 调度流程。
+ * @brief 实现 RUCBase 服务端的启动、连接处理与 SQL 调度流程。
  */
 
 #include "server/server.h"
@@ -147,7 +147,7 @@ int Server::run() {
         }
     }
 
-    std::cout << "Rucbase(" << database_name_ << ") stopped" << std::endl;
+    std::cout << "RUCBase(" << database_name_ << ") stopped" << std::endl;
     return exit_code;
 }
 
@@ -178,7 +178,7 @@ int Server::create_listening_socket() const {
 
 void Server::serve() {
     listening_fd = create_listening_socket();
-    std::cout << "Rucbase(" << database_name_ << ") listening on " << bind_address_ << ':' << port_ << std::endl;
+    std::cout << "RUCBase(" << database_name_ << ") listening on " << bind_address_ << ':' << port_ << std::endl;
 
     while (!stop_requested) {
         const int client_fd = ::accept(listening_fd, nullptr, nullptr);
@@ -255,9 +255,6 @@ bool Server::handle_request(ClientSession* session, const wire::Frame& request) 
     }
     if (request.payload.empty()) {
         return send_error(session->fd, "empty SQL");
-    }
-    if (request.payload == wire::kDatabaseNameRequest) {
-        return send_text_result(session->fd, "database", database_name_);
     }
     if (request.payload == "crash") {
         const char* enabled = std::getenv("RUCBASE_ALLOW_TEST_CRASH");
