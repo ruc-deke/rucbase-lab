@@ -4,7 +4,7 @@ add_subdirectory(net)
 
 # 教学内核各模块联系紧密，统一构建为一个静态库可以避免按目录拆分时产生循环依赖或重复链接。
 set(RUCBASE_CORE_SOURCES
-        analyze/analyze.cpp
+        analyze/analyzer.cpp
         execution/execution_manager.cpp
         index/b_plus_tree.cpp
         index/index_manager.cpp

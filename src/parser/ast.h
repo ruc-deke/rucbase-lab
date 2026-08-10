@@ -5,7 +5,7 @@
  * @file ast.h
  * @brief 定义 SQL 解析器生成的抽象语法树（AST）。
  *
- * Parser 只负责语法分析；表查找、列绑定和类型检查属于 Analyze 层，
+ * Parser 只负责语法分析；表查找、列绑定和类型检查属于 Analyzer 层，
  * 因此不应出现在这些节点中。
  */
 
@@ -47,7 +47,7 @@ enum OrderByDir {
  * @brief 显式 JOIN 子句的连接类型。
  *
  * 连接类型属于 SQL 的语法语义：Parser 在后续支持 INNER、LEFT、RIGHT 和
- * FULL JOIN 时将其写入 AST，Analyze 与 Planner 只消费解析结果。
+ * FULL JOIN 时将其写入 AST，Analyzer 与 Planner 只消费解析结果。
  */
 enum class JoinType {
     Inner,
@@ -182,7 +182,7 @@ struct StringLit : public Value {
 /**
  * @brief 列引用，可以带表名前缀，也可以省略表名。
  *
- * @c tab_name 为空表示这是未限定列名，后续由 Analyze 完成列绑定。
+ * @c tab_name 为空表示这是未限定列名，后续由 Analyzer 完成列绑定。
  */
 struct Col : public Expr {
     std::string tab_name;
@@ -256,7 +256,7 @@ struct UpdateStmt : public Statement {
 /**
  * @brief 尚未经过目录相关语义分析的 SELECT 语句。
  *
- * 此处按解析结果保存表名和列名；后续由 Analyze 解析未限定列名、检查歧义，
+ * 此处按解析结果保存表名和列名；后续由 Analyzer 解析未限定列名、检查歧义，
  * 并验证被引用的表和列。
  */
 struct SelectStmt : public Statement {

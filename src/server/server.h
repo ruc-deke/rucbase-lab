@@ -13,7 +13,7 @@
 #include <thread>
 #include <vector>
 
-#include "analyze/analyze.h"
+#include "analyze/analyzer.h"
 #include "execution/execution_manager.h"
 #include "index/index_manager.h"
 #include "optimizer/optimizer.h"
@@ -141,7 +141,7 @@ private:
     Planner planner_;
     Optimizer optimizer_;
     Portal portal_;
-    Analyze analyze_;
+    Analyzer analyzer_;
     ///@}
 
     /** @name 客户端连接状态 */

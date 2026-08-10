@@ -7,6 +7,7 @@
 #include "server/server.h"
 
 int main(int argc, char** argv) {
+    // 非 Ubuntu 环境 Banner 可能会出现乱码
     rucbase::PrintRucbaseBanner(std::cout);
     std::cout << "Welcome to RUCBase!\n"
               << "Start the client: rucbase_client -p <port>\n\n"

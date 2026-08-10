@@ -108,7 +108,7 @@ Server::Server(std::string database_name, std::string bind_address, const int po
       planner_(&sm_manager_),
       optimizer_(&sm_manager_, &planner_),
       portal_(&sm_manager_),
-      analyze_(&sm_manager_) {}
+      analyzer_(&sm_manager_) {}
 
 int Server::run() {
     int exit_code = 0;
@@ -290,7 +290,7 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql) {
             }
             return send_error(session->fd, parser::FormatError(sql, parse_result.error.value()));
         }
-        auto query = analyze_.do_analyze(std::move(parse_result.statement));
+        auto query = analyzer_.analyze(parse_result.statement);
         auto plan = optimizer_.plan_query(query, &context);
         auto statement = portal_.start(std::move(plan), &context);
         portal_.run(std::move(statement), &ql_manager_, &session->txn_id, &context);

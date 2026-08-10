@@ -54,7 +54,12 @@ class InsertExecutor : public AbstractExecutor {
             if (col.type != val.type) {
                 throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
             }
-            val.init_raw(col.len);
+            if (val.raw == nullptr) {
+                // Keep direct executor construction safe while allowing Analyzer to pre-encode values.
+                val.init_raw(col.len);
+            } else if (val.raw->size != col.len) {
+                throw InternalError("Insert value raw size does not match column length");
+            }
             memcpy(rec.data + col.offset, val.raw->data, col.len);
         }
         // Insert into record file

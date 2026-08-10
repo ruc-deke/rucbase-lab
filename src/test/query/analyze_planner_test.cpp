@@ -1,12 +1,12 @@
 // Copyright (c) 2023-2026 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
+#include <gtest/gtest.h>
+
 #include <memory>
 #include <string>
 
-#include <gtest/gtest.h>
-
-#include "analyze/analyze.h"
+#include "analyze/analyzer.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/planner.h"
 #include "parser/parser.h"
@@ -50,7 +50,7 @@ std::shared_ptr<ScanPlan> FindScan(const std::shared_ptr<Plan>& plan, const std:
 
 class QueryPlanningTest : public ::testing::Test {
 protected:
-    QueryPlanningTest() : analyze_(&sm_manager_), planner_(&sm_manager_), optimizer_(&sm_manager_, &planner_) {
+    QueryPlanningTest() : analyzer_(&sm_manager_), planner_(&sm_manager_), optimizer_(&sm_manager_, &planner_) {
         AddTestTables(sm_manager_);
     }
 
@@ -60,12 +60,12 @@ protected:
         if (!parsed.ok()) {
             return nullptr;
         }
-        auto query = analyze_.do_analyze(std::move(parsed.statement));
+        auto query = analyzer_.analyze(parsed.statement);
         return std::dynamic_pointer_cast<DDLPlan>(planner_.do_planner(std::move(query), nullptr));
     }
 
     SmManager sm_manager_{nullptr, nullptr, nullptr, nullptr};
-    Analyze analyze_;
+    Analyzer analyzer_;
     Planner planner_;
     Optimizer optimizer_;
 };
@@ -74,7 +74,7 @@ TEST_F(QueryPlanningTest, PlansShowDatabaseAsUtility) {
     auto parsed = rucbase::parser::Parse("show database;");
     ASSERT_TRUE(parsed.ok());
 
-    auto query = analyze_.do_analyze(std::move(parsed.statement));
+    auto query = analyzer_.analyze(parsed.statement);
     auto utility = std::dynamic_pointer_cast<OtherPlan>(optimizer_.plan_query(query, nullptr));
     ASSERT_NE(utility, nullptr);
     EXPECT_EQ(utility->tag, T_ShowDatabase);
@@ -84,27 +84,88 @@ TEST_F(QueryPlanningTest, RejectsQualifiedColumnOutsideFromScope) {
     auto parsed = rucbase::parser::Parse("select b.id from a;");
     ASSERT_TRUE(parsed.ok());
 
-    EXPECT_THROW(analyze_.do_analyze(parsed.statement), ColumnNotFoundError);
+    EXPECT_THROW(analyzer_.analyze(parsed.statement), ColumnNotFoundError);
 }
 
 TEST_F(QueryPlanningTest, RejectsQualifiedPredicateOutsideFromScope) {
     auto parsed = rucbase::parser::Parse("select * from a where b.id = 1;");
     ASSERT_TRUE(parsed.ok());
 
-    EXPECT_THROW(analyze_.do_analyze(parsed.statement), ColumnNotFoundError);
+    EXPECT_THROW(analyzer_.analyze(parsed.statement), ColumnNotFoundError);
 }
 
 TEST_F(QueryPlanningTest, RejectsLiteralTypeBeforeEncodingRawValue) {
     auto parsed = rucbase::parser::Parse("select * from a where a.text = 1;");
     ASSERT_TRUE(parsed.ok());
 
-    EXPECT_THROW(analyze_.do_analyze(parsed.statement), IncompatibleTypeError);
+    EXPECT_THROW(analyzer_.analyze(parsed.statement), IncompatibleTypeError);
+}
+
+TEST_F(QueryPlanningTest, PreservesParsedAstAndAnalyzedConditionsDuringPlanning) {
+    auto parsed = rucbase::parser::Parse("select a.id from a where a.id = 1;");
+    ASSERT_TRUE(parsed.ok());
+    auto select_stmt = std::dynamic_pointer_cast<ast::SelectStmt>(parsed.statement);
+    ASSERT_NE(select_stmt, nullptr);
+    const auto parsed_tables = select_stmt->tabs;
+
+    auto query = analyzer_.analyze(parsed.statement);
+    ASSERT_EQ(query->bound_statement.get(), parsed.statement.get());
+    EXPECT_EQ(select_stmt->tabs, parsed_tables);
+    ASSERT_EQ(query->bound_conds.size(), 1U);
+
+    auto plan = planner_.do_planner(query, nullptr);
+    ASSERT_NE(plan, nullptr);
+    ASSERT_EQ(query->bound_conds.size(), 1U);
+    EXPECT_EQ(query->bound_conds[0].lhs_col.tab_name, "a");
+    EXPECT_TRUE(query->bound_conds[0].is_rhs_val);
+}
+
+TEST_F(QueryPlanningTest, AnalyzesAndEncodesInsertValues) {
+    auto parsed = rucbase::parser::Parse("insert into a values (1, 'short');");
+    ASSERT_TRUE(parsed.ok());
+
+    auto query = analyzer_.analyze(parsed.statement);
+    ASSERT_EQ(query->bound_values.size(), 2U);
+    ASSERT_NE(query->bound_values[0].raw, nullptr);
+    ASSERT_NE(query->bound_values[1].raw, nullptr);
+    EXPECT_EQ(query->bound_values[0].raw->size, 4);
+    EXPECT_EQ(query->bound_values[1].raw->size, 8);
+}
+
+TEST_F(QueryPlanningTest, RejectsInvalidInsertBeforePlanning) {
+    auto missing_table = rucbase::parser::Parse("insert into missing values (1);");
+    ASSERT_TRUE(missing_table.ok());
+    EXPECT_THROW(analyzer_.analyze(missing_table.statement), TableNotFoundError);
+
+    auto wrong_count = rucbase::parser::Parse("insert into a values (1);");
+    ASSERT_TRUE(wrong_count.ok());
+    EXPECT_THROW(analyzer_.analyze(wrong_count.statement), InvalidValueCountError);
+
+    auto wrong_type = rucbase::parser::Parse("insert into a values ('one', 'short');");
+    ASSERT_TRUE(wrong_type.ok());
+    EXPECT_THROW(analyzer_.analyze(wrong_type.statement), IncompatibleTypeError);
+
+    auto oversized_string = rucbase::parser::Parse("insert into a values (1, '123456789');");
+    ASSERT_TRUE(oversized_string.ok());
+    EXPECT_THROW(analyzer_.analyze(oversized_string.statement), StringOverflowError);
+}
+
+TEST_F(QueryPlanningTest, BindsUpdateTargetColumn) {
+    auto parsed = rucbase::parser::Parse("update a set text = 'short' where id = 1;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto query = analyzer_.analyze(parsed.statement);
+    ASSERT_EQ(query->bound_set_clauses.size(), 1U);
+    EXPECT_EQ(query->bound_set_clauses[0].lhs.tab_name, "a");
+    EXPECT_EQ(query->bound_set_clauses[0].lhs.col_name, "text");
+    ASSERT_NE(query->bound_set_clauses[0].rhs.raw, nullptr);
+    EXPECT_EQ(query->bound_set_clauses[0].rhs.raw->size, 8);
 }
 
 TEST_F(QueryPlanningTest, AssignsSameTableColumnPredicateToThatTable) {
     auto parsed = rucbase::parser::Parse("select * from a join b where b.x = b.y;");
     ASSERT_TRUE(parsed.ok());
-    auto query = analyze_.do_analyze(parsed.statement);
+    auto query = analyzer_.analyze(parsed.statement);
 
     auto plan = planner_.do_planner(std::move(query), nullptr);
     auto a_scan = FindScan(plan, "a");
@@ -151,11 +212,11 @@ TEST_F(QueryPlanningTest, RejectsOtherInvalidRecordLayoutsBeforeFileCreation) {
 TEST_F(QueryPlanningTest, BindsQualifiedOrderByColumnWithinFromScope) {
     auto parsed = rucbase::parser::Parse("select a.text from a join b order by a.id desc;");
     ASSERT_TRUE(parsed.ok());
-    auto query = analyze_.do_analyze(std::move(parsed.statement));
-    ASSERT_TRUE(query->order_col.has_value());
-    EXPECT_EQ(query->order_col->tab_name, "a");
-    EXPECT_EQ(query->order_col->col_name, "id");
-    EXPECT_TRUE(query->order_desc);
+    auto query = analyzer_.analyze(parsed.statement);
+    ASSERT_TRUE(query->bound_order_col.has_value());
+    EXPECT_EQ(query->bound_order_col->tab_name, "a");
+    EXPECT_EQ(query->bound_order_col->col_name, "id");
+    EXPECT_TRUE(query->bound_order_desc);
 
     auto dml = std::dynamic_pointer_cast<DMLPlan>(planner_.do_planner(std::move(query), nullptr));
     ASSERT_NE(dml, nullptr);
@@ -171,15 +232,15 @@ TEST_F(QueryPlanningTest, BindsQualifiedOrderByColumnWithinFromScope) {
 TEST_F(QueryPlanningTest, RejectsInvalidOrderByColumns) {
     auto outside_scope = rucbase::parser::Parse("select a.id from a order by b.id;");
     ASSERT_TRUE(outside_scope.ok());
-    EXPECT_THROW(analyze_.do_analyze(std::move(outside_scope.statement)), ColumnNotFoundError);
+    EXPECT_THROW(analyzer_.analyze(outside_scope.statement), ColumnNotFoundError);
 
     auto missing = rucbase::parser::Parse("select a.id from a order by missing;");
     ASSERT_TRUE(missing.ok());
-    EXPECT_THROW(analyze_.do_analyze(std::move(missing.statement)), ColumnNotFoundError);
+    EXPECT_THROW(analyzer_.analyze(missing.statement), ColumnNotFoundError);
 
     auto ambiguous = rucbase::parser::Parse("select a.id from a join b order by id;");
     ASSERT_TRUE(ambiguous.ok());
-    EXPECT_THROW(analyze_.do_analyze(std::move(ambiguous.statement)), AmbiguousColumnError);
+    EXPECT_THROW(analyzer_.analyze(ambiguous.statement), AmbiguousColumnError);
 }
 
 }  // namespace

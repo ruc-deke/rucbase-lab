@@ -6,7 +6,7 @@
 #include <memory>
 #include <string>
 
-#include "analyze/analyze.h"
+#include "analyze/analyzed_query.h"
 #include "parser/ast.h"
 #include "plan.h"
 #include "planner.h"
@@ -25,34 +25,33 @@ class Optimizer {
         {}
     
     // query 仅只读使用（dynamic_pointer_cast / 读字段），用 const 引用避免 shared_ptr 拷贝。
-    std::shared_ptr<Plan> plan_query(const std::shared_ptr<Query> &query, Context *context) const {
-        if (std::dynamic_pointer_cast<ast::Help>(query->parse)) {
+    std::shared_ptr<Plan> plan_query(const std::shared_ptr<AnalyzedQuery>& query, Context* context) const {
+        if (std::dynamic_pointer_cast<const ast::Help>(query->bound_statement)) {
             // help;
             return std::make_shared<OtherPlan>(T_Help, std::string());
-        } else if (std::dynamic_pointer_cast<ast::ShowDatabase>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::ShowDatabase>(query->bound_statement)) {
             // show database;
             return std::make_shared<OtherPlan>(T_ShowDatabase, std::string());
-        } else if (std::dynamic_pointer_cast<ast::ShowTables>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::ShowTables>(query->bound_statement)) {
             // show tables;
             return std::make_shared<OtherPlan>(T_ShowTable, std::string());
-        } else if (const auto desc_table = std::dynamic_pointer_cast<ast::DescTable>(query->parse)) {
+        } else if (const auto desc_table = std::dynamic_pointer_cast<const ast::DescTable>(query->bound_statement)) {
             // desc table;
             return std::make_shared<OtherPlan>(T_DescTable, desc_table->tab_name);
-        } else if (std::dynamic_pointer_cast<ast::TxnBegin>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::TxnBegin>(query->bound_statement)) {
             // begin;
             return std::make_shared<OtherPlan>(T_Transaction_begin, std::string());
-        } else if (std::dynamic_pointer_cast<ast::TxnAbort>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::TxnAbort>(query->bound_statement)) {
             // abort;
             return std::make_shared<OtherPlan>(T_Transaction_abort, std::string());
-        } else if (std::dynamic_pointer_cast<ast::TxnCommit>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::TxnCommit>(query->bound_statement)) {
             // commit;
             return std::make_shared<OtherPlan>(T_Transaction_commit, std::string());
-        } else if (std::dynamic_pointer_cast<ast::TxnRollback>(query->parse)) {
+        } else if (std::dynamic_pointer_cast<const ast::TxnRollback>(query->bound_statement)) {
             // rollback;
             return std::make_shared<OtherPlan>(T_Transaction_rollback, std::string());
         } else {
             return planner_->do_planner(query, context);
         }
     }
-
 };
