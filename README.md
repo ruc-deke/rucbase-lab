@@ -5,6 +5,18 @@
 <p align="center"><strong>面向数据库系统课程的教学型关系数据库管理系统</strong></p>
 
 <p align="center">
+  <a href="https://github.com/ruc-deke/rucbase-lab/actions/workflows/ci.yml">
+    <img src="https://github.com/ruc-deke/rucbase-lab/actions/workflows/ci.yml/badge.svg?branch=main&amp;event=push" alt="RUCBase CI">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-MulanPSL--2.0-blue.svg" alt="License: MulanPSL-2.0">
+  </a>
+  <a href="CMakeLists.txt">
+    <img src="https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=c%2B%2B&amp;logoColor=white" alt="C++20">
+  </a>
+</p>
+
+<p align="center">
   <a href="#快速开始">快速开始</a> ·
   <a href="docs/README.md">文档导航</a> ·
   <a href="#课程实验">课程实验</a> ·
