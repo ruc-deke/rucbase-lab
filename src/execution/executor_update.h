@@ -3,13 +3,19 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include "execution_defs.h"
-#include "execution_manager.h"
+#include "common/common.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "executor_abstract.h"
-#include "index/ix.h"
-#include "system/sm.h"
+#include "record/rm_defs.h"
+#include "record/rm_file_handle.h"
+#include "system/sm_manager.h"
+#include "system/sm_meta.h"
 
 class UpdateExecutor : public AbstractExecutor {
    private:

@@ -3,13 +3,15 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
 #include "common/defs.h"
-#include "recovery/log_manager.h"
-#include "transaction/concurrency/lock_manager.h"
-#include "transaction/transaction.h"
+
+class LockManager;
+class LogManager;
+class Transaction;
 
 // class TransactionManager;
 

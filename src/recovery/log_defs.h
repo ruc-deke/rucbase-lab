@@ -3,12 +3,10 @@
 
 #pragma once
 
-#include "common/defs.h"
-#include "storage/disk_manager.h"
-#include "common/config.h"
-
-#include <atomic>
 #include <chrono>
+#include <cstdint>
+
+#include "common/config.h"
 
 static constexpr std::chrono::duration<int64_t> FLUSH_TIMEOUT = std::chrono::seconds(3);
 // the offset of log_type_ in log header

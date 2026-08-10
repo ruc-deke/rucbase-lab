@@ -2,15 +2,16 @@
 
 开始实验前，请先按照 [RUCBase 使用文档](RUCBase使用文档.md) 完成构建和测试环境配置。
 
-在本实验中，学生需要实现存储系统中的索引管理器，它主要由`IxManager`类、`IxIndexHandle`类、`IxNodeHandle`类、`IxScan`类组成。本实验将索引的底层数据结构选取为B+树。
+在本实验中，学生需要完成 B+ 树索引的核心算法。开始编码前，可先阅读 [`src/index/README.md`](../src/index/README.md) 了解模块边界和页面布局。
 
-- `IxManager`类提供了创建/打开/关闭/删除索引文件的接口，其内部实现调用了实验一实现的`DiskManager`和`BufferPoolManager`类的接口。
+| 文件 | 主要类型 | 职责 |
+| --- | --- | --- |
+| `index_types.h/.cpp` | `IndexFileHeader`、`IndexPageHeader`、`IndexPosition` | 定义磁盘布局和扫描位置 |
+| `index_manager.h/.cpp` | `IndexManager` | 管理索引文件生命周期 |
+| `b_plus_tree.h/.cpp` | `BPlusTree`、`BPlusTreeNode` | 实现 B+ 树算法 |
+| `index_scan.h/.cpp` | `IndexScan` | 沿叶子链表遍历索引项 |
 
-- `IxIndexHandle`类用于实现B+树的基本功能，且支持并发。每个`IxIndexHandle`对应一个索引文件，当`IxManager`执行打开文件操作时，便会创建一个指向`IxIndexHandle`的指针。
-- `IxNodeHandle`类用于实现B+树的单个结点的基本功能，方便`IxIndexHandle`类进行调用。
-- `IxScan`类用于遍历叶子结点。
-
-其中，学生只要实现`IxIndexHandle`、`IxNodeHandle`中的接口。已提供其他类的完整源码。
+学生只需要实现 `BPlusTree` 和 `BPlusTreeNode` 中标有 `Todo` 的接口；`IndexManager`、`IndexScan` 和序列化代码均由框架提供。
 
 ![Lab 2 索引管理实验流程图](pics/Lab2流程图.png)
 
@@ -30,10 +31,10 @@ B+树的结构如图：
 
 本实验提供一些已经实现好的辅助函数，学生无需实现，可以阅读其实现，并调用其功能。
 
-（1）`IxNodeHandle`类的辅助函数：
+（1）`BPlusTreeNode`类的辅助函数：
 
 ```cpp
-class IxNodeHandle {
+class BPlusTreeNode {
     // 辅助函数（本实验提供，无需实现）
     char *get_key(int key_idx) const;
     Rid *get_rid(int rid_idx) const;
@@ -48,59 +49,59 @@ class IxNodeHandle {
 
 ​		得到值数组中指定位置的地址。
 
-（2）`IxIndexHandle`类辅助函数：
+（2）`BPlusTree`类辅助函数：
 
 ```cpp
-class IxIndexHandle {
+class BPlusTree {
     // 辅助函数（本实验提供，无需实现）
-    IxNodeHandle *fetch_node(int page_no) const;
-    IxNodeHandle *create_node();
-    void maintain_parent(IxNodeHandle *node);
-    void maintain_child(IxNodeHandle *node, int child_idx);
-    void erase_leaf(IxNodeHandle *leaf);
-    void release_node_handle(IxNodeHandle &node);
+    BPlusTreeNode *fetch_node(int page_no) const;
+    BPlusTreeNode *create_node();
+    void update_ancestor_keys(BPlusTreeNode *node);
+    void update_child_parent(BPlusTreeNode *node, int child_idx);
+    void unlink_leaf(BPlusTreeNode *leaf);
+    void record_page_deletion();
 }
 ```
 
-- `IxNodeHandle *fetch_node(int page_no) const;`
+- `BPlusTreeNode *fetch_node(int page_no) const;`
 
-​		用于获取指定页面对应的`IxNodeHandle`。
+​		用于获取指定页面对应的`BPlusTreeNode`。
 
-- `IxNodeHandle *create_node();`
+- `BPlusTreeNode *create_node();`
 
-​		用于创建一个`IxNodeHandle`。
+​		用于创建一个`BPlusTreeNode`。
 
-- `void maintain_parent(IxNodeHandle *node);`
+- `void update_ancestor_keys(BPlusTreeNode *node);`
 
   用于从`node`开始更新其父节点的第一个key，一直向上更新直到根节点。
 
-- `void maintain_child(IxNodeHandle *node, int child_idx);`
+- `void update_child_parent(BPlusTreeNode *node, int child_idx);`
 
   用于将`node`的第`child_idx`个孩子结点的父结点指针置为`node`。
 
-- `void erase_leaf(IxNodeHandle *leaf);`
+- `void unlink_leaf(BPlusTreeNode *leaf);`
 
-  用于删除`leaf`之前，更新其前驱结点和后继结点的`prev_leaf`和`next_leaf`指针。
+  用于删除 `leaf` 之前，更新其前驱和后继叶子页指针。
 
-- `void release_node_handle(IxNodeHandle &node);`
+- `void record_page_deletion();`
 
   用于删除`node`之后，更新索引头记录的页面个数信息。
 
-（3）`int ix_compare(const char *a, const char *b, ColType type, int col_len);`
+（3）`int compare_index_key(const char *left, const char *right, ColType type, int column_length);`
 
-​		用于比较两个key的大小，key所占长度为col_len。key的类型支持 int * / float * / char *（即字段支持的类型）。
+​		用于比较两个定长键。`column_length` 是该列在复合键中占用的字节数。
 
 ### 任务1 B+树的查找
 
 #### （1）结点内的查找
 
 ```cpp
-class IxNodeHandle {
+class BPlusTreeNode {
     // 结点内的查找
     int lower_bound(const char *target) const;
     int upper_bound(const char *target) const;
     bool leaf_lookup(const char *key, Rid **value);
-    page_id_t InternalLookup(const char *key);
+    page_id_t internal_lookup(const char *key);
 }
 ```
 
@@ -116,7 +117,7 @@ class IxNodeHandle {
 
   用于在当前结点中查找第一个大于`target`的key的位置。
 
-提示：获得key需要调用`get_key()`函数；在比较key大小时需要调用`ix_compare()`函数；B+树中每个结点的键数组是有序的，可用二分查找。
+提示：获得key需要调用`get_key()`函数；在比较key大小时需要调用`compare_index_key()`函数；B+树中每个结点的键数组是有序的，可用二分查找。
 
 - `bool leaf_lookup(const char *key, Rid **value);`
 
@@ -135,16 +136,16 @@ class IxNodeHandle {
 #### （2）B+树的查找
 
 ```cpp
-class IxIndexHandle {
+class BPlusTree {
     // B+树的查找
-    std::pair<IxNodeHandle *, bool> find_leaf_page(const char *key, Operation operation, Transaction *transaction,bool find_first = false);
+    std::pair<BPlusTreeNode *, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction,bool find_first = false);
     bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);
 }
 ```
 
 学生需要实现以下函数：
 
-- `std::pair<IxNodeHandle *, bool> find_leaf_page(const char *key, Operation operation, Transaction *transaction, bool find_first = false);`
+- `std::pair<BPlusTreeNode *, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction, bool find_first = false);`
 
 ​		用于查找指定键所在的叶子结点。
 
@@ -165,7 +166,7 @@ class IxIndexHandle {
 #### （1）结点内的插入
 
 ```cpp
-class IxNodeHandle {
+class BPlusTreeNode {
     // 结点内的插入
     void insert_pairs(int pos, const char *key, const Rid *rid, int n);
     int insert(const char *key, const Rid &value);
@@ -178,7 +179,7 @@ class IxNodeHandle {
 
 ​		用于在结点中的指定位置插入多个键值对。
 
-​		该函数插入指定`n`个单位长度的键值对数组`(key,rid)`到结点中的指定位置`pos`。其中`key`为键数组的首地址，其每个单位长度为`file_hdr_->col_lens_[i]`。`rid`为值数组的首地址，其每个单位长度为`sizeof(Rid)`。这里内部存储结构是键数组和值数组连续存储，即键数组的后面存储了值数组。
+​		该函数插入指定 `n` 个键值对数组 `(key, rid)` 到结点中的 `pos` 位置。`key` 指向连续的定长复合键，每个键占 `file_header_->key_length_` 字节；`rid` 指向与键一一对应的 `Rid` 数组。节点页内先连续存放键数组，再存放 `Rid` 数组。
 
 ​		对于该操作的内部实现逻辑，可以先将数组中原来从第`pos`位开始到其后`n`位的数据移到末尾，再将要插入的数组移到`pos`位之后。注意键数组和值数组的数据都要移动。
 
@@ -195,11 +196,11 @@ class IxNodeHandle {
 #### （2）B+树的插入
 
 ```cpp
-class IxIndexHandle {
+class BPlusTree {
     // B+树的插入
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
-    IxNodeHandle *split(IxNodeHandle *node);
-    void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);
+    BPlusTreeNode *split(BPlusTreeNode *node);
+    void insert_into_parent(BPlusTreeNode *old_node, const char *key, BPlusTreeNode *new_node, Transaction *transaction);
 }
 ```
 学生需要实现以下函数：
@@ -212,7 +213,7 @@ class IxIndexHandle {
 
 ​		提示：需要调用`find_leaf_page()`、`insert()`、`split()`、`insert_into_parent()`。
 
-- `IxNodeHandle *split(IxNodeHandle *node);`
+- `BPlusTreeNode *split(BPlusTreeNode *node);`
 
 ​		用于分裂结点。函数返回分裂产生的新结点。
 
@@ -220,7 +221,7 @@ class IxIndexHandle {
 
 ​		注意：如果分裂的结点是叶结点，要更新叶结点的后继指针。如果分裂的结点是内部结点，要更新其孩子结点的父指针。
 
-- `void insert_into_parent(IxNodeHandle *old_node, const char *key, IxNodeHandle *new_node, Transaction *transaction);`
+- `void insert_into_parent(BPlusTreeNode *old_node, const char *key, BPlusTreeNode *new_node, Transaction *transaction);`
 
 ​		用于结点分裂后，更新父结点中的键值对。
 
@@ -240,7 +241,7 @@ B+树插入的整体流程如下图：
 #### （1）结点内的删除
 
 ```cpp
-class IxNodeHandle {
+class BPlusTreeNode {
     // 结点内的删除
     void erase_pair(int pos);
     int remove(const char *key);
@@ -264,13 +265,13 @@ class IxNodeHandle {
 #### （2）B+树的删除
 
 ```cpp
-class IxIndexHandle {
+class BPlusTree {
     // B+树的删除
     bool delete_entry(const char *key, Transaction *transaction);
-    bool coalesce_or_redistribute(IxNodeHandle *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);
-    bool coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, IxNodeHandle **parent, int index,Transaction *transaction, bool *root_is_latched);
-    void redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node, IxNodeHandle *parent, int index);
-    bool adjust_root(IxNodeHandle *old_root_node);
+    bool coalesce_or_redistribute(BPlusTreeNode *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);
+    bool coalesce(BPlusTreeNode **neighbor_node, BPlusTreeNode **node, BPlusTreeNode **parent, int index,Transaction *transaction, bool *root_is_latched);
+    void redistribute(BPlusTreeNode *neighbor_node, BPlusTreeNode *node, BPlusTreeNode *parent, int index);
+    bool adjust_root(BPlusTreeNode *old_root_node);
 }
 ```
 
@@ -284,7 +285,7 @@ class IxIndexHandle {
 
 ​		提示：需要调用`find_leaf_page()`、`remove()`、`coalesce_or_redistribute()`。
 
-- `bool coalesce_or_redistribute(IxNodeHandle *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);`
+- `bool coalesce_or_redistribute(BPlusTreeNode *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);`
 
   用于处理合并和重分配的逻辑。函数返回是否有结点被删除（无论是`node`还是它的兄弟结点被删除）。传出参数`root_is_latched`记录根结点是否被上锁，该参数将在任务3使用，在本任务2中不使用。
 
@@ -292,7 +293,7 @@ class IxIndexHandle {
 
 ​		提示：需要调用`coalesce()`、`redistribute()`、`adjust_root()`。
 
-- `bool coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, IxNodeHandle **parent, int index,Transaction *transaction, bool *root_is_latched);`
+- `bool coalesce(BPlusTreeNode **neighbor_node, BPlusTreeNode **node, BPlusTreeNode **parent, int index,Transaction *transaction, bool *root_is_latched);`
 
 ​		将`node`向前合并到其前驱`neighbor_node`。函数返回`node`的父结点`parent`否需要被删除。
 
@@ -300,17 +301,17 @@ class IxIndexHandle {
 
 ​		参数`index`是`node`在`parent`中的rid_idx，其表示`neighbor_node`是否为`node`的前驱结点。需要保证`neighbor_node`为`node`的前驱，如果不是，则交换位置。
 
-​		提示：需要调用`insert_pairs()`、`erase_pair()`、`maintain_child()`、`release_node_handle()`。以及`coalesce_or_redistribute()`进行继续递归。
+​		提示：需要调用`insert_pairs()`、`erase_pair()`、`update_child_parent()`、`record_page_deletion()`。以及`coalesce_or_redistribute()`进行继续递归。
 
-- `void redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node, IxNodeHandle *parent, int index);`
+- `void redistribute(BPlusTreeNode *neighbor_node, BPlusTreeNode *node, BPlusTreeNode *parent, int index);`
 
 ​		重新分配`node`和兄弟结点`neighbor_node`的键值对。参数`index`表示`node`在parent中的rid_idx，其决定`neighbor_node`是否为`node`的前驱结点。
 
 ​		`node`是之前被删除过的结点，所以要移动其兄弟结点`neighbor_node`的一个键值对到`node`。注意这里有多种情况要考虑：根据`neighbor_node`是在`node`的前面还是后面，移动的键值对不一样；此外，如果`node`是内部结点要更新其孩子结点的父指针。
 
-​		提示：需要调用`insert_pairs()`、`erase_pair()`、`maintain_child()`。
+​		提示：需要调用`insert_pairs()`、`erase_pair()`、`update_child_parent()`。
 
-- `bool adjust_root(IxNodeHandle *old_root_node);`
+- `bool adjust_root(BPlusTreeNode *old_root_node);`
 
 ​		用于根结点被删除了一个键值对之后的处理。函数返回根结点是否需要被删除。
 
@@ -318,7 +319,7 @@ class IxIndexHandle {
 
 ​		对于其他情况则无需任何处理，因为根结点无需被删除。
 
-​		提示：需要调用`release_node_handle()`。
+​		提示：需要调用`record_page_deletion()`。
 
 
 
@@ -328,7 +329,7 @@ B+树删除的整体流程如下图：
 
 ### 任务4 B+树索引并发控制
 
-本任务要求修改`IxIndexHandle`类的原实现逻辑，让其支持对B+树索引的**并发**查找、插入、删除操作。
+本任务要求修改`BPlusTree`类的原实现逻辑，让其支持对B+树索引的**并发**查找、插入、删除操作。
 
 学生可以选择实现并发的粒度，选择下面两种并发粒度的任意一种进行实现即可。
 
@@ -342,7 +343,7 @@ B+树删除的整体流程如下图：
 
 请自行学习B+树索引并发算法：**蟹行协议（crabbing protocol）**。
 
-主要需要修改`IxIndexHandle`类中以下函数的实现逻辑：
+主要需要修改`BPlusTree`类中以下函数的实现逻辑：
 
 （1）`find_leaf_page()`
 
@@ -354,7 +355,7 @@ B+树删除的整体流程如下图：
 
 ​		参数`transaction`表示事务，其中有一个数据结构`page_set_`用于存储从根结点到当前结点经过的所有祖先结点（索引页面）。实际上，只有插入或删除操作需要记录当前结点的所有祖先结点，然后判断如果当前结点是“安全”的，就遍历`transaction`的`page_set_`中存放的所有页面，依次释放这些页面的写锁。
 
-​		函数返回值修改为`std::pair<IxNodeHandle*, bool>`，其两部分分别表示找到的叶结点以及根结点是否被锁住。在`IxIndexHandle`类中设计了一个mutex锁（互斥锁）`root_latch_`用于对根结点进行上锁。对于读操作（查找），不需要对根结点上锁，因为蟹行协议允许多个线程同时读B+树；但对于写操作（插入/删除），则需要上锁，直到确定根结点不会被修改或者已经将根结点修改完毕，才能释放锁，从而防止本线程写操作未完成而其他线程又进行读的错误。最后用一个bool类型的变量表示根结点是否被上锁。
+​		函数返回值修改为`std::pair<BPlusTreeNode*, bool>`，其两部分分别表示找到的叶结点以及根结点是否被锁住。在`BPlusTree`类中设计了一个mutex锁（互斥锁）`root_latch_`用于对根结点进行上锁。对于读操作（查找），不需要对根结点上锁，因为蟹行协议允许多个线程同时读B+树；但对于写操作（插入/删除），则需要上锁，直到确定根结点不会被修改或者已经将根结点修改完毕，才能释放锁，从而防止本线程写操作未完成而其他线程又进行读的错误。最后用一个bool类型的变量表示根结点是否被上锁。
 
 （2）查找函数`get_value()`
 
@@ -388,4 +389,4 @@ ctest --preset lab2
 
 注意：
 1. 在本实验中的所有测试只调用`get_value()`、`insert_entry()`、`delete_entry()`这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
-2. 索引单元测试直接使用 `IxManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。
+2. 索引单元测试直接使用 `IndexManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。

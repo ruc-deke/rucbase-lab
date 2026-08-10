@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/errors.h"
 #include "gtest/gtest.h"
 
 constexpr int MAX_FILES = 32;

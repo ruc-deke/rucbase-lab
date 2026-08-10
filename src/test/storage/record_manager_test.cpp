@@ -12,6 +12,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "common/context.h"
 #include "gtest/gtest.h"
 
 // Keep the access-control shim from rewriting declarations in libstdc++ headers.

@@ -3,16 +3,16 @@
 
 #pragma once
 
-#include <map>
+#include <memory>
+#include <string>
 
-#include "common/errors.h"
-#include "execution/execution.h"
-#include "parser/parser.h"
-#include "system/sm.h"
-#include "common/context.h"
-#include "transaction/transaction_manager.h"
-#include "planner.h"
+#include "analyze/analyze.h"
+#include "parser/ast.h"
 #include "plan.h"
+#include "planner.h"
+
+class Context;
+class SmManager;
 
 class Optimizer {
    private:

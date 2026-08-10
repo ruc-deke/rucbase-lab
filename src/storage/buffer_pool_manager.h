@@ -2,19 +2,18 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
-#include <fcntl.h>
-#include <unistd.h>
 
-#include <cassert>
+#include <cstddef>
 #include <list>
+#include <mutex>
 #include <unordered_map>
-#include <vector>
 
-#include "common/errors.h"
-#include "disk_manager.h"
+#include "common/config.h"
 #include "page.h"
 #include "replacer/lru_replacer.h"
 #include "replacer/replacer.h"
+
+class DiskManager;
 
 class BufferPoolManager {
 private:

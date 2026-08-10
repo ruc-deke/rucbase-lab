@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "system/sm_manager.h"
+
 /**
  * @description: 分析器，进行语义分析和查询重写，需要检查不符合语义规定的部分
  * @param {shared_ptr<ast::TreeNode>} parse parser生成的结果集

@@ -2,11 +2,25 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
-#include "execution_defs.h"
-#include "execution_manager.h"
+
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "common/common.h"
+#include "common/config.h"
+#include "common/context.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "executor_abstract.h"
-#include "index/ix.h"
-#include "system/sm.h"
+#include "index/b_plus_tree.h"
+#include "index/index_manager.h"
+#include "record/rm_defs.h"
+#include "record/rm_file_handle.h"
+#include "system/sm_manager.h"
+#include "system/sm_meta.h"
 
 class InsertExecutor : public AbstractExecutor {
    private:
@@ -48,7 +62,7 @@ class InsertExecutor : public AbstractExecutor {
         
         // 范围 for 遍历 indexes；内层再遍历 index.cols 拼复合键。
         for (auto& index : tab_.indexes) {
-            auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+            auto ih = sm_manager_->indexes_.at(sm_manager_->get_index_manager()->make_index_name(tab_name_, index.cols)).get();
             std::vector<char> key(index.col_tot_len);
             int offset = 0;
             for (const auto& index_col : index.cols) {

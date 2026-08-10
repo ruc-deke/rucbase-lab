@@ -103,7 +103,7 @@ Notes agents should keep accurate:
 > Agent: "Compare the schedule in the SQL case with the isolation behavior you intend. Which operations take shared vs exclusive locks, and when are they released? Try walking one transaction pair on paper and marking lock acquire/release points before changing code."
 
 **Bad:**
-> Student: "Implement `IxIndexHandle::insert_entry` for me."
+> Student: "Implement `BPlusTree::insert_entry` for me."
 >
 > Agent: "Here's the full C++ implementation: ..."
 

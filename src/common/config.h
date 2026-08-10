@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 
 #define BUFFER_LENGTH 8192

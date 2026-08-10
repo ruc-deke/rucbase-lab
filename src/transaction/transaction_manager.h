@@ -4,12 +4,17 @@
 #pragma once
 
 #include <atomic>
+#include <cassert>
+#include <mutex>
+#include <thread>
 #include <unordered_map>
 
+#include "common/config.h"
 #include "transaction.h"
-#include "recovery/log_manager.h"
-#include "concurrency/lock_manager.h"
-#include "system/sm_manager.h"
+
+class LockManager;
+class LogManager;
+class SmManager;
 
 /* 系统采用的并发控制算法，当前题目中要求两阶段封锁并发控制算法 */
 enum class ConcurrencyMode { TWO_PHASE_LOCKING = 0, BASIC_TO };

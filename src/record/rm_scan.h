@@ -3,7 +3,8 @@
 
 #pragma once
 
-#include "rm_defs.h"
+#include "common/config.h"
+#include "common/defs.h"
 
 class RmFileHandle;
 

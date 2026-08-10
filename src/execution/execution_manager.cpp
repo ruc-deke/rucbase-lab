@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <span>
 
+#include "common/context.h"
 #include "executor_delete.h"
 #include "executor_index_scan.h"
 #include "executor_insert.h"
@@ -13,7 +14,10 @@
 #include "executor_projection.h"
 #include "executor_seq_scan.h"
 #include "executor_update.h"
-#include "index/ix.h"
+#include "optimizer/plan.h"
+#include "system/sm_manager.h"
+#include "transaction/transaction.h"
+#include "transaction/transaction_manager.h"
 
 constexpr char help_info[] =
     "Supported SQL syntax:\n"

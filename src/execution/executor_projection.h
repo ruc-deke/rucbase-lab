@@ -2,11 +2,18 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
-#include "execution_defs.h"
-#include "execution_manager.h"
+
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "common/common.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "executor_abstract.h"
-#include "index/ix.h"
-#include "system/sm.h"
+#include "record/rm_defs.h"
+#include "system/sm_meta.h"
 
 class ProjectionExecutor : public AbstractExecutor {
 private:

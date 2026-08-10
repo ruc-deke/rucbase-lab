@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include "common/defs.h"
+#include <cstring>
+
 #include "common/errors.h"
-#include "storage/buffer_pool_manager.h"
 
 constexpr int RM_NO_PAGE = -1;           ///< 无有效页面，用作空闲页链表的终止标记。
 constexpr int RM_FILE_HDR_PAGE = 0;      ///< 记录文件头固定占用的页号。

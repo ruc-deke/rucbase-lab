@@ -3,11 +3,15 @@
 
 #pragma once
 
-#include <map>
-#include <unordered_map>
+#include <vector>
+
+#include "common/config.h"
 #include "log_manager.h"
-#include "storage/disk_manager.h"
-#include "system/sm_manager.h"
+
+class BufferPoolManager;
+class DiskManager;
+class RmFileHandle;
+class SmManager;
 
 class RedoLogsInPage {
 public:

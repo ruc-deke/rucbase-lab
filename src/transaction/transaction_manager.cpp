@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "transaction_manager.h"
-#include "record/rm_file_handle.h"
-#include "system/sm_manager.h"
 
 std::unordered_map<txn_id_t, Transaction *> TransactionManager::txn_map = {};
 
@@ -50,5 +48,4 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 3. 清空事务相关资源，eg.锁集
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
-    
 }

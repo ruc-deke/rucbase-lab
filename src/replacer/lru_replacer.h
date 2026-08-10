@@ -3,13 +3,13 @@
 
 #pragma once
 
+#include <cstddef>
 #include <list>
-#include <mutex>  
-#include <vector>
+#include <mutex>
+#include <unordered_map>
 
 #include "common/config.h"
 #include "replacer/replacer.h"
-#include "unordered_map"
 
 /*
 LRUReplacer实现了LRU替换策略

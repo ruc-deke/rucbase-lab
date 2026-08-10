@@ -3,11 +3,16 @@
 
 #pragma once
 
-#include <assert.h>
+#include <memory>
+#include <string>
 
 #include "bitmap.h"
+#include "common/config.h"
+#include "common/errors.h"
 #include "rm_defs.h"
 #include "rm_file_handle.h"
+#include "storage/buffer_pool_manager.h"
+#include "storage/disk_manager.h"
 
 /* 记录管理器，用于管理表的数据文件，进行文件的创建、打开、删除、关闭 */
 class RmManager {

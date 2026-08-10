@@ -18,6 +18,7 @@
 #include <utility>
 #include <vector>
 
+#include "ast.h"
 #include "parser.h"
 
 namespace rucbase::parser {

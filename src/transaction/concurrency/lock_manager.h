@@ -4,9 +4,15 @@
 #pragma once
 
 #include <condition_variable>
+#include <list>
 #include <mutex>
+#include <unordered_map>
 
-#include "transaction/transaction.h"
+#include "common/config.h"
+#include "common/defs.h"
+#include "transaction/txn_defs.h"
+
+class Transaction;
 
 inline constexpr const char* GroupLockModeStr[] = {"NON_LOCK", "IS", "IX", "S", "X", "SIX"};
 

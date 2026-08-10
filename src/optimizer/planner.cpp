@@ -6,14 +6,9 @@
 #include <algorithm>
 #include <memory>
 
-#include "execution/executor_delete.h"
-#include "execution/executor_index_scan.h"
-#include "execution/executor_insert.h"
-#include "execution/executor_nestedloop_join.h"
-#include "execution/executor_projection.h"
-#include "execution/executor_seq_scan.h"
-#include "execution/executor_update.h"
-#include "index/ix.h"
+#include "analyze/analyze.h"
+#include "optimizer/plan.h"
+#include "system/sm_manager.h"
 
 // 目前的索引匹配规则为：完全匹配索引字段，且全部为单点查询，不会自动调整where条件的顺序
 bool Planner::get_index_cols(const std::string& tab_name,

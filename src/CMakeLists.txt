@@ -6,8 +6,10 @@ add_subdirectory(net)
 set(RUCBASE_CORE_SOURCES
         analyze/analyze.cpp
         execution/execution_manager.cpp
-        index/ix_index_handle.cpp
-        index/ix_scan.cpp
+        index/b_plus_tree.cpp
+        index/index_manager.cpp
+        index/index_scan.cpp
+        index/index_types.cpp
         optimizer/planner.cpp
         portal/portal.cpp
         record/rm_file_handle.cpp

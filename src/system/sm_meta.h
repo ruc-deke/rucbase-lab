@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "common/defs.h"
 #include "common/errors.h"
-#include "sm_defs.h"
 
 /** @brief 字段的目录元数据，包含其定长记录布局。 */
 struct ColMeta {

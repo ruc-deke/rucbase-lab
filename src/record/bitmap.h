@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <cinttypes>
 #include <cstring>
 
 static constexpr int BITMAP_WIDTH = 8;

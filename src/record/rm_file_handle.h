@@ -3,14 +3,19 @@
 
 #pragma once
 
-#include <assert.h>
-
+#include <cassert>
+#include <cstddef>
 #include <memory>
 
 #include "bitmap.h"
-#include "common/context.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "rm_defs.h"
+#include "storage/buffer_pool_manager.h"
+#include "storage/disk_manager.h"
+#include "storage/page.h"
 
+class Context;
 class RmManager;
 
 /* 对表数据文件中的页面进行封装 */

@@ -3,13 +3,17 @@
 
 #pragma once
 
-#include <cassert>
-#include <cstring>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "common/common.h"
 #include "parser/ast.h"
+#include "system/sm_defs.h"
+#include "system/sm_manager.h"
+#include "system/sm_meta.h"
 
 typedef enum PlanTag{
     T_Invalid = 1,

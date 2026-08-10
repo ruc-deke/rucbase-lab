@@ -39,7 +39,7 @@ flowchart LR
 | `src/execution/` | 顺序扫描、投影、连接和增删改算子 | Lab 3 |
 | `src/system/` | 数据库、表、索引的元数据和 DDL | Lab 3 |
 | `src/record/` | 定长记录、页面和文件扫描 | Lab 1 |
-| `src/index/` | B+ 树索引和索引扫描 | Lab 2 |
+| [`src/index/`](../src/index/README.md) | B+ 树、索引文件管理和叶链扫描 | Lab 2 |
 | `src/replacer/` | 缓冲池页面替换策略 | Lab 1 |
 | `src/storage/` | 页面、缓冲池和磁盘文件访问 | Lab 1 |
 | `src/transaction/` | 事务生命周期、锁和并发控制 | Lab 4 |

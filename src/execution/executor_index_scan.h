@@ -3,11 +3,23 @@
 
 #pragma once
 
-#include "execution_defs.h"
-#include "execution_manager.h"
+#include <cassert>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "common/common.h"
+#include "common/config.h"
+#include "common/defs.h"
+#include "common/errors.h"
 #include "executor_abstract.h"
-#include "index/ix.h"
-#include "system/sm.h"
+#include "record/rm_defs.h"
+#include "record/rm_file_handle.h"
+#include "system/sm_manager.h"
+#include "system/sm_meta.h"
 
 class IndexScanExecutor : public AbstractExecutor {
    private:

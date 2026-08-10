@@ -3,12 +3,21 @@
 
 #pragma once
 
-#include "index/ix.h"
+#include <memory>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "index/b_plus_tree.h"
 #include "record/rm_file_handle.h"
 #include "sm_defs.h"
 #include "sm_meta.h"
 
+class BufferPoolManager;
 class Context;
+class DiskManager;
+class IndexManager;
+class RmManager;
 
 /**
  * @brief 管理当前数据库的元数据，并执行数据库、表和索引的 DDL 操作。
@@ -21,13 +30,13 @@ class SmManager {
 public:
     DbMeta db_;                                                            ///< 当前打开数据库的元数据。
     std::unordered_map<std::string, std::unique_ptr<RmFileHandle>> fhs_;   ///< 表名 -> 记录文件句柄。
-    std::unordered_map<std::string, std::unique_ptr<IxIndexHandle>> ihs_;  ///< 索引文件名 -> 索引句柄。
+    std::unordered_map<std::string, std::unique_ptr<BPlusTree>> indexes_;  ///< 索引文件名 -> 索引句柄。
 
 private:
     DiskManager* disk_manager_;               ///< 非拥有指针。
     BufferPoolManager* buffer_pool_manager_;  ///< 非拥有指针。
     RmManager* rm_manager_;                   ///< 非拥有指针。
-    IxManager* ix_manager_;                   ///< 非拥有指针。
+    IndexManager* index_manager_;                   ///< 非拥有指针。
 
 public:
     /**
@@ -35,16 +44,16 @@ public:
      * @param disk_manager 磁盘管理器，非拥有指针。
      * @param buffer_pool_manager 缓冲池管理器，非拥有指针。
      * @param rm_manager 记录管理器，非拥有指针。
-     * @param ix_manager 索引管理器，非拥有指针。
+     * @param index_manager 索引管理器，非拥有指针。
      */
     SmManager(DiskManager* disk_manager,
               BufferPoolManager* buffer_pool_manager,
               RmManager* rm_manager,
-              IxManager* ix_manager)
+              IndexManager* index_manager)
         : disk_manager_(disk_manager),
           buffer_pool_manager_(buffer_pool_manager),
           rm_manager_(rm_manager),
-          ix_manager_(ix_manager) {}
+          index_manager_(index_manager) {}
 
     ~SmManager() = default;
 
@@ -55,7 +64,7 @@ public:
     RmManager* get_rm_manager() const noexcept { return rm_manager_; }
 
     /** @brief 获取索引管理器。 */
-    IxManager* get_ix_manager() const noexcept { return ix_manager_; }
+    IndexManager* get_index_manager() const noexcept { return index_manager_; }
 
     /** @brief 判断数据库目录是否存在。 */
     bool is_dir(const std::string& db_name) const;

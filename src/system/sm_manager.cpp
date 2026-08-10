@@ -12,8 +12,10 @@
 #include <utility>
 
 #include "common/context.h"
-#include "index/ix.h"
-#include "record/rm.h"
+#include "index/index_manager.h"
+#include "record/rm_manager.h"
+#include "storage/buffer_pool_manager.h"
+#include "storage/disk_manager.h"
 
 namespace {
 

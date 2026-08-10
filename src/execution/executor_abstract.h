@@ -4,12 +4,18 @@
 #pragma once
 
 #include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "common/errors.h"
-#include "execution_defs.h"
 #include "common/common.h"
-#include "index/ix.h"
-#include "system/sm.h"
+#include "common/defs.h"
+#include "common/errors.h"
+#include "record/rm_defs.h"
+#include "system/sm_meta.h"
+
+class Context;
 
 class AbstractExecutor {
    public:

@@ -3,14 +3,15 @@
 
 #pragma once
 
-#include <atomic>
 #include <deque>
-#include <string>
-#include <thread>
 #include <memory>
+#include <thread>
 #include <unordered_set>
 
+#include "common/config.h"
 #include "txn_defs.h"
+
+class Page;
 
 class Transaction {
    public:

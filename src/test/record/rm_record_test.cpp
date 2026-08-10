@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "record/rm_defs.h"
+#include "storage/page.h"
 
 TEST(RecordValueTest, SupportsCopyMoveAndSelfAssignment) {
     const std::array<char, 3> bytes{{'a', 'b', 'c'}};

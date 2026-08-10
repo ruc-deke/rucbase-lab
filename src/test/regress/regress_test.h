@@ -6,6 +6,7 @@
 #include <string>
 
 #include "net/client.h"
+#include "net/wire.h"
 
 constexpr int kDefaultPort = 8765;
 

@@ -15,7 +15,7 @@
 
 #include "analyze/analyze.h"
 #include "execution/execution_manager.h"
-#include "index/ix_manager.h"
+#include "index/index_manager.h"
 #include "optimizer/optimizer.h"
 #include "optimizer/planner.h"
 #include "portal/portal.h"
@@ -131,7 +131,7 @@ private:
     DiskManager disk_manager_;
     BufferPoolManager buffer_pool_manager_;
     RmManager rm_manager_;
-    IxManager ix_manager_;
+    IndexManager index_manager_;
     SmManager sm_manager_;
     LockManager lock_manager_;
     LogManager log_manager_;

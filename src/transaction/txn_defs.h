@@ -3,8 +3,10 @@
 
 #pragma once
 
-#include <atomic>
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <functional>
 #include <string>
 #include <utility>

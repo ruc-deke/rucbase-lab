@@ -53,8 +53,8 @@ rucbase_add_gtest(lab1_record_types_test record/rm_record_test.cpp rucbase::core
 rucbase_add_gtest(lab2_b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp rucbase::core unit lab2)
-rucbase_add_gtest(lab2_index_layout_test index/ix_layout_test.cpp rucbase::core unit lab2)
-rucbase_add_gtest(lab2_index_handle_test index/ix_index_handle_test.cpp rucbase::core unit lab2)
+rucbase_add_gtest(lab2_index_layout_test index/index_layout_test.cpp rucbase::core unit lab2)
+rucbase_add_gtest(lab2_index_manager_test index/index_manager_test.cpp rucbase::core unit lab2)
 
 rucbase_add_gtest(framework_catalog_metadata_test system/sm_meta_test.cpp rucbase::core unit framework)
 rucbase_add_gtest(framework_wire_test net/wire_test.cpp rucbase::wire unit framework smoke)

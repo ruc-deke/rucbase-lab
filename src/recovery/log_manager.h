@@ -3,13 +3,21 @@
 
 #pragma once
 
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <mutex>
-#include <vector>
+#include <string>
 
 #include "common/config.h"
+#include "common/defs.h"
 #include "log_defs.h"
 #include "record/rm_defs.h"
+
+class DiskManager;
 
 /* 日志记录对应操作的类型 */
 enum LogType : int { UPDATE = 0, INSERT, DELETE, begin, commit, ABORT };

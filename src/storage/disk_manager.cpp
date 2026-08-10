@@ -13,6 +13,7 @@
 #include <system_error>
 
 #include "common/defs.h"
+#include "common/errors.h"
 
 namespace fs = std::filesystem;
 

@@ -11,7 +11,9 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/errors.h"
 #include "gtest/gtest.h"
+#include "storage/disk_manager.h"
 
 constexpr int MAX_FILES = 32;
 constexpr int MAX_PAGES = 128;

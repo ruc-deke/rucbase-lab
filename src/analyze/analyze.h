@@ -3,16 +3,16 @@
 
 #pragma once
 
-#include <cassert>
-#include <cstring>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "parser/parser.h"
-#include "system/sm.h"
 #include "common/common.h"
+#include "parser/ast.h"
+#include "system/sm_meta.h"
+
+class SmManager;
 
 class Query{
     public:

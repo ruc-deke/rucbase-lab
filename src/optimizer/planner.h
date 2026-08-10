@@ -3,21 +3,19 @@
 
 #pragma once
 
-#include <cassert>
-#include <cstring>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include "execution/execution_defs.h"
-#include "execution/execution_manager.h"
-#include "record/rm.h"
-#include "system/sm.h"
-#include "common/context.h"
-#include "plan.h"
-#include "parser/parser.h"
 #include "common/common.h"
-#include "analyze/analyze.h"
+#include "common/defs.h"
+#include "parser/ast.h"
+
+class Context;
+class Plan;
+class Query;
+class SmManager;
 
 class Planner {
    private:

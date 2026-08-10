@@ -7,11 +7,11 @@
 #include <cstring>
 #include <memory>
 #include <string>
-#include <vector>
+#include <utility>
+
 #include "common/defs.h"
 #include "common/errors.h"
 #include "record/rm_defs.h"
-
 
 struct TabCol {
     std::string tab_name;
