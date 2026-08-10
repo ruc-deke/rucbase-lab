@@ -388,9 +388,6 @@ public:
 
 ```bash
 cmake --preset debug
-cmake --build --preset debug --target \
-  disk_manager_test lru_replacer_test buffer_pool_manager_test record_manager_test -j 4
-ctest --preset debug \
-  -R '^(disk_manager_test|lru_replacer_test|buffer_pool_manager_test|record_manager_test)$' \
-  --output-on-failure
+cmake --build --preset debug -j 4
+ctest --preset lab1
 ```

@@ -10,10 +10,7 @@
       "name": "base",
       "hidden": true,
       "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
+      "binaryDir": "${sourceDir}/build/${presetName}"
     },
     {
       "name": "debug",
@@ -32,18 +29,20 @@
       }
     },
     {
-      "name": "asan",
-      "displayName": "Debug with AddressSanitizer",
+      "name": "quality",
+      "displayName": "Debug with strict warnings",
       "inherits": "debug",
       "cacheVariables": {
-        "RUCBASE_ENABLE_ASAN": "ON"
+        "RUCBASE_STRICT_WARNINGS": "ON",
+        "RUCBASE_WARNINGS_AS_ERRORS": "ON"
       }
     },
     {
-      "name": "ubsan",
-      "displayName": "Debug with UndefinedBehaviorSanitizer",
+      "name": "sanitizers",
+      "displayName": "Debug with AddressSanitizer and UndefinedBehaviorSanitizer",
       "inherits": "debug",
       "cacheVariables": {
+        "RUCBASE_ENABLE_ASAN": "ON",
         "RUCBASE_ENABLE_UBSAN": "ON"
       }
     },
@@ -66,12 +65,12 @@
       "configurePreset": "release"
     },
     {
-      "name": "asan",
-      "configurePreset": "asan"
+      "name": "quality",
+      "configurePreset": "quality"
     },
     {
-      "name": "ubsan",
-      "configurePreset": "ubsan"
+      "name": "sanitizers",
+      "configurePreset": "sanitizers"
     },
     {
       "name": "tsan",
@@ -92,38 +91,182 @@
   ],
   "testPresets": [
     {
-      "name": "debug",
-      "configurePreset": "debug",
+      "name": "test-base",
+      "hidden": true,
       "output": {
         "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
       }
+    },
+    {
+      "name": "debug",
+      "inherits": "test-base",
+      "configurePreset": "debug"
     },
     {
       "name": "release",
-      "configurePreset": "release",
-      "output": {
-        "outputOnFailure": true
+      "inherits": "test-base",
+      "configurePreset": "release"
+    },
+    {
+      "name": "smoke",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "smoke"
+        }
       }
     },
     {
-      "name": "asan",
-      "configurePreset": "asan",
-      "output": {
-        "outputOnFailure": true
+      "name": "quality-smoke",
+      "inherits": "test-base",
+      "configurePreset": "quality",
+      "filter": {
+        "include": {
+          "label": "smoke"
+        }
       }
     },
     {
-      "name": "ubsan",
-      "configurePreset": "ubsan",
-      "output": {
-        "outputOnFailure": true
+      "name": "sanitizers-smoke",
+      "inherits": "test-base",
+      "configurePreset": "sanitizers",
+      "filter": {
+        "include": {
+          "label": "smoke"
+        }
       }
     },
     {
-      "name": "tsan",
+      "name": "tsan-smoke",
+      "inherits": "test-base",
       "configurePreset": "tsan",
-      "output": {
-        "outputOnFailure": true
+      "filter": {
+        "include": {
+          "label": "smoke"
+        }
+      }
+    },
+    {
+      "name": "framework",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "framework"
+        }
+      }
+    },
+    {
+      "name": "unit",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "unit"
+        }
+      }
+    },
+    {
+      "name": "lab1",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "lab1"
+        }
+      }
+    },
+    {
+      "name": "lab2",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "lab2"
+        }
+      }
+    },
+    {
+      "name": "lab3",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "lab3"
+        }
+      }
+    },
+    {
+      "name": "lab3-query",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "query-suite"
+        }
+      }
+    },
+    {
+      "name": "lab3-regress",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "regress-suite"
+        }
+      }
+    },
+    {
+      "name": "lab4",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "lab4"
+        },
+        "exclude": {
+          "label": "bonus"
+        }
+      }
+    },
+    {
+      "name": "lab4-transaction",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "transaction-suite"
+        },
+        "exclude": {
+          "label": "bonus"
+        }
+      }
+    },
+    {
+      "name": "lab4-concurrency",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "concurrency-suite"
+        },
+        "exclude": {
+          "label": "bonus"
+        }
+      }
+    },
+    {
+      "name": "blackbox",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "blackbox"
+        },
+        "exclude": {
+          "label": "bonus"
+        }
+      }
+    },
+    {
+      "name": "bonus",
+      "inherits": "debug",
+      "filter": {
+        "include": {
+          "label": "bonus"
+        }
       }
     }
   ]

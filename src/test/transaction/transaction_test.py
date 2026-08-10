@@ -1,9 +1,8 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from run_blackbox import run_pytest
-
 
 if __name__ == "__main__":
     raise SystemExit(
@@ -12,6 +11,6 @@ if __name__ == "__main__":
                 "test_transaction.py::test_transaction[commit_test]",
                 "test_transaction.py::test_transaction[abort_test]",
             ],
-            ["transaction_test"],
+            ["blackbox_transaction_client"],
         )
     )

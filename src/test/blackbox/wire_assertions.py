@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
-
 WIRE_COLUMN_WIDTH = 16
 
 

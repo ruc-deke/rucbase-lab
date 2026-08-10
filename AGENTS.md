@@ -41,10 +41,10 @@ RUCBase labs are intentionally implementation-heavy. Students must fill in `Todo
 
 | Lab | Focus | Typical code areas | Typical tests |
 | --- | --- | --- | --- |
-| Lab1 | Storage | `src/storage/`, `src/replacer/`, `src/record/` | `disk_manager_test`, `lru_replacer_test`, `buffer_pool_manager_test`, `record_manager_test` |
-| Lab2 | Index | `src/index/` | `b_plus_tree_insert_test`, `b_plus_tree_delete_test`, `b_plus_tree_concurrent_test` |
-| Lab3 | Query execution | `src/execution/`, related planner/analyze paths | query / regress black-box (`blackbox.query`, handout scripts under `src/test/query/`) |
-| Lab4 | Concurrency | `src/transaction/` | transaction / concurrency black-box (`blackbox.transaction`, `blackbox.concurrency`, bonus variants) |
+| Lab1 | Storage | `src/storage/`, `src/replacer/`, `src/record/` | `lab1_disk_manager_test`, `lab1_lru_replacer_test`, `lab1_buffer_pool_manager_test`, `lab1_record_manager_test` |
+| Lab2 | Index | `src/index/` | `lab2_b_plus_tree_insert_test`, `lab2_b_plus_tree_delete_test`, `lab2_b_plus_tree_concurrent_test` |
+| Lab3 | Query execution | `src/execution/`, related planner/analyze paths | query / regress black-box (`lab3_query_blackbox_test`, handout scripts under `src/test/query/`) |
+| Lab4 | Concurrency | `src/transaction/` | transaction / concurrency black-box (`lab4_transaction_blackbox_test`, `lab4_concurrency_blackbox_test`, bonus variants) |
 
 When helping, prefer the handout for the lab the student is currently working on. Do not jump ahead and implement later labs for them.
 
@@ -71,10 +71,10 @@ cmake --preset debug
 cmake --build --preset debug -j 4
 
 # unit tests only
-ctest --preset debug -L unit
+ctest --preset unit
 
 # black-box suites (requires pytest)
-ctest --preset debug -L blackbox
+ctest --preset blackbox
 
 # handout-compatible entry points still exist, e.g.
 python3 src/test/query/query_test_basic.py
@@ -86,7 +86,7 @@ Notes agents should keep accurate:
 
 * Binaries from the `debug` preset live under `build/debug/bin/` (for example `rmdb`).
 * Black-box tests use per-test temp databases and dynamic ports; failure logs are under `build/debug/test-logs`.
-* `blackbox.transaction` / `blackbox.concurrency` are basic suites; bonus cases are registered separately.
+* `lab4_transaction_blackbox_test` / `lab4_concurrency_blackbox_test` are basic suites; bonus cases are registered separately.
 * GoogleTest may come from `deps/googletest`, a system install, or CMake FetchContent—students usually do not need to vendor it by hand on networked machines.
 * Do not tell students to `rm -rf build` or `kill -9 rmdb` as a normal workflow; use clean configure/build and the black-box harness.
 

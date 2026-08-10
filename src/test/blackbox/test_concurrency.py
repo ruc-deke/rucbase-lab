@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-
 CONCURRENCY_DIR = Path(__file__).parents[1] / "concurrency" / "concurrency_sql"
 BASIC_CASES = [
     "concurrency_read_test",

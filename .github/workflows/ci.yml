@@ -4,10 +4,17 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: '17 18 * * 1'
   workflow_dispatch:
     inputs:
       run_lab_tests:
         description: Run all teaching-lab black-box tests
+        required: false
+        type: boolean
+        default: false
+      run_full_quality:
+        description: Run nightly ThreadSanitizer smoke tests
         required: false
         type: boolean
         default: false
@@ -20,8 +27,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  quality:
+    name: Quality gates (Clang)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install native quality tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison \
+            clang-18 \
+            clang-tidy-18
+
+      - name: Configure strict Clang build
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: |
+          cmake --preset quality \
+            -DRUCBASE_CLANG_TIDY_EXECUTABLE=/usr/bin/clang-tidy-18 \
+            -DRUCBASE_RUN_CLANG_TIDY_EXECUTABLE=/usr/bin/run-clang-tidy-18
+
+      - name: Build with warnings as errors
+        run: cmake --build --preset quality --parallel 2
+
+      - name: Run clang-tidy
+        run: cmake --build --preset quality --target check-clang-tidy --parallel 2
+
+      - name: Run strict-build smoke tests
+        run: ctest --preset quality-smoke
+
   cmake:
     name: ${{ matrix.name }}
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -79,16 +128,14 @@ jobs:
         run: cmake --build --preset debug --parallel 2
 
       # Storage/index/transaction tests intentionally cover unfinished lab TODOs.
-      # Keep protocol and parser tests required while the skeleton is taught.
-      - name: Run parser and Wire smoke tests
-        run: |
-          ctest --preset debug --output-on-failure \
-            -R '^(test_parser|wire_test|analyze_planner_test)$'
+      # Keep framework tests required while the skeleton is taught.
+      - name: Run framework smoke tests
+        run: ctest --preset smoke
 
       - name: Run teaching-lab black-box tests (manual)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_lab_tests && runner.os == 'Linux' }}
         run: |
-          ctest --preset debug --output-on-failure -L blackbox
+          ctest --preset blackbox
 
       - name: Upload test logs
         if: ${{ always() }}
@@ -102,6 +149,7 @@ jobs:
 
   windows-msys2:
     name: Windows (MSYS2/POSIX)
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -139,11 +187,9 @@ jobs:
         shell: msys2 {0}
         run: cmake --build --preset debug --parallel 2
 
-      - name: Run parser and Wire smoke tests
+      - name: Run framework smoke tests
         shell: msys2 {0}
-        run: |
-          ctest --preset debug --output-on-failure \
-            -R '^(test_parser|wire_test|analyze_planner_test)$'
+        run: ctest --preset smoke
 
       - name: Upload test logs
         if: ${{ always() }}
@@ -157,6 +203,7 @@ jobs:
 
   release:
     name: Release build
+    if: ${{ github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -181,3 +228,84 @@ jobs:
 
       - name: Build Release
         run: cmake --build --preset release --parallel 2
+
+  sanitizers:
+    name: ASan + UBSan smoke tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison
+
+      - name: Configure sanitizers
+        run: cmake --preset sanitizers
+
+      - name: Build sanitizers
+        run: cmake --build --preset sanitizers --parallel 2
+
+      - name: Run sanitizer smoke tests
+        run: ctest --preset sanitizers-smoke
+
+      - name: Upload sanitizer logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-test-logs
+          path: |
+            build/sanitizers/test-logs
+            build/sanitizers/Testing/Temporary
+          if-no-files-found: ignore
+
+  thread-sanitizer:
+    name: TSan smoke tests (nightly)
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_full_quality) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source and GoogleTest
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            cmake \
+            flex \
+            bison
+
+      - name: Configure ThreadSanitizer
+        run: cmake --preset tsan
+
+      - name: Build ThreadSanitizer
+        run: cmake --build --preset tsan --parallel 2
+
+      - name: Run ThreadSanitizer smoke tests
+        run: ctest --preset tsan-smoke
+
+      - name: Upload ThreadSanitizer logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tsan-test-logs
+          path: |
+            build/tsan/test-logs
+            build/tsan/Testing/Temporary
+          if-no-files-found: ignore

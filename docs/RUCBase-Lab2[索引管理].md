@@ -382,11 +382,8 @@ B+树删除的整体流程如下图：
 
 ```bash
 cmake --preset debug
-cmake --build --preset debug --target \
-  b_plus_tree_insert_test b_plus_tree_delete_test b_plus_tree_concurrent_test -j 4
-ctest --preset debug \
-  -R '^(b_plus_tree_insert_test|b_plus_tree_delete_test|b_plus_tree_concurrent_test)$' \
-  --output-on-failure
+cmake --build --preset debug -j 4
+ctest --preset lab2
 ```
 
 注意：

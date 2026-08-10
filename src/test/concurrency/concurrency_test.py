@@ -1,9 +1,8 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from run_blackbox import run_pytest
-
 
 BASIC_CASES = [
     "concurrency_read_test",
@@ -18,6 +17,6 @@ if __name__ == "__main__":
     raise SystemExit(
         run_pytest(
             [f"test_concurrency.py::test_concurrency[{case}]" for case in BASIC_CASES],
-            ["concurrency_test"],
+            ["blackbox_concurrency_client"],
         )
     )

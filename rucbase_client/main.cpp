@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "common/banner.h"
 #include "net/client.h"
 
 namespace {
@@ -325,13 +326,7 @@ int RunClient(int argc, char* argv[]) {
     const std::string database_name = interactive ? FetchDatabaseName(client) : "";
 
     if (interactive) {
-        std::cout << "\n"
-                     "  ____  _   _  ____ ____    _    ____  _____ \n"
-                     " |  _ \\| | | |/ ___| __ )  / \\  / ___|| ____|\n"
-                     " | |_) | | | | |   |  _ \\ / _ \\ \\___ \\|  _|  \n"
-                     " |  _ <| |_| | |___| |_) / ___ \\ ___) | |___ \n"
-                     " |_| \\_ \\___/ \\____|____/_/   \\_\\____/|_____|\n"
-                     "\n";
+        rucbase::PrintRucbaseBanner(std::cout);
         std::cout << "Connected to " << server_host << ":" << server_port << "\n";
         std::cout << "Database: " << database_name << "\n";
         std::cout << "Type 'help;' for server help, 'exit;' to quit.\n\n";

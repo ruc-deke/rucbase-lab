@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import pytest
-
 from wire_assertions import assert_wire_output
-
 
 TRANSACTION_DIR = Path(__file__).parents[1] / "transaction" / "transaction_sql"
 TRANSACTION_CASES = [

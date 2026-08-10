@@ -77,7 +77,7 @@ cmake --build --preset debug -j 4
 只编译一个目标时，可以使用：
 
 ```bash
-cmake --build --preset debug --target lru_replacer_test -j 4
+cmake --build --preset debug --target lab1_lru_replacer_test -j 4
 ```
 
 修改 `CMakeLists.txt`、切换分支或新增源码文件后，重新执行 `cmake --preset debug` 即可，一般不需要删除整个构建目录。
@@ -118,23 +118,39 @@ cd build/debug
 ctest --preset debug --output-on-failure
 ```
 
-按类别运行：
+按框架或 Lab 运行：
 
 ```bash
-# GoogleTest、解析器和通信协议测试
-ctest --preset debug -L unit --output-on-failure
+# 不依赖学生实验实现的框架冒烟测试
+ctest --preset smoke
+
+# 所有框架测试
+ctest --preset framework
+
+# 所有 GoogleTest 单元测试
+ctest --preset unit
+
+# 当前 Lab 的测试
+ctest --preset lab1
+ctest --preset lab2
+ctest --preset lab3
+ctest --preset lab4
 
 # 查询、事务和并发黑盒测试
-ctest --preset debug -L blackbox --output-on-failure
+ctest --preset blackbox
+
+# 只运行加分测试
+ctest --preset bonus
 ```
 
 运行单个测试：
 
 ```bash
-ctest --preset debug -R 'lru_replacer_test' --output-on-failure
+cmake --build --preset debug --target lab1_lru_replacer_test -j 4
+./build/debug/bin/lab1_lru_replacer_test
 ```
 
-黑盒测试需要 pytest。测试程序会为每个用例创建独立的临时数据库并选择动态端口；失败日志位于 `build/debug/test-logs/`。
+黑盒测试需要 pytest。缺少 pytest 时，`blackbox_pytest_dependency` 会明确失败，不会把“没有运行黑盒测试”误报为成功。测试程序会为每个用例创建独立的临时数据库并选择动态端口；失败日志位于 `build/debug/test-logs/`。
 
 各 Lab 文档还保留了与课程讲义兼容的 Python 测试入口。测试范围和评分以对应 Lab 文档为准。
 
@@ -160,14 +176,15 @@ git submodule update --init --recursive
 cmake --preset debug
 ```
 
-### CTest 中没有黑盒测试
+### 黑盒测试报告缺少 pytest
 
-确认 Python 可以导入 pytest，然后重新配置：
+安装 pytest 并确认 Python 可以导入：
 
 ```bash
 python3 -m pytest --version
-cmake --preset debug
 ```
+
+黑盒测试在配置阶段已经注册，安装完成后无需重新运行 CMake。
 
 ### 端口已被占用
 

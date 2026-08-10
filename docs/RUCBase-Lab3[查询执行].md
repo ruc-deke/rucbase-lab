@@ -43,7 +43,7 @@ cd src/test/query
 python3 query_unit_test.py basic_query_test1.sql # 25分
 ```
 
-上述兼容命令内部使用pytest运行测试，不再删除已有构建目录。也可以在仓库根目录执行`ctest --preset debug -R blackbox.query`。
+上述兼容命令内部使用pytest运行测试，不再删除已有构建目录。也可以在仓库根目录执行`ctest --preset lab3-query`。
 
 
 ## 实验二：DML语句实现（75分）

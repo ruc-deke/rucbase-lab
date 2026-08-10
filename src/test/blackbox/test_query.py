@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import pytest
-
 from wire_assertions import assert_wire_output
-
 
 QUERY_DIR = Path(__file__).parents[1] / "query" / "query_sql"
 QUERY_CASES = [f"basic_query_test{index}" for index in range(1, 6)]

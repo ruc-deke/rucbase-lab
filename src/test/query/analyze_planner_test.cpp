@@ -48,10 +48,9 @@ std::shared_ptr<ScanPlan> FindScan(const std::shared_ptr<Plan>& plan, const std:
     return nullptr;
 }
 
-class AnalyzePlannerTest : public ::testing::Test {
-  protected:
-    AnalyzePlannerTest()
-        : analyze_(&sm_manager_), planner_(&sm_manager_), optimizer_(&sm_manager_, &planner_) {
+class QueryPlanningTest : public ::testing::Test {
+protected:
+    QueryPlanningTest() : analyze_(&sm_manager_), planner_(&sm_manager_), optimizer_(&sm_manager_, &planner_) {
         AddTestTables(sm_manager_);
     }
 
@@ -71,7 +70,7 @@ class AnalyzePlannerTest : public ::testing::Test {
     Optimizer optimizer_;
 };
 
-TEST_F(AnalyzePlannerTest, PlansShowDatabaseAsUtility) {
+TEST_F(QueryPlanningTest, PlansShowDatabaseAsUtility) {
     auto parsed = rucbase::parser::Parse("show database;");
     ASSERT_TRUE(parsed.ok());
 
@@ -81,28 +80,28 @@ TEST_F(AnalyzePlannerTest, PlansShowDatabaseAsUtility) {
     EXPECT_EQ(utility->tag, T_ShowDatabase);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsQualifiedColumnOutsideFromScope) {
+TEST_F(QueryPlanningTest, RejectsQualifiedColumnOutsideFromScope) {
     auto parsed = rucbase::parser::Parse("select b.id from a;");
     ASSERT_TRUE(parsed.ok());
 
     EXPECT_THROW(analyze_.do_analyze(parsed.statement), ColumnNotFoundError);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsQualifiedPredicateOutsideFromScope) {
+TEST_F(QueryPlanningTest, RejectsQualifiedPredicateOutsideFromScope) {
     auto parsed = rucbase::parser::Parse("select * from a where b.id = 1;");
     ASSERT_TRUE(parsed.ok());
 
     EXPECT_THROW(analyze_.do_analyze(parsed.statement), ColumnNotFoundError);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsLiteralTypeBeforeEncodingRawValue) {
+TEST_F(QueryPlanningTest, RejectsLiteralTypeBeforeEncodingRawValue) {
     auto parsed = rucbase::parser::Parse("select * from a where a.text = 1;");
     ASSERT_TRUE(parsed.ok());
 
     EXPECT_THROW(analyze_.do_analyze(parsed.statement), IncompatibleTypeError);
 }
 
-TEST_F(AnalyzePlannerTest, AssignsSameTableColumnPredicateToThatTable) {
+TEST_F(QueryPlanningTest, AssignsSameTableColumnPredicateToThatTable) {
     auto parsed = rucbase::parser::Parse("select * from a join b where b.x = b.y;");
     ASSERT_TRUE(parsed.ok());
     auto query = analyze_.do_analyze(parsed.statement);
@@ -118,7 +117,7 @@ TEST_F(AnalyzePlannerTest, AssignsSameTableColumnPredicateToThatTable) {
     EXPECT_EQ(b_scan->conds_[0].rhs_col.tab_name, "b");
 }
 
-TEST_F(AnalyzePlannerTest, RejectsNonPositiveCharLengthsBeforeFileCreation) {
+TEST_F(QueryPlanningTest, RejectsNonPositiveCharLengthsBeforeFileCreation) {
     auto negative = PlanCreateTable("create table negative_len(c char(-1));");
     ASSERT_NE(negative, nullptr);
     EXPECT_THROW(sm_manager_.create_table(negative->tab_name_, negative->cols_, nullptr), InvalidColLengthError);
@@ -128,14 +127,14 @@ TEST_F(AnalyzePlannerTest, RejectsNonPositiveCharLengthsBeforeFileCreation) {
     EXPECT_THROW(sm_manager_.create_table(zero->tab_name_, zero->cols_, nullptr), InvalidColLengthError);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsDuplicateColumnsBeforeFileCreation) {
+TEST_F(QueryPlanningTest, RejectsDuplicateColumnsBeforeFileCreation) {
     auto plan = PlanCreateTable("create table duplicate_cols(id int, id float);");
     ASSERT_NE(plan, nullptr);
 
     EXPECT_THROW(sm_manager_.create_table(plan->tab_name_, plan->cols_, nullptr), ColumnExistsError);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsOtherInvalidRecordLayoutsBeforeFileCreation) {
+TEST_F(QueryPlanningTest, RejectsOtherInvalidRecordLayoutsBeforeFileCreation) {
     EXPECT_THROW(sm_manager_.create_table("empty_cols", {}, nullptr), InvalidRecordSizeError);
     EXPECT_THROW(sm_manager_.create_table("bad_int", {{.name = "id", .type = TYPE_INT, .len = 1}}, nullptr),
                  InvalidColLengthError);
@@ -149,7 +148,7 @@ TEST_F(AnalyzePlannerTest, RejectsOtherInvalidRecordLayoutsBeforeFileCreation) {
                  InvalidRecordSizeError);
 }
 
-TEST_F(AnalyzePlannerTest, BindsQualifiedOrderByColumnWithinFromScope) {
+TEST_F(QueryPlanningTest, BindsQualifiedOrderByColumnWithinFromScope) {
     auto parsed = rucbase::parser::Parse("select a.text from a join b order by a.id desc;");
     ASSERT_TRUE(parsed.ok());
     auto query = analyze_.do_analyze(std::move(parsed.statement));
@@ -169,7 +168,7 @@ TEST_F(AnalyzePlannerTest, BindsQualifiedOrderByColumnWithinFromScope) {
     EXPECT_TRUE(sort->is_desc_);
 }
 
-TEST_F(AnalyzePlannerTest, RejectsInvalidOrderByColumns) {
+TEST_F(QueryPlanningTest, RejectsInvalidOrderByColumns) {
     auto outside_scope = rucbase::parser::Parse("select a.id from a order by b.id;");
     ASSERT_TRUE(outside_scope.ok());
     EXPECT_THROW(analyze_.do_analyze(std::move(outside_scope.statement)), ColumnNotFoundError);

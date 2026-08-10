@@ -23,6 +23,8 @@ endif()
 option(RUCBASE_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(RUCBASE_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 option(RUCBASE_ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+option(RUCBASE_STRICT_WARNINGS "Enable additional compiler warnings" OFF)
+option(RUCBASE_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
 
 if(RUCBASE_ENABLE_TSAN AND (RUCBASE_ENABLE_ASAN OR RUCBASE_ENABLE_UBSAN))
     message(FATAL_ERROR "ThreadSanitizer must use a separate build from ASan/UBSan.")
@@ -33,7 +35,12 @@ add_library(rucbase::project_options ALIAS rucbase_project_options)
 target_compile_features(rucbase_project_options INTERFACE cxx_std_20)
 target_compile_options(rucbase_project_options INTERFACE
         $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
-        # Lab skeletons intentionally leave members unused until students implement them.
+        "$<$<AND:$<BOOL:${RUCBASE_STRICT_WARNINGS}>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-Wextra;-Wpedantic>"
+        $<$<AND:$<BOOL:${RUCBASE_STRICT_WARNINGS}>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/W4>
+        $<$<AND:$<BOOL:${RUCBASE_WARNINGS_AS_ERRORS}>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-Werror>
+        $<$<AND:$<BOOL:${RUCBASE_WARNINGS_AS_ERRORS}>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/WX>
+        # Lab skeletons intentionally leave parameters and members unused until students implement them.
+        $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wno-unused-parameter>
         $<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-unused-private-field>)
 
 if(RUCBASE_ENABLE_ASAN OR RUCBASE_ENABLE_UBSAN OR RUCBASE_ENABLE_TSAN)
@@ -96,3 +103,5 @@ add_subdirectory(src)
 
 # Staff-provided interactive client; also buildable via --target rucbase_client.
 add_subdirectory(rucbase_client)
+
+include(cmake/Quality.cmake)

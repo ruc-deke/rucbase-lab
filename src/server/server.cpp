@@ -39,6 +39,7 @@ constexpr int kListenBacklog = 8;
 volatile sig_atomic_t stop_requested = 0;
 volatile sig_atomic_t listening_fd = -1;
 
+// 信号处理函数只修改简单状态并关闭套接字，避免在异步信号上下文执行复杂逻辑。
 void handle_interrupt(int) {
     stop_requested = 1;
     if (listening_fd >= 0) {
@@ -86,6 +87,7 @@ struct Server::ClientSession {
     explicit ClientSession(const int client_fd) : fd(client_fd) { text_buffer.fill('\0'); }
 
     int fd;
+    // 事务身份随连接保留，文本结果缓冲区则在每条 SQL 执行前清空。
     txn_id_t txn_id = INVALID_TXN_ID;
     std::array<char, BUFFER_LENGTH> text_buffer{};
     int text_offset = 0;
@@ -114,6 +116,7 @@ int Server::run() {
 
     try {
         std::signal(SIGINT, handle_interrupt);
+        // 客户端提前断开时让写操作返回错误，而不是用 SIGPIPE 终止整个服务端。
         std::signal(SIGPIPE, SIG_IGN);
 
         if (!sm_manager_.is_dir(database_name_)) {
@@ -122,32 +125,34 @@ int Server::run() {
         sm_manager_.open_db(database_name_);
         database_open = true;
 
+        // 先完成日志回放，再开始接受客户端请求。
         recovery_manager_.analyze();
         recovery_manager_.redo();
         recovery_manager_.undo();
         serve();
     } catch (const std::exception& error) {
-        std::cerr << error.what() << std::endl;
+        std::cerr << error.what() << '\n';
         exit_code = 1;
     }
 
+    // 先结束客户端线程，确保关闭数据库时没有请求仍在访问内核组件。
     stop_clients();
     if (database_open) {
         try {
             log_manager_.flush_log_to_disk();
         } catch (const std::exception& error) {
-            std::cerr << "Failed to flush log: " << error.what() << std::endl;
+            std::cerr << "Failed to flush log: " << error.what() << '\n';
             exit_code = 1;
         }
         try {
             sm_manager_.close_db();
         } catch (const std::exception& error) {
-            std::cerr << "Failed to close database: " << error.what() << std::endl;
+            std::cerr << "Failed to close database: " << error.what() << '\n';
             exit_code = 1;
         }
     }
 
-    std::cout << "RUCBase(" << database_name_ << ") stopped" << std::endl;
+    std::cout << "RUCBase(" << database_name_ << ") stopped\n";
     return exit_code;
 }
 
@@ -165,6 +170,7 @@ int Server::create_listening_socket() const {
         throw std::runtime_error("Invalid IPv4 bind address: " + bind_address_);
     }
 
+    // 允许服务端重启后及时重新绑定仍处于 TIME_WAIT 状态的地址。
     constexpr int reuse_address = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(reuse_address)) != 0 ||
         ::bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 || ::listen(fd, kListenBacklog) != 0) {
@@ -178,8 +184,9 @@ int Server::create_listening_socket() const {
 
 void Server::serve() {
     listening_fd = create_listening_socket();
-    std::cout << "RUCBase(" << database_name_ << ") listening on " << bind_address_ << ':' << port_ << std::endl;
+    std::cout << "RUCBase(" << database_name_ << ") listening on " << bind_address_ << ':' << port_ << '\n';
 
+    // accept 会阻塞；SIGINT 处理函数关闭监听套接字后，循环便能退出。
     while (!stop_requested) {
         const int client_fd = ::accept(listening_fd, nullptr, nullptr);
         if (client_fd < 0) {
@@ -187,7 +194,7 @@ void Server::serve() {
                 break;
             }
             if (errno != EINTR) {
-                std::cerr << "Accept failed: " << std::strerror(errno) << std::endl;
+                std::cerr << "Accept failed: " << std::strerror(errno) << '\n';
             }
             continue;
         }
@@ -196,6 +203,7 @@ void Server::serve() {
             continue;
         }
 
+        // 先登记连接，停机流程才能唤醒随后可能阻塞在网络读取上的线程。
         {
             std::lock_guard<std::mutex> lock(clients_mutex_);
             client_fds_.push_back(client_fd);
@@ -203,7 +211,7 @@ void Server::serve() {
         try {
             client_threads_.emplace_back(&Server::handle_client, this, client_fd);
         } catch (const std::exception& error) {
-            std::cerr << "Failed to create client thread: " << error.what() << std::endl;
+            std::cerr << "Failed to create client thread: " << error.what() << '\n';
             close_client(client_fd);
         }
     }
@@ -217,28 +225,29 @@ void Server::serve() {
 void Server::stop_clients() {
     {
         std::lock_guard<std::mutex> lock(clients_mutex_);
+        // shutdown 会唤醒阻塞中的读写；套接字最终由各客户端线程关闭。
         for (int fd : client_fds_) {
             ::shutdown(fd, SHUT_RDWR);
         }
     }
+    // 在锁外等待，避免客户端线程在 close_client 中等待同一把锁而死锁。
     for (std::thread& thread : client_threads_) {
         thread.join();
     }
 }
 
 void Server::close_client(const int fd) {
-    std::lock_guard<std::mutex> lock(clients_mutex_);
+    std::lock_guard lock(clients_mutex_);
     ::close(fd);
     // C++20：std::erase(container, value) 删除所有等于 value 的元素。
-    // 等价于 erase-remove 惯用法：
-    //   client_fds_.erase(std::remove(...), client_fds_.end());
     std::erase(client_fds_, fd);
 }
 
 void Server::handle_client(const int fd) {
     ClientSession session(fd);
-    std::cout << "Client connected (fd=" << fd << ")" << std::endl;
+    std::cout << "Client connected (fd=" << fd << ")\n";
 
+    // 一次握手建立协议版本后，同一连接可以连续处理多条 SQL 请求。
     if (wire::ReadAndCheckHandshake(fd)) {
         wire::Frame request;
         while (wire::ReadFrame(fd, &request) && handle_request(&session, request)) {
@@ -246,7 +255,7 @@ void Server::handle_client(const int fd) {
     }
 
     close_client(fd);
-    std::cout << "Client disconnected (fd=" << fd << ")" << std::endl;
+    std::cout << "Client disconnected (fd=" << fd << ")\n";
 }
 
 bool Server::handle_request(ClientSession* session, const wire::Frame& request) {
@@ -256,22 +265,17 @@ bool Server::handle_request(ClientSession* session, const wire::Frame& request) 
     if (request.payload.empty()) {
         return send_error(session->fd, "empty SQL");
     }
-    if (request.payload == "crash") {
-        const char* enabled = std::getenv("RUCBASE_ALLOW_TEST_CRASH");
-        if (enabled != nullptr && std::strcmp(enabled, "1") == 0) {
-            std::_Exit(1);
-        }
-        return send_error(session->fd, "test crash command is disabled");
-    }
 
-    std::cout << "[fd=" << session->fd << "] " << request.payload << std::endl;
+    std::cout << "[fd=" << session->fd << "] " << request.payload << '\n';
     return execute_sql(session, request.payload);
 }
 
 // 一条 SQL 的完整的处理主线：parse/analyze -> plan -> portal/executor。
 bool Server::execute_sql(ClientSession* session, const std::string& sql) {
+    // 文本结果缓冲区属于单条语句，每次执行前都要重置。
     session->text_buffer.fill('\0');
     session->text_offset = 0;
+    // Context 汇集一次语句执行所需的事务、日志、锁和结果状态。
     Context context(&lock_manager_, &log_manager_, nullptr, session->text_buffer.data(), &session->text_offset);
 
     try {
@@ -297,6 +301,7 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql) {
         //     transaction_manager_.commit(context.txn_, context.log_mgr_);
         // }
 
+        // 查询返回结构化结果，文本型命令返回单列文本，其余命令只返回成功状态。
         if (context.wire_result_.has_query_result) {
             return send_query_result(session->fd, context.wire_result_);
         }
@@ -309,16 +314,17 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql) {
         }
         return wire::WriteFrame(session->fd, wire::kTagCommandOk, 0, "");
     } catch (TransactionAbortException& error) {
+        // 事务异常需要先回滚，再发送专用终止帧以保持客户端协议同步。
         if (context.txn_ != nullptr) {
             transaction_manager_.abort(context.txn_, &log_manager_);
         }
-        std::cout << error.GetInfo() << std::endl;
+        std::cout << error.GetInfo() << '\n';
         return wire::WriteFrame(session->fd, wire::kTagTransactionAbort, 0, "abort");
     } catch (const RMDBError& error) {
-        std::cerr << error.what() << std::endl;
+        std::cerr << error.what() << '\n';
         return send_error(session->fd, error.what());
     } catch (const std::exception& error) {
-        std::cerr << error.what() << std::endl;
+        std::cerr << error.what() << '\n';
         return send_error(session->fd, std::string("internal server error: ") + error.what());
     }
 }
@@ -335,9 +341,9 @@ void Server::prepare_transaction(ClientSession* session, Context* context) {
 
 bool Server::send_query_result(int fd, const WireResultSet& result) {
     std::vector<wire::ColumnDef> columns;
-    for (const auto& source : result.columns) {
-        wire::ColumnDef column{.name = source.name};
-        if (!wire::ColTypeToWire(static_cast<int>(source.type), &column.sql_type)) {
+    for (const auto& [name, type] : result.columns) {
+        wire::ColumnDef column{.name = name};
+        if (!wire::ColTypeToWire(static_cast<int>(type), &column.sql_type)) {
             return send_error(fd, "unsupported query result type");
         }
         columns.push_back(std::move(column));
@@ -357,6 +363,7 @@ bool Server::send_query_result(int fd, const WireResultSet& result) {
 
     std::string payload;
     std::string diagnostic;
+    // 结果集按 META、ROW*、RESULT_END 的顺序编码，客户端据此重建表格。
     if (!wire::TryEncodeMeta(columns, &payload, &diagnostic)) {
         return send_error(fd, diagnostic);
     }
@@ -381,12 +388,14 @@ bool Server::send_query_result(int fd, const WireResultSet& result) {
 }
 
 bool Server::send_text_result(int fd, const std::string& column_name, const std::string& text) {
+    // 原始文本仍封装为单列、单行结果，复用统一的结果集状态机。
     return wire::WriteFrame(fd, wire::kTagMeta, wire::kFlagRawText, wire::EncodeMetaSingleCharColumn(column_name)) &&
            wire::WriteFrame(fd, wire::kTagRow, 0, wire::EncodeRowSingleChar(text)) &&
            wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(1));
 }
 
 bool Server::send_error(int fd, std::string diagnostic) {
+    // 统一补换行并限制长度，避免诊断信息生成过大的协议帧。
     if (!diagnostic.empty() && diagnostic.back() != '\n') {
         diagnostic.push_back('\n');
     }

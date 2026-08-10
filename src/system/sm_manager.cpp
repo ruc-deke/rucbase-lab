@@ -101,7 +101,8 @@ void set_string_result(Context* context,
         row.reserve(values.size());
         for (auto& value : values) {
             account(value.size());
-            WireResultCell cell{.type = TYPE_STRING, .str_val = std::move(value)};
+            WireResultCell cell{};
+            cell.str_val = std::move(value);
             row.push_back(std::move(cell));
         }
         result.rows.push_back(std::move(row));

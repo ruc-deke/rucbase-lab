@@ -24,7 +24,7 @@ IxFileHdr make_header(int key_len) {
     return header;
 }
 
-TEST(IxLayoutTest, NumericComparisonAcceptsPackedKeys) {
+TEST(IndexLayoutTest, NumericComparisonAcceptsPackedKeys) {
     alignas(int) std::array<char, 1 + sizeof(int)> int_left{};
     alignas(int) std::array<char, 1 + sizeof(int)> int_right{};
     int lhs = 7;
@@ -42,7 +42,7 @@ TEST(IxLayoutTest, NumericComparisonAcceptsPackedKeys) {
     EXPECT_GT(ix_compare(float_left.data() + 1, float_right.data() + 1, TYPE_FLOAT, sizeof(float)), 0);
 }
 
-TEST(IxLayoutTest, RidAreaIsAlignedForOddLengthKeys) {
+TEST(IndexLayoutTest, RidAreaIsAlignedForOddLengthKeys) {
     IxFileHdr header = make_header(3);
     Page page;
     IxNodeHandle node(&header, &page);
@@ -53,7 +53,7 @@ TEST(IxLayoutTest, RidAreaIsAlignedForOddLengthKeys) {
     EXPECT_EQ(*node.get_rid(0), expected);
 }
 
-TEST(IxLayoutTest, FileHeaderRoundTripsAndRejectsInvalidBounds) {
+TEST(IndexLayoutTest, FileHeaderRoundTripsAndRejectsInvalidBounds) {
     IxFileHdr header = make_header(3);
     std::array<char, PAGE_SIZE> page{};
     header.serialize(page.data());

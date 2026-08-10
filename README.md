@@ -1,16 +1,21 @@
-# RUCBase
+<h1 align="center">
+  <img src="docs/pics/RUCBase.png" alt="RUCBase" width="680">
+</h1>
 
-```text
- ____  _   _  ____ ____    _    ____  _____
-|  _ \| | | |/ ___| __ )  / \  / ___|| ____|
-| |_) | | | | |   |  _ \ / _ \ \___ \|  _|
-|  _ <| |_| | |___| |_) / ___ \ ___) | |___
-|_| \_ \___/ \____|____/_/   \_\____/|_____|
-```
+<p align="center"><strong>面向数据库系统课程的教学型关系数据库管理系统</strong></p>
+
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="docs/README.md">文档导航</a> ·
+  <a href="#课程实验">课程实验</a> ·
+  <a href="docs/RUCBase开发文档.md">参与开发</a>
+</p>
+
+## 项目简介
 
 RUCBase 是由中国人民大学卢卫教授带领数据库教学团队开发的一款教学用数据库管理系统，配套教育部“101计划”计算机核心教材《数据库管理系统原理与实现》建设，主要面向数据库基础较为薄弱的本科生，为数据库系统课程的实验教学提供支撑。
 
-RUCBase 的系统框架参考并借鉴了 CMU 15-445 课程的 [BusTub](https://github.com/cmu-db/bustub) 和 Stanford CS346 课程的 [RedBase](https://web.stanford.edu/class/cs346/2015/redbase.html)。目前，中国人民大学、哈尔滨工业大学、华中科技大学、西北工业大学、西安电子科技大学等高校已使用 RucBase 开展数据库内核相关实验教学。
+RUCBase 的系统框架参考并借鉴了 CMU 15-445 课程的 [BusTub](https://github.com/cmu-db/bustub) 和 Stanford CS346 课程的 [RedBase](https://web.stanford.edu/class/cs346/2015/redbase.html)。目前，中国人民大学、哈尔滨工业大学、华中科技大学、西北工业大学、西安电子科技大学等高校已使用 RUCBase 开展数据库内核相关实验教学。
 
 ## 从这里开始
 
@@ -67,14 +72,8 @@ src/                  数据库内核、服务端和测试
 rucbase_client/       课程客户端
 docs/                 使用、开发、项目结构和实验文档
 docker/               课程开发镜像
-build/<preset>/       本地构建产物，不提交到 Git
 ```
 
-## 学术诚信
-
-RUCBase 实验用于课程学习。学生应独立完成实验核心代码，遵守课程关于代码共享、作业提交和公开仓库的规定，不要公开包含实验答案的个人仓库。
-
-欢迎通过 Issue 或 Pull Request 报告文档错误、构建问题和可复现的框架缺陷。
 
 ## 许可
 

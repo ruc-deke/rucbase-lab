@@ -66,7 +66,7 @@ void QlManager::run_mutli_query(const std::shared_ptr<Plan>& plan, Context* cont
                 break;
             }
             default:
-                throw InternalError("Unexpected field type");
+                throw InternalError("Unexpected ddl type");
                 break;
         }
     }
@@ -173,7 +173,8 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot,
         wire_row.reserve(proj_cols.size());
         for (auto& col : proj_cols) {
             char* rec_buf = Tuple->data + col.offset;
-            WireResultCell cell{.type = col.type};
+            WireResultCell cell{};
+            cell.type = col.type;
             if (col.type == TYPE_INT) {
                 std::memcpy(&cell.int_val, rec_buf, sizeof(cell.int_val));
             } else if (col.type == TYPE_FLOAT) {

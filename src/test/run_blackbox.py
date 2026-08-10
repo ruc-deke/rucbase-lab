@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BLACKBOX_DIR = Path(__file__).resolve().parent / "blackbox"
 
@@ -41,13 +40,13 @@ def run_pytest(test_nodes: str | list[str], targets: list[str]) -> int:
         "--rmdb-binary",
         str(binary_dir / "rmdb"),
         "--query-client",
-        str(binary_dir / "query_test"),
+        str(binary_dir / "blackbox_query_client"),
         "--transaction-client",
-        str(binary_dir / "transaction_test"),
+        str(binary_dir / "blackbox_transaction_client"),
         "--regress-client",
-        str(binary_dir / "regress_test"),
+        str(binary_dir / "blackbox_regress_client"),
         "--concurrency-client",
-        str(binary_dir / "concurrency_test"),
+        str(binary_dir / "blackbox_concurrency_client"),
         "--log-dir",
         str(build_dir / "test-logs"),
     ]

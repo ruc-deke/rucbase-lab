@@ -183,11 +183,11 @@ public:
      */
     void Draw(BufferPoolManager* bpm, const std::string& outf) {
         std::ofstream out(outf);
-        out << "digraph G {" << std::endl;
+        out << "digraph G {\n";
 
         IxNodeHandle* node = ih_->fetch_node(ih_->file_hdr_->root_page_);
         ToGraph(ih_.get(), node, bpm, out);
-        out << "}" << std::endl;
+        out << "}\n";
         out.close();
 
         // 由dot文件生成png文件

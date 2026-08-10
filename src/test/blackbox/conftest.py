@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 import signal
 import socket
 import subprocess
@@ -8,6 +7,21 @@ import time
 from pathlib import Path
 
 import pytest
+
+LOG_NAME_CHARACTERS = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
+
+
+def safe_log_name(test_name: str) -> str:
+    characters: list[str] = []
+    previous_was_separator = False
+    for character in test_name:
+        if character in LOG_NAME_CHARACTERS:
+            characters.append(character)
+            previous_was_separator = False
+        elif not previous_was_separator:
+            characters.append("-")
+            previous_was_separator = True
+    return "".join(characters).strip("-") or "unnamed-test"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -73,7 +87,7 @@ class RucbaseServer:
         self.log_dir = log_dir
         self.database_name = f"database-{port}"
         self.database_dir = work_dir / self.database_name
-        safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", test_name).strip("-")
+        safe_name = safe_log_name(test_name)
         self.log_path = log_dir / f"{safe_name}-{port}-server.log"
         self.request = request
         self.process: subprocess.Popen[str] | None = None

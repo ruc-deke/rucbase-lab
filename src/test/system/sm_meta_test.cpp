@@ -11,7 +11,7 @@
 #include "common/context.h"
 #include "system/sm_manager.h"
 
-TEST(SmMetaTest, WritesReadableEmptyDatabaseJson) {
+TEST(CatalogMetadataTest, WritesReadableEmptyDatabaseJson) {
     std::istringstream input(R"({"database":"demo","tables":[]})");
     DbMeta db;
     input >> db;
@@ -21,7 +21,7 @@ TEST(SmMetaTest, WritesReadableEmptyDatabaseJson) {
     EXPECT_EQ(output.str(), "{\n  \"database\": \"demo\",\n  \"tables\": []\n}\n");
 }
 
-TEST(SmMetaTest, ShowDatabaseReturnsStructuredCurrentName) {
+TEST(CatalogMetadataTest, ShowDatabaseReturnsStructuredCurrentName) {
     SmManager sm_manager(nullptr, nullptr, nullptr, nullptr);
     std::istringstream input(R"({"database":"demo","tables":[]})");
     input >> sm_manager.db_;
@@ -38,7 +38,7 @@ TEST(SmMetaTest, ShowDatabaseReturnsStructuredCurrentName) {
     EXPECT_EQ(context.wire_result_.rows[0][0].str_val, "demo");
 }
 
-TEST(SmMetaTest, DefaultMetadataIsInitialized) {
+TEST(CatalogMetadataTest, DefaultMetadataIsInitialized) {
     ColMeta column;
     IndexMeta index;
     EXPECT_EQ(column.len, 0);
@@ -48,7 +48,7 @@ TEST(SmMetaTest, DefaultMetadataIsInitialized) {
     EXPECT_EQ(index.col_tot_len, 0);
 }
 
-TEST(SmMetaTest, RebuildsDerivedMetadataOnRoundTrip) {
+TEST(CatalogMetadataTest, RebuildsDerivedMetadataOnRoundTrip) {
     const std::string json = R"({
         "database": "teach\"db",
         "tables": [
@@ -101,7 +101,7 @@ TEST(SmMetaTest, RebuildsDerivedMetadataOnRoundTrip) {
     EXPECT_FALSE(restored.is_table("student"));
 }
 
-TEST(SmMetaTest, RejectsLegacyAndInvalidMetadata) {
+TEST(CatalogMetadataTest, RejectsLegacyAndInvalidMetadata) {
     DbMeta db;
     std::istringstream legacy("demo\n0\n");
     EXPECT_THROW(legacy >> db, InternalError);
@@ -121,7 +121,7 @@ TEST(SmMetaTest, RejectsLegacyAndInvalidMetadata) {
     EXPECT_THROW(oversized >> db, InternalError);
 }
 
-TEST(SmMetaTest, PreservesJsonEscapes) {
+TEST(CatalogMetadataTest, PreservesJsonEscapes) {
     DbMeta db;
     std::istringstream input(R"({"database":"line\n\u4eba","tables":[]})");
     input >> db;
@@ -135,7 +135,7 @@ TEST(SmMetaTest, PreservesJsonEscapes) {
     EXPECT_NO_THROW(round_trip >> restored);
 }
 
-TEST(SmMetaTest, AcceptsReorderedObjectFields) {
+TEST(CatalogMetadataTest, AcceptsReorderedObjectFields) {
     std::istringstream input(
         R"({"tables":[{"indexes":[],"columns":[{"length":4,"type":"INT","name":"id"}],"name":"t"}],"database":"demo"})");
 

@@ -3,25 +3,13 @@
 
 #include <iostream>
 
+#include "common/banner.h"
 #include "server/server.h"
 
-namespace {
-
-constexpr char kRucbaseBanner[] = R"(
-  ____  _   _  ____ ____    _    ____  _____
- |  _ \| | | |/ ___| __ )  / \  / ___|| ____|
- | |_) | | | | |   |  _ \ / _ \ \___ \|  _|
- |  _ <| |_| | |___| |_) / ___ \ ___) | |___
- |_| \_ \___/ \____|____/_/   \_\____/|_____|
-
-Welcome to RUCBase!
-Type 'help;' for help.
-
-)";
-
-}  // namespace
-
 int main(int argc, char** argv) {
-    std::cout << kRucbaseBanner << std::flush;
+    rucbase::PrintRucbaseBanner(std::cout);
+    std::cout << "Welcome to RUCBase!\n"
+              << "Start the client: rucbase_client -p <port>\n\n"
+              << std::flush;
     return rucbase::Server::start(argc, argv);
 }

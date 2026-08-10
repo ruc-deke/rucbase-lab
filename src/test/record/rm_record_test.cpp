@@ -9,7 +9,7 @@
 
 #include "record/rm_defs.h"
 
-TEST(RmRecordTest, SupportsCopyMoveAndSelfAssignment) {
+TEST(RecordValueTest, SupportsCopyMoveAndSelfAssignment) {
     const std::array<char, 3> bytes{{'a', 'b', 'c'}};
     RmRecord source(static_cast<int>(bytes.size()), bytes.data());
 
@@ -34,7 +34,7 @@ TEST(RmRecordTest, SupportsCopyMoveAndSelfAssignment) {
     EXPECT_EQ(std::memcmp(moved.data, bytes.data(), bytes.size()), 0);
 }
 
-TEST(RmRecordTest, DeserializesUnalignedInputAndValidatesLength) {
+TEST(RecordValueTest, DeserializesUnalignedInputAndValidatesLength) {
     std::array<char, sizeof(int) + 4> serialized{};
     const int size = 3;
     std::memcpy(serialized.data() + 1, &size, sizeof(size));

@@ -24,9 +24,8 @@ void send_recv_sql(rucbase::wire::Client *client, const std::string &sql) {
     }
     const rucbase::wire::ExecuteResult result = client->Execute(sql);
     if (!result.ok()) {
-        std::cerr << "EXEC_STREAM failed: "
-                  << (result.diagnostic.empty() ? "unknown error" : result.diagnostic)
-                  << std::endl;
+        std::cerr << "EXEC_STREAM failed: " << (result.diagnostic.empty() ? "unknown error" : result.diagnostic)
+                  << '\n';
         std::cout << "failure\n";
         return;
     }

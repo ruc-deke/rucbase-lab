@@ -82,7 +82,7 @@ cd src/test/transaction
 python3 transaction_test.py
 ```
 
-该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.transaction`。
+该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset lab4-transaction`。
 
 本测试包含两个测试点，分别对事务的提交和回滚进行测试，测试点分数设置如下：
 
@@ -198,7 +198,7 @@ cd src/test/concurrency
 python3 concurrency_test.py
 ```
 
-该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset debug -R blackbox.concurrency`。测试失败日志位于`build/debug/test-logs`。
+该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset lab4-concurrency`。测试失败日志位于`build/debug/test-logs`。
 
 本测试包含六个测试点考虑，对应不同的数据异常：
 

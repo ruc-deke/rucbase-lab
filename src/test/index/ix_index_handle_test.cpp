@@ -16,7 +16,7 @@ const std::vector<ColMeta> kIndexCols = {
     {.tab_name = kTableName, .name = "id", .type = TYPE_INT, .len = sizeof(int), .offset = 0, .index = true},
 };
 
-TEST(IxIndexHandleTest, ReopenRestoresPageAllocatorHighWaterMark) {
+TEST(IndexHandleTest, ReopenRestoresPageAllocatorHighWaterMark) {
     std::string index_name;
     {
         DiskManager disk_manager;
