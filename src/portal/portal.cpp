@@ -58,20 +58,20 @@ std::unique_ptr<PortalStmt> Portal::start(std::shared_ptr<Plan> plan, Context* c
 
     switch (dml->tag) {
         case T_select: {
-            auto projection = std::dynamic_pointer_cast<ProjectionPlan>(dml->subplan_);
+            const auto projection = std::dynamic_pointer_cast<ProjectionPlan>(dml->subplan_);
             auto root = convert_plan_executor(projection, context);
             return std::make_unique<PortalStmt>(PortalType::Select, std::move(projection->sel_cols_), std::move(root),
                                                 std::move(plan));
         }
         case T_Update: {
-            auto scan = convert_plan_executor(dml->subplan_, context);
+            const auto scan = convert_plan_executor(dml->subplan_, context);
             auto root = std::make_unique<UpdateExecutor>(sm_manager_, dml->tab_name_, dml->set_clauses_, dml->conds_,
                                                          collect_rids(scan.get()), context);
             return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
                                                 std::move(plan));
         }
         case T_Delete: {
-            auto scan = convert_plan_executor(dml->subplan_, context);
+            const auto scan = convert_plan_executor(dml->subplan_, context);
             auto root = std::make_unique<DeleteExecutor>(sm_manager_, dml->tab_name_, dml->conds_,
                                                          collect_rids(scan.get()), context);
             return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
@@ -90,39 +90,39 @@ std::unique_ptr<PortalStmt> Portal::start(std::shared_ptr<Plan> plan, Context* c
 void Portal::run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* txn_id, Context* context) {
     switch (portal->type) {
         case PortalType::Select:
-            ql->select_from(std::move(portal->root), std::move(portal->sel_cols), context);
+            ql->select_from(std::move(portal->root), portal->sel_cols, context);
             return;
         case PortalType::Dml:
             ql->run_dml(std::move(portal->root));
             return;
         case PortalType::Ddl:
-            ql->run_mutli_query(std::move(portal->plan), context);
+            ql->run_mutli_query(portal->plan, context);
             return;
         case PortalType::Utility:
-            ql->run_cmd_utility(std::move(portal->plan), txn_id, context);
+            ql->run_cmd_utility(portal->plan, txn_id, context);
             return;
     }
     throw InternalError("unexpected portal type");
 }
 
-std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(std::shared_ptr<Plan> plan, Context* context) {
-    if (auto projection = std::dynamic_pointer_cast<ProjectionPlan>(plan)) {
+std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(const std::shared_ptr<Plan>& plan, Context* context) {
+    if (const auto projection = std::dynamic_pointer_cast<ProjectionPlan>(plan)) {
         return std::make_unique<ProjectionExecutor>(convert_plan_executor(projection->subplan_, context),
                                                     projection->sel_cols_);
     }
-    if (auto scan = std::dynamic_pointer_cast<ScanPlan>(plan)) {
+    if (const auto scan = std::dynamic_pointer_cast<ScanPlan>(plan)) {
         if (scan->tag == T_SeqScan) {
             return std::make_unique<SeqScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, context);
         }
         return std::make_unique<IndexScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, scan->index_col_names_,
                                                    context);
     }
-    if (auto join = std::dynamic_pointer_cast<JoinPlan>(plan)) {
+    if (const auto join = std::dynamic_pointer_cast<JoinPlan>(plan)) {
         return std::make_unique<NestedLoopJoinExecutor>(convert_plan_executor(join->left_, context),
                                                         convert_plan_executor(join->right_, context),
                                                         std::move(join->conds_));
     }
-    if (auto sort = std::dynamic_pointer_cast<SortPlan>(plan)) {
+    if (const auto sort = std::dynamic_pointer_cast<SortPlan>(plan)) {
         return std::make_unique<SortExecutor>(convert_plan_executor(sort->subplan_, context), sort->sel_col_,
                                               sort->is_desc_);
     }

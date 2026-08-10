@@ -117,7 +117,6 @@ cd build/debug
 ./bin/rmdb <database_name> # 如果存在该数据库,直接加载;若不存在该数据库,自动创建
 # 自定义端口示例：./bin/rmdb -p 9000 <database_name>
 # 默认仅监听 127.0.0.1；允许远程连接：./bin/rmdb -b 0.0.0.0 -p 9000 <database_name>
-# 自定义 socket I/O 超时（秒）：./bin/rmdb -t 300 <database_name>
 ```
 
 以上路径对应`debug` Preset。如果使用`cmake -S . -B build`手工配置，则进入`build`目录运行。

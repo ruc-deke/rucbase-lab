@@ -3,70 +3,106 @@
 
 #include "sm_manager.h"
 
-#include <sys/stat.h>
-#include <unistd.h>
-
-#include <cstdint>
+#include <algorithm>
+#include <filesystem>
 #include <fstream>
+#include <ranges>
+#include <sstream>
+#include <system_error>
 #include <utility>
 
+#include "common/context.h"
 #include "index/ix.h"
 #include "record/rm.h"
 
 namespace {
 
-void SetStringResult(Context* context, std::vector<std::string> column_names,
-                     std::vector<std::vector<std::string>> row_values) {
-    WireResultSet result;
-    result.has_query_result = true;
-    result.columns.reserve(column_names.size());
-    for (auto& name : column_names) {
-        result.columns.push_back({std::move(name), TYPE_STRING});
+namespace fs = std::filesystem;
+
+/**
+ * @brief 将数据库名约束为当前目录下的单个路径分量。
+ * @throws RMDBError 名称为空、包含父目录或包含路径分隔符。
+ */
+fs::path database_path(const std::string& db_name) {
+    fs::path path(db_name);
+    if (path.empty() || path != path.filename() || path == "." || path == "..") {
+        throw RMDBError("Invalid database name: " + db_name);
     }
-    size_t schema_bytes = result.columns.size() * sizeof(WireResultColumn);
-    if (schema_bytes > WireResultSet::kMaxBufferedBytes) {
-        throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
-    }
-    for (const auto& column : result.columns) {
-        if (column.name.size() > WireResultSet::kMaxBufferedBytes - schema_bytes) {
-            throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
-        }
-        schema_bytes += column.name.size();
-    }
-    if (!result.try_account(schema_bytes)) {
-        throw InternalError("utility result schema exceeds the 16 MiB teaching wire buffer");
+    return path;
+}
+
+/**
+ * @brief 序列化后再覆盖元数据文件，避免序列化失败时提前清空旧文件。
+ * @throws InternalError 序列化、打开或写入失败。
+ */
+void write_meta_file(const fs::path& path, const DbMeta& db) {
+    std::ostringstream serialized;
+    serialized << db;
+    if (!serialized) {
+        throw InternalError("cannot serialize database metadata");
     }
 
-    if (row_values.size() > WireResultSet::kMaxBufferedBytes /
-                                (2 * sizeof(std::vector<WireResultCell>))) {
+    std::ofstream output(path, std::ios::out | std::ios::trunc);
+    if (!output) {
+        throw InternalError("cannot open database metadata: " + path.string());
+    }
+    output << serialized.str();
+    output.flush();
+    if (!output) {
+        throw InternalError("cannot write database metadata: " + path.string());
+    }
+}
+
+/**
+ * @brief 将系统命令的字符串结果转换成统一的 WireResultSet。
+ * @throws InternalError 上下文为空、行列不匹配或结果超过教学版缓存上限。
+ */
+void set_string_result(Context* context,
+                       std::vector<std::string> column_names,
+                       std::vector<std::vector<std::string>> row_values) {
+    if (context == nullptr) {
+        throw InternalError("utility result requires a request context");
+    }
+
+    WireResultSet result;
+    result.has_query_result = true;
+
+    auto account = [&result](size_t bytes) {
+        if (!result.try_account(bytes)) {
+            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+        }
+    };
+
+    if (column_names.size() > WireResultSet::kMaxBufferedBytes / sizeof(WireResultColumn)) {
         throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
     }
+    account(column_names.size() * sizeof(WireResultColumn));
+    result.columns.reserve(column_names.size());
+    for (auto& name : column_names) {
+        account(name.size());
+        result.columns.push_back({.name = std::move(name), .type = TYPE_STRING});
+    }
+
+    if (row_values.size() > WireResultSet::kMaxBufferedBytes / sizeof(std::vector<WireResultCell>)) {
+        throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+    }
+    account(row_values.size() * sizeof(std::vector<WireResultCell>));
     result.rows.reserve(row_values.size());
     for (auto& values : row_values) {
         if (values.size() != result.columns.size()) {
             throw InternalError("utility result row does not match its columns");
         }
+        if (values.size() > WireResultSet::kMaxBufferedBytes / sizeof(WireResultCell)) {
+            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
+        }
 
         std::vector<WireResultCell> row;
-        size_t row_bytes = 2 * sizeof(std::vector<WireResultCell>) +
-                           values.size() * sizeof(WireResultCell);
-        if (row_bytes > WireResultSet::kMaxBufferedBytes) {
-            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-        }
+        account(values.size() * sizeof(WireResultCell));
         row.reserve(values.size());
         for (auto& value : values) {
-            if (value.size() > WireResultSet::kMaxBufferedBytes - row_bytes) {
-                throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-            }
-            row_bytes += value.size();
-
-            WireResultCell cell;
-            cell.type = TYPE_STRING;
-            cell.str_val = std::move(value);
+            account(value.size());
+            WireResultCell cell{.type = TYPE_STRING, .str_val = std::move(value)};
             row.push_back(std::move(cell));
-        }
-        if (!result.try_account(row_bytes)) {
-            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
         }
         result.rows.push_back(std::move(row));
     }
@@ -76,109 +112,67 @@ void SetStringResult(Context* context, std::vector<std::string> column_names,
 
 }  // namespace
 
-/**
- * @description: 判断是否为一个文件夹
- * @return {bool} 返回是否为一个文件夹
- * @param {string&} db_name 数据库文件名称，与文件夹同名
- */
-bool SmManager::is_dir(const std::string& db_name) {
-    struct stat st;
-    return stat(db_name.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
-}
+bool SmManager::is_dir(const std::string& db_name) const { return fs::is_directory(database_path(db_name)); }
 
-/**
- * @description: 创建数据库，所有的数据库相关文件都放在数据库同名文件夹下
- * @param {string&} db_name 数据库名称
- */
-void SmManager::create_db(const std::string& db_name) {
-    if (is_dir(db_name)) {
+void SmManager::create_db(const std::string& db_name) const {
+    const fs::path db_path = database_path(db_name);
+    if (fs::exists(db_path)) {
         throw DatabaseExistsError(db_name);
     }
-    //为数据库创建一个子目录
-    std::string cmd = "mkdir " + db_name;
-    if (system(cmd.c_str()) < 0) {  // 创建一个名为db_name的目录
-        throw UnixError();
+
+    if (!fs::create_directory(db_path)) {
+        throw DatabaseExistsError(db_name);
     }
-    if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
-        throw UnixError();
-    }
-    //创建系统目录
-    DbMeta *new_db = new DbMeta();
-    new_db->name_ = db_name;
 
-    // 注意，此处ofstream会在当前目录创建(如果没有此文件先创建)和打开一个名为DB_META_NAME的文件
-    std::ofstream ofs(DB_META_NAME);
-
-    // 将new_db中的信息，按照定义好的operator<<操作符，写入到ofs打开的DB_META_NAME文件中
-    ofs << *new_db;  // 注意：此处重载了操作符<<
-
-    delete new_db;
-
-    // 创建日志文件
-    disk_manager_->create_file(LOG_FILE_NAME);
-
-    // 回到根目录
-    if (chdir("..") < 0) {
-        throw UnixError();
+    try {
+        DbMeta new_db;
+        new_db.name_ = db_name;
+        write_meta_file(db_path / DB_META_NAME, new_db);
+        disk_manager_->create_file((db_path / LOG_FILE_NAME).string());
+    } catch (...) {
+        // 只回滚本次刚创建的目录，不触碰任何既有路径。
+        std::error_code ignored;
+        fs::remove_all(db_path, ignored);
+        throw;
     }
 }
 
-/**
- * @description: 删除数据库，同时需要清空相关文件以及数据库同名文件夹
- * @param {string&} db_name 数据库名称，与文件夹同名
- */
 void SmManager::drop_db(const std::string& db_name) {
-    if (!is_dir(db_name)) {
+    const fs::path db_path = database_path(db_name);
+    if (!fs::is_directory(db_path) || !fs::is_regular_file(db_path / DB_META_NAME)) {
         throw DatabaseNotFoundError(db_name);
     }
-    std::string cmd = "rm -r " + db_name;
-    if (system(cmd.c_str()) < 0) {
-        throw UnixError();
+    if (db_.name_ == db_name) {
+        throw InternalError("cannot drop an open database: " + db_name);
+    }
+    if (fs::remove_all(db_path) == 0) {
+        throw DatabaseNotFoundError(db_name);
     }
 }
 
-/**
- * @description: 打开数据库，找到数据库对应的文件夹，并加载数据库元数据和相关文件
- * @param {string&} db_name 数据库名称，与文件夹同名
- */
 void SmManager::open_db(const std::string& db_name) {
-    
+    // TODO(Lab 3): 加载数据库元数据，并打开所有表文件和索引文件。
+    throw NotImplementedError("SmManager::open_db (Lab 3)");
 }
 
-/**
- * @description: 把数据库相关的元数据刷入磁盘中
- */
-void SmManager::flush_meta() {
-    // 默认清空文件
-    std::ofstream ofs(DB_META_NAME);
-    ofs << db_;
-}
+void SmManager::flush_meta() const { write_meta_file(DB_META_NAME, db_); }
 
-/**
- * @description: 关闭数据库并把数据落盘
- */
 void SmManager::close_db() {
-    
+    // TODO(Lab 3): 刷盘并关闭所有表、索引和数据库元数据。
+    throw NotImplementedError("SmManager::close_db (Lab 3)");
 }
 
-/**
- * @description: 显示所有的表，结果通过当前请求的 Wire 响应返回
- * @param {Context*} context 
- */
 void SmManager::show_tables(Context* context) {
     std::vector<std::vector<std::string>> rows;
     rows.reserve(db_.tabs_.size());
-    for (const auto& entry : db_.tabs_) {
-        rows.push_back({entry.second.name});
+    // C++20：`map | std::views::values` 只遍历 value（表元数据），不关心 key。
+    // 等价于 for (const auto& [name, tab] : db_.tabs_) { ... 使用 tab ... }
+    for (const auto& tab : db_.tabs_ | std::views::values) {
+        rows.push_back({tab.name});
     }
-    SetStringResult(context, {"Tables"}, std::move(rows));
+    set_string_result(context, {"Tables"}, std::move(rows));
 }
 
-/**
- * @description: 显示表的元数据
- * @param {string&} tab_name 表名称
- * @param {Context*} context 
- */
 void SmManager::desc_table(const std::string& tab_name, Context* context) {
     const TabMeta& tab = db_.get_table(tab_name);
 
@@ -187,78 +181,102 @@ void SmManager::desc_table(const std::string& tab_name, Context* context) {
     for (const auto& col : tab.cols) {
         rows.push_back({col.name, coltype2str(col.type), col.index ? "YES" : "NO"});
     }
-    SetStringResult(context, {"Field", "Type", "Index"}, std::move(rows));
+    set_string_result(context, {"Field", "Type", "Index"}, std::move(rows));
 }
 
-/**
- * @description: 创建表
- * @param {string&} tab_name 表的名称
- * @param {vector<ColDef>&} col_defs 表的字段
- * @param {Context*} context 
- */
 void SmManager::create_table(const std::string& tab_name, const std::vector<ColDef>& col_defs, Context* context) {
     if (db_.is_table(tab_name)) {
         throw TableExistsError(tab_name);
     }
-    // Create table meta
+    // C++20：unordered_map::contains，避免 find/end 比较。
+    if (fhs_.contains(tab_name)) {
+        throw InternalError("Record handle already exists: " + tab_name);
+    }
+    if (col_defs.empty()) {
+        throw InvalidRecordSizeError(0);
+    }
+
+    std::vector<std::string> col_names;
+    col_names.reserve(col_defs.size());
+    int record_size = 0;
+    // C++17 结构化绑定：ColDef 是聚合类型，可拆成 name/type/len。
+    // 等价于 for (const auto& col_def : col_defs) { 使用 col_def.name 等 }
+    for (const auto& [name, type, len] : col_defs) {
+        // C++20 ranges::find：直接对容器查找，无需 begin()/end()。
+        if (std::ranges::find(col_names, name) != col_names.end()) {
+            throw ColumnExistsError(name);
+        }
+        col_names.push_back(name);
+
+        const bool fixed_length_mismatch =
+            (type == TYPE_INT && len != static_cast<int>(sizeof(int))) ||
+            (type == TYPE_FLOAT && len != static_cast<int>(sizeof(float)));
+        if (len <= 0 || fixed_length_mismatch) {
+            throw InvalidColLengthError(len);
+        }
+        if (len > RM_MAX_RECORD_SIZE) {
+            throw InvalidRecordSizeError(len);
+        }
+        const int next_record_size = record_size + len;
+        if (next_record_size > RM_MAX_RECORD_SIZE) {
+            throw InvalidRecordSizeError(next_record_size);
+        }
+        record_size = next_record_size;
+    }
+
+    // 字段按声明顺序连续存放，offset 是字段在一条记录中的起始位置。
     int curr_offset = 0;
     TabMeta tab;
     tab.name = tab_name;
-    for (auto &col_def : col_defs) {
-        ColMeta col = {.tab_name = tab_name,
-                       .name = col_def.name,
-                       .type = col_def.type,
-                       .len = col_def.len,
-                       .offset = curr_offset,
-                       .index = false};
-        curr_offset += col_def.len;
-        tab.cols.push_back(col);
+    tab.cols.reserve(col_defs.size());
+    // 同上：结构化绑定展开 ColDef 的三个成员。
+    for (const auto& [name, type, len] : col_defs) {
+        ColMeta col;
+        col.tab_name = tab_name;
+        col.name = name;
+        col.type = type;
+        col.len = len;
+        col.offset = curr_offset;
+        curr_offset += len;
+        tab.cols.push_back(std::move(col));
     }
-    // Create & open record file
-    int record_size = curr_offset;  // record_size就是col meta所占的大小（表的元数据也是以记录的形式进行存储的）
+
+    // 先构造候选目录，只有文件句柄和 db.meta 都准备成功后才替换当前目录。
+    DbMeta next_db = db_;
+    next_db.tabs_[tab_name] = tab;
     rm_manager_->create_file(tab_name, record_size);
-    db_.tabs_[tab_name] = tab;
-    // fhs_[tab_name] = rm_manager_->open_file(tab_name);
-    fhs_.emplace(tab_name, rm_manager_->open_file(tab_name));
 
-    flush_meta();
+    try {
+        fhs_.emplace(tab_name, rm_manager_->open_file(tab_name));
+        write_meta_file(DB_META_NAME, next_db);
+        db_ = std::move(next_db);
+    } catch (...) {
+        // 只清理本次建表产生的句柄和文件，再保留原目录供调用者继续使用。
+        if (auto handle = fhs_.find(tab_name); handle != fhs_.end()) {
+            rm_manager_->close_file(handle->second.get());
+            fhs_.erase(handle);
+        }
+        rm_manager_->destroy_file(tab_name);
+        throw;
+    }
 }
 
-/**
- * @description: 删除表
- * @param {string&} tab_name 表的名称
- * @param {Context*} context
- */
 void SmManager::drop_table(const std::string& tab_name, Context* context) {
-    
+    // TODO(Lab 3): 删除表的索引、记录文件、句柄和元数据。
+    throw NotImplementedError("SmManager::drop_table (Lab 3)");
 }
 
-/**
- * @description: 创建索引
- * @param {string&} tab_name 表的名称
- * @param {vector<string>&} col_names 索引包含的字段名称
- * @param {Context*} context
- */
 void SmManager::create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
-    
+    // TODO(Lab 3): 创建并加载索引，同时维护索引元数据。
+    throw NotImplementedError("SmManager::create_index (Lab 3)");
 }
 
-/**
- * @description: 删除索引
- * @param {string&} tab_name 表名称
- * @param {vector<string>&} col_names 索引包含的字段名称
- * @param {Context*} context
- */
 void SmManager::drop_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
-    
+    // TODO(Lab 3): 关闭并删除索引，同时维护索引元数据。
+    throw NotImplementedError("SmManager::drop_index (Lab 3)");
 }
 
-/**
- * @description: 删除索引
- * @param {string&} tab_name 表名称
- * @param {vector<ColMeta>&} 索引包含的字段元数据
- * @param {Context*} context
- */
 void SmManager::drop_index(const std::string& tab_name, const std::vector<ColMeta>& cols, Context* context) {
-    
+    // TODO(Lab 3): 与按字段名删除索引的重载共享核心逻辑。
+    throw NotImplementedError("SmManager::drop_index (Lab 3)");
 }

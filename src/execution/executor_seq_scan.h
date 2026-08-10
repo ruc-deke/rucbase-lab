@@ -18,7 +18,7 @@ class SeqScanExecutor : public AbstractExecutor {
     size_t len_;                        // scan后生成的每条记录的长度
     std::vector<Condition> fed_conds_;  // 同conds_，两个字段相同
 
-    Rid rid_;
+    Rid rid_{.page_no = INVALID_PAGE_ID, .slot_no = -1};
     std::unique_ptr<RecScan> scan_;     // table_iterator
 
     SmManager *sm_manager_;

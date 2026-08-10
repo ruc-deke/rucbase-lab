@@ -416,4 +416,4 @@ make b_plus_tree_concurrent_test
 
 注意：
 1. 在本实验中的所有测试只调用`get_value()`、`insert_entry()`、`delete_entry()`这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
-2. 进行测试前，学生还需自行完成src/system/sm_manager.cpp中的`SmManager::create_index()`函数，方可进行测试。
+2. 索引单元测试直接使用 `IxManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。

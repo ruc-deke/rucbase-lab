@@ -91,7 +91,7 @@ ParseError ErrorAtOffset(const std::string_view sql, const std::size_t offset, s
             ++column;
         }
     }
-    return {line, column, std::move(message)};
+    return {.line = line, .column = column, .message = std::move(message)};
 }
 
 }  // namespace
@@ -99,10 +99,11 @@ ParseError ErrorAtOffset(const std::string_view sql, const std::size_t offset, s
 ParseResult Parse(const std::string_view sql) {
     const std::size_t nul = sql.find('\0');
     if (nul != std::string_view::npos) {
-        return {nullptr, ErrorAtOffset(sql, nul, "NUL byte is not allowed in SQL")};
+        return {.statement = nullptr, .error = ErrorAtOffset(sql, nul, "NUL byte is not allowed in SQL")};
     }
     if (sql.size() > static_cast<std::size_t>(INT_MAX)) {
-        return {nullptr, ParseError{1, 1, "SQL statement is too large"}};
+        return {.statement = nullptr,
+                .error = ParseError{.line = 1, .column = 1, .message = "SQL statement is too large"}};
     }
 
     // Flex 仍持有进程级 scanner 状态，因此在 Parser 模块内部串行化访问；
@@ -114,10 +115,10 @@ ParseResult Parse(const std::string_view sql) {
     const int status = yyparse(&context);
 
     if (status != 0 && !context.error.has_value()) {
-        context.error = ParseError{1, 1, "syntax error"};
+        context.error = ParseError{.line = 1, .column = 1, .message = "syntax error"};
     }
     if (status == 0 && context.statement == nullptr && !context.error.has_value()) {
-        context.error = ParseError{1, 1, "empty SQL statement"};
+        context.error = ParseError{.line = 1, .column = 1, .message = "empty SQL statement"};
     }
     return {.statement = std::move(context.statement), .error = std::move(context.error)};
 }

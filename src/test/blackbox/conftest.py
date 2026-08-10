@@ -139,6 +139,7 @@ class RucbaseServer:
                 f"stdout:\n{error.stdout or ''}\nstderr:\n{error.stderr or ''}\n"
             )
             pytest.fail(f"{label} timed out; see {client_log}", pytrace=False)
+            raise AssertionError("pytest.fail unexpectedly returned") from error
 
         client_log.write_text(
             f"command: {' '.join(command)}\nreturn code: {result.returncode}\n"

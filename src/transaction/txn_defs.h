@@ -4,6 +4,10 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <utility>
 
 #include "common/config.h"
 #include "common/defs.h"
@@ -33,13 +37,14 @@ class WriteRecord {
    public:
     WriteRecord() = default;
 
+    // 接收端「下沉」参数：按值接收 + 成员 std::move，调用方传临时量时只搬移一次。
     // constructor for insert operation
-    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid)
-        : wtype_(wtype), tab_name_(tab_name), rid_(rid) {}
+    WriteRecord(WType wtype, std::string tab_name, const Rid &rid)
+        : wtype_(wtype), tab_name_(std::move(tab_name)), rid_(rid) {}
 
     // constructor for delete & update operation
-    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid, const RmRecord &record)
-        : wtype_(wtype), tab_name_(tab_name), rid_(rid), record_(record) {}
+    WriteRecord(WType wtype, std::string tab_name, const Rid &rid, RmRecord record)
+        : wtype_(wtype), tab_name_(std::move(tab_name)), rid_(rid), record_(std::move(record)) {}
 
     ~WriteRecord() = default;
 
@@ -83,18 +88,21 @@ class LockDataId {
         type_ = type;
     }
 
-    inline int64_t Get() const {
+    /** @brief 将锁对象字段编码为无符号哈希输入，避免有符号移位。 */
+    uint64_t Get() const noexcept {
         if (type_ == LockDataType::TABLE) {
             // fd_
-            return static_cast<int64_t>(fd_);
+            return static_cast<uint32_t>(fd_);
         } else {
             // fd_, rid_.page_no, rid.slot_no
-            return ((static_cast<int64_t>(type_)) << 63) | ((static_cast<int64_t>(fd_)) << 31) |
-                   ((static_cast<int64_t>(rid_.page_no)) << 16) | rid_.slot_no;
+            return (static_cast<uint64_t>(type_) << 63U) |
+                   (static_cast<uint64_t>(static_cast<uint32_t>(fd_)) << 31U) |
+                   (static_cast<uint64_t>(static_cast<uint32_t>(rid_.page_no)) << 16U) |
+                   static_cast<uint32_t>(rid_.slot_no);
         }
     }
 
-    bool operator==(const LockDataId &other) const {
+    bool operator==(const LockDataId &other) const noexcept {
         if (type_ != other.type_) return false;
         if (fd_ != other.fd_) return false;
         return rid_ == other.rid_;
@@ -106,7 +114,7 @@ class LockDataId {
 
 template <>
 struct std::hash<LockDataId> {
-    size_t operator()(const LockDataId &obj) const { return std::hash<int64_t>()(obj.Get()); }
+    size_t operator()(const LockDataId &obj) const noexcept { return std::hash<uint64_t>{}(obj.Get()); }
 };
 
 /* 事务回滚原因 */
@@ -121,9 +129,9 @@ class TransactionAbortException : public std::exception {
     explicit TransactionAbortException(txn_id_t txn_id, AbortReason abort_reason)
         : txn_id_(txn_id), abort_reason_(abort_reason) {}
 
-    txn_id_t get_transaction_id() { return txn_id_; }
-    AbortReason GetAbortReason() { return abort_reason_; }
-    std::string GetInfo() {
+    txn_id_t get_transaction_id() const noexcept { return txn_id_; }
+    AbortReason GetAbortReason() const noexcept { return abort_reason_; }
+    std::string GetInfo() const {
         switch (abort_reason_) {
             case AbortReason::LOCK_ON_SHIRINKING: {
                 return "Transaction " + std::to_string(txn_id_) +

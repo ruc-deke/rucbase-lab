@@ -20,6 +20,8 @@
 
 实验对应代码文件`sm_manager.cpp`
 
+为保持实验边界清楚，教学版本约定 DDL 不与其他 SQL 并发执行。
+
 在本实验中，你需要利用*nix相关文件操作创建和删除数据库实体文件，并利用记录和索引模块的相关接口完成数据库系统的操作的功能逻辑
 
 ### create_db操作思路
@@ -28,49 +30,57 @@
 ```cpp
 void SmManager::create_db(const std::string &db_name) ;
 ```
-参数`db_name`指出了要创建的数据库名称，在本系统中，数据库在*nix系统中表现为一个文件夹，因此你需要首先判断该文件夹目录是否存在，并使用`mkdir`创建并进入该文件夹中
+参数`db_name`指出了要创建的数据库名称。在本系统中，一个数据库对应一个同名目录。示例实现使用
+`std::filesystem`直接创建目录和目录内的文件，不拼接shell命令，也不需要临时改变进程工作目录：
 
 ```cpp
-	if (is_dir(db_name)) {
+    namespace fs = std::filesystem;
+    const fs::path db_path(db_name);
+    if (fs::exists(db_path)) {
         throw DatabaseExistsError(db_name);
     }
-    // Create a subdirectory for the database
-    std::string cmd = "mkdir " + db_name;
-    if (system(cmd.c_str()) < 0) {  // 创建一个名为db_name的目录
-        throw UnixError();
-    }
-    if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
-        throw UnixError();
-    }
+    fs::create_directory(db_path);
 ```
 
-创建目录后，你需要为该数据库构建`DBMeta`文件，这样`rucbase`才能识别并读取相关文件。利用已经写好的重载运算符创建。
+创建目录后，需要构造一份空的`DbMeta`，并利用已经提供的输出运算符将它写入目录内的
+`DB_META_NAME`文件。局部对象会自动释放，不需要手工`new`和`delete`：
 
 ```cpp
-	// Create the system catalogs
-    DbMeta *new_db = new DbMeta();
-    new_db->name_ = db_name;
-
-    // 注意，此处ofstream会在当前目录创建(如果没有此文件先创建)和打开一个名为DB_META_NAME的文件
-    std::ofstream ofs(DB_META_NAME);
-
-    // 将new_db中的信息，按照定义好的operator<<操作符，写入到ofs打开的DB_META_NAME文件中
-    ofs << *new_db;  // 注意：此处重载了操作符<<
-
+    DbMeta new_db;
+    new_db.name_ = db_name;
+    std::ofstream ofs(db_path / DB_META_NAME);
+    ofs << new_db;
 ```
 
-最后，释放内存中的`DBMeta`,并回退到上一级目录
+实际代码还应检查目录创建和文件写入是否成功；如果初始化失败，只回滚本次刚创建的数据库目录。
 
-```cpp
-    delete new_db;
+`db.meta` 使用便于阅读的 JSON 格式，例如：
 
-    // cd back to root dir
-    if (chdir("..") < 0) {
-        throw UnixError();
+```json
+{
+  "database": "demo",
+  "tables": [
+    {
+      "name": "student",
+      "columns": [
+        {"name": "id", "type": "INT", "length": 4},
+        {"name": "name", "type": "STRING", "length": 32}
+      ],
+      "indexes": [
+        {"columns": ["id"]}
+      ]
     }
+  ]
+}
 ```
+
+表字段只保存名称、类型和长度，索引只保存有序列名；`tab_name`、字段偏移和索引总长度等可推导信息会在读取时自动重建。
+学生仍然使用已有的 `<<` / `>>` 接口，不需要手工解析 JSON；底层使用仓库内固定版本的 `nlohmann/json`，字段顺序不影响读取。
+旧版空格分隔元数据不再兼容，旧实验数据库需要重新创建。
 
 ### close_db操作思路
+
+教学版本约定：`open_db()` 进入数据库目录，并保持该工作目录直到 `close_db()` 返回上一级目录。
 
 关闭数据库的接口声明是这样的
 
@@ -141,10 +151,8 @@ rm_manager_->destroy_file(...);
 删除索引文件
 
 ```cpp
-for (auto &col : tab.cols) {
-     if (col.index) {
-     	// drop_index
-     }
+for (const auto &index : tab.indexes) {
+    // 按 index.cols 的顺序删除该索引
 }
 ```
 
@@ -269,8 +277,3 @@ if (col.index) {
 ### Delete 操作思路
 
 回顾Insert的思路，与之类似，构造方法中的`std::vector<Rid> rids`是根据扫描算子得到的应该删除的记录组，你可以先获取`IxIndexHandle`删除对应的索引`entry`，再获取`RmFileHandle`删除记录。
-
-
-
-
-

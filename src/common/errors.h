@@ -13,18 +13,18 @@ class RMDBError : public std::exception {
 public:
     RMDBError() : _msg("Error: ") {}
 
-    RMDBError(const std::string& msg) : _msg("Error: " + msg) {}
+    explicit RMDBError(const std::string& msg) : _msg("Error: " + msg) {}
 
     const char* what() const noexcept override { return _msg.c_str(); }
 
-    int get_msg_len() { return _msg.length(); }
+    std::size_t get_msg_len() const noexcept { return _msg.length(); }
 
     std::string _msg;
 };
 
 class InternalError : public RMDBError {
 public:
-    InternalError(const std::string& msg) : RMDBError(msg) {}
+    explicit InternalError(const std::string& msg) : RMDBError(msg) {}
 };
 
 class NotImplementedError : public RMDBError {
@@ -40,22 +40,22 @@ public:
 
 class FileNotOpenError : public RMDBError {
 public:
-    FileNotOpenError(int fd) : RMDBError("Invalid file descriptor: " + std::to_string(fd)) {}
+    explicit FileNotOpenError(int fd) : RMDBError("Invalid file descriptor: " + std::to_string(fd)) {}
 };
 
 class FileNotClosedError : public RMDBError {
 public:
-    FileNotClosedError(const std::string& filename) : RMDBError("File is opened: " + filename) {}
+    explicit FileNotClosedError(const std::string& filename) : RMDBError("File is opened: " + filename) {}
 };
 
 class FileExistsError : public RMDBError {
 public:
-    FileExistsError(const std::string& filename) : RMDBError("File already exists: " + filename) {}
+    explicit FileExistsError(const std::string& filename) : RMDBError("File already exists: " + filename) {}
 };
 
 class FileNotFoundError : public RMDBError {
 public:
-    FileNotFoundError(const std::string& filename) : RMDBError("File not found: " + filename) {}
+    explicit FileNotFoundError(const std::string& filename) : RMDBError("File not found: " + filename) {}
 };
 
 // RM errors
@@ -67,13 +67,13 @@ public:
 
 class InvalidRecordSizeError : public RMDBError {
 public:
-    InvalidRecordSizeError(int record_size) : RMDBError("Invalid record size: " + std::to_string(record_size)) {}
+    explicit InvalidRecordSizeError(int record_size) : RMDBError("Invalid record size: " + std::to_string(record_size)) {}
 };
 
 // IX errors
 class InvalidColLengthError : public RMDBError {
 public:
-    InvalidColLengthError(int col_len) : RMDBError("Invalid column length: " + std::to_string(col_len)) {}
+    explicit InvalidColLengthError(int col_len) : RMDBError("Invalid column length: " + std::to_string(col_len)) {}
 };
 
 class IndexEntryNotFoundError : public RMDBError {
@@ -84,27 +84,32 @@ public:
 // SM errors
 class DatabaseNotFoundError : public RMDBError {
 public:
-    DatabaseNotFoundError(const std::string& db_name) : RMDBError("Database not found: " + db_name) {}
+    explicit DatabaseNotFoundError(const std::string& db_name) : RMDBError("Database not found: " + db_name) {}
 };
 
 class DatabaseExistsError : public RMDBError {
 public:
-    DatabaseExistsError(const std::string& db_name) : RMDBError("Database already exists: " + db_name) {}
+    explicit DatabaseExistsError(const std::string& db_name) : RMDBError("Database already exists: " + db_name) {}
 };
 
 class TableNotFoundError : public RMDBError {
 public:
-    TableNotFoundError(const std::string& tab_name) : RMDBError("Table not found: " + tab_name) {}
+    explicit TableNotFoundError(const std::string& tab_name) : RMDBError("Table not found: " + tab_name) {}
 };
 
 class TableExistsError : public RMDBError {
 public:
-    TableExistsError(const std::string& tab_name) : RMDBError("Table already exists: " + tab_name) {}
+    explicit TableExistsError(const std::string& tab_name) : RMDBError("Table already exists: " + tab_name) {}
 };
 
 class ColumnNotFoundError : public RMDBError {
 public:
-    ColumnNotFoundError(const std::string& col_name) : RMDBError("Column not found: " + col_name) {}
+    explicit ColumnNotFoundError(const std::string& col_name) : RMDBError("Column not found: " + col_name) {}
+};
+
+class ColumnExistsError : public RMDBError {
+public:
+    explicit ColumnExistsError(const std::string& col_name) : RMDBError("Column already exists: " + col_name) {}
 };
 
 class IndexNotFoundError : public RMDBError {
@@ -115,7 +120,7 @@ public:
             if (i > 0) _msg += ", ";
             _msg += col_names[i];
         }
-        _msg += ")";
+        _msg += ')';
     }
 };
 
@@ -127,7 +132,7 @@ public:
             if (i > 0) _msg += ", ";
             _msg += col_names[i];
         }
-        _msg += ")";
+        _msg += ')';
     }
 };
 
@@ -150,7 +155,7 @@ public:
 
 class AmbiguousColumnError : public RMDBError {
 public:
-    AmbiguousColumnError(const std::string& col_name) : RMDBError("Ambiguous column: " + col_name) {}
+    explicit AmbiguousColumnError(const std::string& col_name) : RMDBError("Ambiguous column: " + col_name) {}
 };
 
 class PageNotExistError : public RMDBError {

@@ -16,13 +16,18 @@ def run_pytest(test_nodes: str | list[str], targets: list[str]) -> int:
     build_dir = Path(os.environ.get("RUCBASE_BUILD_DIR", REPOSITORY_ROOT / "build" / "debug"))
     binary_dir = build_dir / "bin"
     required_targets = ["rmdb", *targets]
-    if any(not (binary_dir / target).is_file() for target in required_targets):
-        subprocess.run(["cmake", "--preset", "debug"], cwd=REPOSITORY_ROOT, check=True)
-        subprocess.run(
-            ["cmake", "--build", "--preset", "debug", "--target", *required_targets, "-j", "4"],
-            cwd=REPOSITORY_ROOT,
-            check=True,
-        )
+    # Always perform an incremental build: file existence alone cannot tell
+    # whether a binary reflects the current source tree.
+    subprocess.run(
+        ["cmake", "-S", str(REPOSITORY_ROOT), "-B", str(build_dir), "-DCMAKE_BUILD_TYPE=Debug"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+    )
+    subprocess.run(
+        ["cmake", "--build", str(build_dir), "--target", *required_targets, "-j", "4"],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+    )
 
     if isinstance(test_nodes, str):
         test_nodes = [test_nodes]

@@ -1,18 +1,21 @@
 // Copyright (c) 2023-2026 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
-#include <string>
-#include <vector>
+#pragma once
+
 #include <fstream>
+#include <memory>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "net/client.h"
 
 class Operation {
 public:
     std::string name;   // 比如t1a, t1b, t2a
-    std::string sql;    
-    int txn_id;
+    std::string sql;
+    int txn_id = -1;
 };
 
 class OperationPermutation {
@@ -22,21 +25,18 @@ public:
 
 class Transaction {
 public:
-    std::vector<Operation*> operations;
-    int txn_id;
+    std::vector<std::unique_ptr<Operation>> operations;
+    int txn_id = -1;
     rucbase::wire::Client client;
 };
 
 class TestCaseAnalyzer {
 public:
-    TestCaseAnalyzer() {
-        permutation = new OperationPermutation();
-    }
     void analyze_operation(Operation* operation, const std::string& operation_line);
     void analyze_test_case();
 
-    OperationPermutation* permutation;
-    std::vector<Transaction*> transactions;
+    OperationPermutation permutation;
+    std::vector<std::unique_ptr<Transaction>> transactions;
     std::vector<std::string> preload;
     std::string infile_path;
     std::fstream infile;

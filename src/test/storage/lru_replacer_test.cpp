@@ -127,6 +127,7 @@ TEST(LRUReplacerTest, ConcurrencyTest) {
         int value_size = 1000;
         std::shared_ptr<LRUReplacer> lru_replacer{new LRUReplacer(value_size)};
         std::vector<std::thread> threads;
+        threads.reserve(num_threads);
         int result;
         std::vector<int> value(value_size);
         for (int i = 0; i < value_size; i++) {

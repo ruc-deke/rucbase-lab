@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <chrono>  // NOLINT
-#include <cstdio>
 #include <cinttypes>
+#include <cstdio>
 #include <functional>
 #include <random>  // for std::default_random_engine
 #include <thread>  // NOLINT
@@ -14,13 +14,15 @@
 #include "index/ix.h"
 #undef private  // for use private variables in "ix.h"
 
+#include "record/rm.h"
 #include "storage/buffer_pool_manager.h"
 #include "system/sm.h"
-#include "record/rm.h"
 
 const std::string TEST_DB_NAME = "BPlusTreeConcurrentTest_db";  // 以数据库名作为根目录
 const std::string TEST_FILE_NAME = "table1";                    // 测试文件名的前缀
 const std::vector<std::string> TEST_COL = {"col1"};
+const std::vector<ColMeta> TEST_COL_META = {
+    {.tab_name = TEST_FILE_NAME, .name = "col1", .type = TYPE_INT, .len = sizeof(int), .offset = 0, .index = true}};
 // 创建的索引文件名为"table1.0.idx"（TEST_FILE_NAME + index_no + .idx）
 
 /** 注意：每个测试点只测试了单个文件！
@@ -28,7 +30,7 @@ const std::vector<std::string> TEST_COL = {"col1"};
  * 然后在此目录下创建和打开索引文件"table1.0.idx"，记录IxIndexHandle */
 
 class BPlusTreeConcurrentTest : public ::testing::Test {
-   public:
+public:
     std::unique_ptr<DiskManager> disk_manager_;
     std::unique_ptr<BufferPoolManager> buffer_pool_manager_;
     std::unique_ptr<IxManager> ix_manager_;
@@ -37,7 +39,7 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
     std::unique_ptr<RmManager> rm_;
     std::unique_ptr<SmManager> sm_;
 
-   public:
+public:
     // This function is called before every test.
     void SetUp() override {
         ::testing::Test::SetUp();
@@ -47,12 +49,13 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
         ix_manager_ = std::make_unique<IxManager>(disk_manager_.get(), buffer_pool_manager_.get());
         txn_ = std::make_unique<Transaction>(0);
         rm_ = std::make_unique<RmManager>(disk_manager_.get(), buffer_pool_manager_.get());
-        sm_ = std::make_unique<SmManager>(disk_manager_.get(), buffer_pool_manager_.get(), rm_.get(), ix_manager_.get());
+        sm_ =
+            std::make_unique<SmManager>(disk_manager_.get(), buffer_pool_manager_.get(), rm_.get(), ix_manager_.get());
 
         // 如果测试目录不存在，则先创建测试目录
         if (disk_manager_->is_dir(TEST_DB_NAME)) {
             std::string cmd = "rm -rf " + TEST_DB_NAME;
-            if (system(cmd.c_str()) < 0) {  
+            if (system(cmd.c_str()) < 0) {
                 throw UnixError();
             }
         }
@@ -67,10 +70,10 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
             ix_manager_->destroy_index(TEST_FILE_NAME, TEST_COL);
         }
         std::vector<ColDef> coldef;
-        coldef.push_back({"col1", TYPE_INT, 4});
-        coldef.push_back({"col2", TYPE_INT, 4});
+        coldef.push_back({.name = "col1", .type = TYPE_INT, .len = 4});
+        coldef.push_back({.name = "col2", .type = TYPE_INT, .len = 4});
         sm_->create_table(TEST_FILE_NAME, coldef, nullptr);
-        sm_->create_index(TEST_FILE_NAME, TEST_COL, nullptr);
+        ix_manager_->create_index(TEST_FILE_NAME, TEST_COL_META);
         assert(ix_manager_->exists(TEST_FILE_NAME, TEST_COL));
         // 打开测试文件
         ih_ = ix_manager_->open_index(TEST_FILE_NAME, TEST_COL);
@@ -89,11 +92,11 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
         assert(disk_manager_->is_dir(TEST_DB_NAME));
     };
 
-    void ToGraph(const IxIndexHandle *ih, IxNodeHandle *node, BufferPoolManager *bpm, std::ofstream &out) const {
+    void ToGraph(const IxIndexHandle* ih, IxNodeHandle* node, BufferPoolManager* bpm, std::ofstream& out) const {
         std::string leaf_prefix("LEAF_");
         std::string internal_prefix("INT_");
         if (node->is_leaf_page()) {
-            IxNodeHandle *leaf = node;
+            IxNodeHandle* leaf = node;
             // Print node name
             out << leaf_prefix << leaf->get_page_no();
             // Print node properties
@@ -115,17 +118,17 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
             if (leaf->get_next_leaf() != INVALID_PAGE_ID && leaf->get_next_leaf() > 1) {
                 // 注意加上一个大于1的判断条件，否则若GetNextPageNo()是1，会把1那个结点也画出来
                 out << leaf_prefix << leaf->get_page_no() << " -> " << leaf_prefix << leaf->get_next_leaf() << ";\n";
-                out << "{rank=same " << leaf_prefix << leaf->get_page_no() << " " << leaf_prefix << leaf->get_next_leaf()
-                    << "};\n";
+                out << "{rank=same " << leaf_prefix << leaf->get_page_no() << " " << leaf_prefix
+                    << leaf->get_next_leaf() << "};\n";
             }
 
             // Print parent links if there is a parent
             if (leaf->get_parent_page_no() != INVALID_PAGE_ID) {
-                out << internal_prefix << leaf->get_parent_page_no() << ":p" << leaf->get_page_no() << " -> " << leaf_prefix
-                    << leaf->get_page_no() << ";\n";
+                out << internal_prefix << leaf->get_parent_page_no() << ":p" << leaf->get_page_no() << " -> "
+                    << leaf_prefix << leaf->get_page_no() << ";\n";
             }
         } else {
-            IxNodeHandle *inner = node;
+            IxNodeHandle* inner = node;
             // Print node name
             out << internal_prefix << inner->get_page_no();
             // Print node properties
@@ -157,10 +160,10 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
             }
             // Print leaves
             for (int i = 0; i < inner->get_size(); i++) {
-                IxNodeHandle *child_node = ih->fetch_node(inner->value_at(i));
+                IxNodeHandle* child_node = ih->fetch_node(inner->value_at(i));
                 ToGraph(ih, child_node, bpm, out);  // 继续递归
                 if (i > 0) {
-                    IxNodeHandle *sibling_node = ih->fetch_node(inner->value_at(i - 1));
+                    IxNodeHandle* sibling_node = ih->fetch_node(inner->value_at(i - 1));
                     if (!sibling_node->is_leaf_page() && !child_node->is_leaf_page()) {
                         out << "{rank=same " << internal_prefix << sibling_node->get_page_no() << " " << internal_prefix
                             << child_node->get_page_no() << "};\n";
@@ -178,11 +181,11 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
      * @param bpm 缓冲池
      * @param outf dot文件名
      */
-    void Draw(BufferPoolManager *bpm, const std::string &outf) {
+    void Draw(BufferPoolManager* bpm, const std::string& outf) {
         std::ofstream out(outf);
         out << "digraph G {" << std::endl;
-        
-        IxNodeHandle *node = ih_->fetch_node(ih_->file_hdr_->root_page_);
+
+        IxNodeHandle* node = ih_->fetch_node(ih_->file_hdr_->root_page_);
         ToGraph(ih_.get(), node, bpm, out);
         out << "}" << std::endl;
         out.close();
@@ -205,13 +208,13 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
      *
      * @param ih
      */
-    void check_leaf(const IxIndexHandle *ih) {
+    void check_leaf(const IxIndexHandle* ih) {
         // check leaf list
         page_id_t leaf_no = ih->file_hdr_->first_leaf_;
         while (leaf_no != IX_LEAF_HEADER_PAGE) {
-            IxNodeHandle *curr = ih->fetch_node(leaf_no);
-            IxNodeHandle *prev = ih->fetch_node(curr->get_prev_leaf());
-            IxNodeHandle *next = ih->fetch_node(curr->get_next_leaf());
+            IxNodeHandle* curr = ih->fetch_node(leaf_no);
+            IxNodeHandle* prev = ih->fetch_node(curr->get_prev_leaf());
+            IxNodeHandle* next = ih->fetch_node(curr->get_next_leaf());
             // Ensure prev->next == curr && next->prev == curr
             ASSERT_EQ(prev->get_next_leaf(), leaf_no);
             ASSERT_EQ(next->get_prev_leaf(), leaf_no);
@@ -228,14 +231,14 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
      * @param ih 树
      * @param now_page_no 当前遍历到的结点
      */
-    void check_tree(const IxIndexHandle *ih, int now_page_no) {
-        IxNodeHandle *node = ih->fetch_node(now_page_no);
+    void check_tree(const IxIndexHandle* ih, int now_page_no) {
+        IxNodeHandle* node = ih->fetch_node(now_page_no);
         if (node->is_leaf_page()) {
             buffer_pool_manager_->unpin_page(node->get_page_id(), false);
             return;
         }
-        for (int i = 0; i < node->get_size(); i++) {                 // 遍历node的所有孩子
-            IxNodeHandle *child = ih->fetch_node(node->value_at(i));  // 第i个孩子
+        for (int i = 0; i < node->get_size(); i++) {                  // 遍历node的所有孩子
+            IxNodeHandle* child = ih->fetch_node(node->value_at(i));  // 第i个孩子
             // check parent
             assert(child->get_parent_page_no() == now_page_no);
             // check first key
@@ -264,25 +267,24 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
      * @param ih
      * @param mock 函数外部记录插入/删除后的(key,rid)
      */
-    void check_all(IxIndexHandle *ih, const std::multimap<int, Rid> &mock) {
+    void check_all(IxIndexHandle* ih, const std::multimap<int, Rid>& mock) {
         check_tree(ih, ih->file_hdr_->root_page_);
         if (!ih->is_empty()) {
             check_leaf(ih);
         }
 
-        for (auto &entry : mock) {
-            int mock_key = entry.first;
+        for (auto& [mock_key, _] : mock) {
             // test lower bound
             {
-                auto mock_lower = mock.lower_bound(mock_key);        // multimap的lower_bound方法
-                Iid iid = ih->lower_bound((const char *)&mock_key);  // IxIndexHandle的lower_bound方法
+                auto mock_lower = mock.lower_bound(mock_key);       // multimap的lower_bound方法
+                Iid iid = ih->lower_bound((const char*)&mock_key);  // IxIndexHandle的lower_bound方法
                 Rid rid = ih->get_rid(iid);
                 ASSERT_EQ(rid, mock_lower->second);
             }
             // test upper bound
             {
                 auto mock_upper = mock.upper_bound(mock_key);
-                Iid iid = ih->upper_bound((const char *)&mock_key);
+                Iid iid = ih->upper_bound((const char*)&mock_key);
                 if (iid != ih->leaf_end()) {
                     Rid rid = ih->get_rid(iid);
                     ASSERT_EQ(rid, mock_upper->second);
@@ -307,13 +309,13 @@ class BPlusTreeConcurrentTest : public ::testing::Test {
         ASSERT_EQ(scan.is_end(), true);
         ASSERT_EQ(it, mock.end());
     }
-
 };
 
 // helper function to launch multiple threads
 template <typename... Args>
-void LaunchParallelTest(uint64_t num_threads, Args &&...args) {
+void LaunchParallelTest(uint64_t num_threads, Args&&... args) {
     std::vector<std::thread> thread_group;
+    thread_group.reserve(static_cast<size_t>(num_threads));
 
     // Launch a group of threads
     for (uint64_t thread_itr = 0; thread_itr < num_threads; ++thread_itr) {
@@ -337,27 +339,28 @@ int getThreadId() {
 }
 
 // helper function to insert
-void InsertHelper(IxIndexHandle *tree, const std::vector<int64_t> &keys,
+void InsertHelper(IxIndexHandle* tree,
+                  const std::vector<int64_t>& keys,
                   __attribute__((unused)) uint64_t thread_itr = 0) {
     // create transaction
-    Transaction *transaction = new Transaction(0);  // 注意，每个线程都有一个事务；不能从上层传入一个共用的事务
+    Transaction* transaction = new Transaction(0);  // 注意，每个线程都有一个事务；不能从上层传入一个共用的事务
 
-    const char *index_key;
+    const char* index_key;
     for (auto key : keys) {
-        int32_t value = key & 0xFFFFFFFF;
-        Rid rid = {.page_no = static_cast<int32_t>(key >> 32), .slot_no = value};
-        index_key = (const char *)&key;
+        int32_t value = static_cast<int32_t>(static_cast<uint32_t>(key));
+        Rid rid = {.page_no = static_cast<int32_t>(static_cast<uint64_t>(key) >> 32U), .slot_no = value};
+        index_key = (const char*)&key;
         tree->insert_entry(index_key, rid, transaction);
     }
 
     std::vector<Rid> rids;
     for (auto key : keys) {
         rids.clear();
-        index_key = (const char *)&key;
+        index_key = (const char*)&key;
         tree->get_value(index_key, &rids, transaction);  // 调用GetValue
         EXPECT_EQ(rids.size(), 1);
 
-        int64_t value = key & 0xFFFFFFFF;
+        int64_t value = static_cast<uint32_t>(key);
         EXPECT_EQ(rids[0].slot_no, value);
     }
 
@@ -365,14 +368,15 @@ void InsertHelper(IxIndexHandle *tree, const std::vector<int64_t> &keys,
 }
 
 // helper function to delete
-void DeleteHelper(IxIndexHandle *tree, const std::vector<int64_t> &keys,
+void DeleteHelper(IxIndexHandle* tree,
+                  const std::vector<int64_t>& keys,
                   __attribute__((unused)) uint64_t thread_itr = 0) {
     // create transaction
-    Transaction *transaction = new Transaction(0);  // 注意，每个线程都有一个事务；不能从上层传入一个共用的事务
+    Transaction* transaction = new Transaction(0);  // 注意，每个线程都有一个事务；不能从上层传入一个共用的事务
 
-    const char *index_key;
+    const char* index_key;
     for (auto key : keys) {
-        index_key = (const char *)&key;
+        index_key = (const char*)&key;
         tree->delete_entry(index_key, transaction);
     }
 
@@ -381,7 +385,7 @@ void DeleteHelper(IxIndexHandle *tree, const std::vector<int64_t> &keys,
 
 /**
  * @brief concurrent insert 1~10000
- * 
+ *
  * @note lab2 计分：10 points
  */
 TEST_F(BPlusTreeConcurrentTest, InsertScaleTest) {
@@ -422,7 +426,7 @@ TEST_F(BPlusTreeConcurrentTest, InsertScaleTest) {
 
 /**
  * @brief concurrent insert 1~10000 and delete 1~9900
- * 
+ *
  * @note lab2 计分：20 points
  */
 TEST_F(BPlusTreeConcurrentTest, MixScaleTest) {

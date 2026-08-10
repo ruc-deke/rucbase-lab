@@ -31,11 +31,11 @@ public:
 
     void abort(Transaction* txn, LogManager* log_manager);
 
-    ConcurrencyMode get_concurrency_mode() { return concurrency_mode_; }
+    ConcurrencyMode get_concurrency_mode() const noexcept { return concurrency_mode_; }
 
     void set_concurrency_mode(ConcurrencyMode concurrency_mode) { concurrency_mode_ = concurrency_mode; }
 
-    LockManager* get_lock_manager() { return lock_manager_; }
+    LockManager* get_lock_manager() const noexcept { return lock_manager_; }
 
     /**
      * @description: 获取事务ID为txn_id的事务对象
@@ -46,7 +46,8 @@ public:
         if(txn_id == INVALID_TXN_ID) return nullptr;
         
         std::unique_lock<std::mutex> lock(latch_);
-        assert(TransactionManager::txn_map.find(txn_id) != TransactionManager::txn_map.end());
+        // C++20：unordered_map::contains，等价于 find(txn_id) != end()。
+        assert(TransactionManager::txn_map.contains(txn_id));
         auto *res = TransactionManager::txn_map[txn_id];
         lock.unlock();
         assert(res != nullptr);

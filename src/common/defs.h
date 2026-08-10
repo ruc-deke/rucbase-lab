@@ -9,7 +9,7 @@
 #include <string>
 #include <type_traits>
 
-// 此处重载了<<操作符，在ColMeta中进行了调用
+// 枚举的通用流式读写辅助。
 template <typename T, typename = typename std::enable_if<std::is_enum<T>::value, T>::type>
 std::ostream& operator<<(std::ostream& os, const T& enum_val) {
     os << static_cast<int>(enum_val);

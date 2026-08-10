@@ -15,11 +15,14 @@ class IxScan : public RecScan {
     const IxIndexHandle *ih_;
     Iid iid_;  // 初始为lower（用于遍历的指针）
     Iid end_;  // 初始为upper
-    BufferPoolManager *bpm_;
 
    public:
-    IxScan(const IxIndexHandle *ih, const Iid &lower, const Iid &upper, BufferPoolManager *bpm)
-        : ih_(ih), iid_(lower), end_(upper), bpm_(bpm) {}
+    IxScan(const IxIndexHandle *ih, const Iid &lower, const Iid &upper) : ih_(ih), iid_(lower), end_(upper) {}
+
+    // Keep the original teaching-lab call shape compatible. Page ownership
+    // always follows ih_; the extra pointer is intentionally not a source of truth.
+    IxScan(const IxIndexHandle *ih, const Iid &lower, const Iid &upper, BufferPoolManager *)
+        : IxScan(ih, lower, upper) {}
 
     void next() override;
 

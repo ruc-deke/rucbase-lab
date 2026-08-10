@@ -22,15 +22,15 @@ class LRUReplacer : public Replacer {
      */
     explicit LRUReplacer(size_t num_pages);
 
-    ~LRUReplacer();
+    ~LRUReplacer() override;
 
-    bool victim(frame_id_t *frame_id);
+    bool victim(frame_id_t *frame_id) override;
 
-    void pin(frame_id_t frame_id);
+    void pin(frame_id_t frame_id) override;
 
-    void unpin(frame_id_t frame_id);
+    void unpin(frame_id_t frame_id) override;
 
-    size_t Size();
+    size_t Size() override;
 
    private:
     std::mutex latch_;                  // 互斥锁

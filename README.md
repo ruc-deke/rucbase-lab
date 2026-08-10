@@ -11,14 +11,14 @@ RucBase是由中国人民大学卢卫教授领导的数据库教学团队开发�
 
 ## 快速导航
 
-| 目的 | 入口 |
-| --- | --- |
-| 直接使用开发环境 | [Docker 开发镜像](docker/README.md) |
-| 手工配置环境 | [环境配置文档](docs/RucBase环境配置文档.md) |
-| 编译、运行和测试 | [使用文档](docs/RucBase使用文档.md) |
-| 了解代码组织 | [项目结构](docs/RucBase项目结构.pdf) |
-| 了解客户端协议 | [RMDB Wire Protocol](docs/rmdb_wire.md) |
-| 开始课程实验 | [学生实验操作说明](docs/RucBase学生实验操作说明示例.md) |
+| 目的             | 入口 |
+|------------------| --- |
+| Docker开发环境   | [Docker 开发镜像](docker/README.md) |
+| 手工配置环境     | [环境配置文档](docs/Rucbase环境配置文档.md) |
+| 编译、运行和测试 | [使用文档](docs/Rucbase使用文档.md) |
+| 了解代码组织     | [项目结构](docs/Rucbase项目结构.pdf) |
+| 了解客户端协议   | [RMDB Wire Protocol](docs/rmdb_wire.md) |
+| 开始课程实验     | [学生实验操作说明](docs/Rucbase学生实验操作说明示例.md) |
 
 ## 主要组成
 
@@ -72,13 +72,13 @@ docker start -ai rucbase-dev
 进入容器后，在源码目录中构建：
 
 ```bash
-cd /workspace/RucBase-lab
+cd /workspace/rucbase-lab
 cmake --preset debug
 cmake --build --preset debug-client -j 4
 ```
 
 镜像构建细节和视频教程见 [docker/README.md](docker/README.md) 与
-[环境配置文档](docs/RucBase环境配置文档.md)。
+[环境配置文档](docs/Rucbase环境配置文档.md)。
 
 ### 方式二：在 Ubuntu 或 macOS 上手工构建
 
@@ -90,7 +90,7 @@ cmake --build --preset debug-client -j 4
 | C++ 编译器 | GCC 11+（推荐 GCC 13）或 Clang 14+ |
 | CMake | 3.22+ |
 | 其他依赖 | flex、bison、Python 3 和 pytest |
-| C++ 标准 | C++17 |
+| C++ 标准 | C++20 |
 
 下载项目（建议递归获取 GoogleTest 子模块）：
 
@@ -127,8 +127,7 @@ cd build/debug
 ./bin/rmdb -p 8765 demo
 ```
 
-服务端默认只监听 `127.0.0.1`。确需允许其他主机连接时，显式增加 `-b 0.0.0.0`；
-`-t <秒>` 可调整 socket I/O 超时（默认 120 秒）。
+服务端默认只监听 `127.0.0.1`。确需允许其他主机连接时，显式增加 `-b 0.0.0.0`。
 
 服务端启动后，在另一个终端连接：
 
@@ -145,7 +144,7 @@ cd build/debug
 ```
 
 交互模式下以分号结束一条语句；输入 `exit;`、`bye;` 或按 Ctrl-D 退出客户端。
-服务端使用 Ctrl-C 关闭。更多 SQL 示例见 [使用文档](docs/RucBase使用文档.md)。
+服务端使用 Ctrl-C 关闭。更多 SQL 示例见 [使用文档](docs/Rucbase使用文档.md)。
 
 ## 构建配置与测试
 
@@ -190,10 +189,10 @@ ctest --preset debug -L blackbox --output-on-failure
 
 实验要求和评分以各实验文档为准：
 
-- [Lab 1：存储管理](<docs/RucBase-Lab1[存储管理实验文档].md>)
-- [Lab 2：索引管理](<docs/RucBase-Lab2[索引管理实验文档].md>)
-- [Lab 3：查询执行](<docs/RucBase-Lab3[查询执行实验文档].md>)
-- [Lab 4：并发控制](<docs/RucBase-Lab4[并发控制实验文档].md>)
+- [Lab 1：存储管理](<docs/Rucbase-Lab1[存储管理实验文档].md>)
+- [Lab 2：索引管理](<docs/Rucbase-Lab2[索引管理实验文档].md>)
+- [Lab 3：查询执行](<docs/Rucbase-Lab3[查询执行实验文档].md>)
+- [Lab 4：并发控制](<docs/Rucbase-Lab4[并发控制实验文档].md>)
 
 ## 仓库结构
 

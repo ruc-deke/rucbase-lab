@@ -22,7 +22,7 @@ class IndexScanExecutor : public AbstractExecutor {
     std::vector<std::string> index_col_names_;  // index scan涉及到的索引包含的字段
     IndexMeta index_meta_;                      // index scan涉及到的索引元数据
 
-    Rid rid_;
+    Rid rid_{.page_no = INVALID_PAGE_ID, .slot_no = -1};
     std::unique_ptr<RecScan> scan_;
 
     SmManager *sm_manager_;
@@ -36,7 +36,8 @@ class IndexScanExecutor : public AbstractExecutor {
         tab_ = sm_manager_->db_.get_table(tab_name_);
         conds_ = std::move(conds);
         // index_no_ = index_no;
-        index_col_names_ = index_col_names; 
+        // 按值形参 + move 到成员：避免再拷贝一份 vector。
+        index_col_names_ = std::move(index_col_names);
         index_meta_ = *(tab_.get_index_meta(index_col_names_));
         fh_ = sm_manager_->fhs_.at(tab_name_).get();
         cols_ = tab_.cols;

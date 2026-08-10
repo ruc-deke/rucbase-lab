@@ -16,10 +16,10 @@ const std::string TEST_DB_NAME = "DiskManagerTest_db";  // 以TEST_DB_NAME作为
 
 // Add by jiawen
 class DiskManagerTest : public ::testing::Test {
-   public:
+public:
     std::unique_ptr<DiskManager> disk_manager_;
 
-   public:
+public:
     // This function is called before every test.
     void SetUp() override {
         ::testing::Test::SetUp();
@@ -48,11 +48,11 @@ class DiskManagerTest : public ::testing::Test {
     /**
      * @brief 将buf填充size个字节的随机数据
      */
-    void rand_buf(char *buf, int size) {
+    void rand_buf(char* buf, int size) {
         srand((unsigned)time(nullptr));
         for (int i = 0; i < size; i++) {
-            int rand_ch = rand() & 0xff;
-            buf[i] = rand_ch;
+            const unsigned rand_ch = static_cast<unsigned>(rand()) & 0xFFU;
+            buf[i] = static_cast<char>(rand_ch);
         }
     }
 };
@@ -65,26 +65,18 @@ TEST_F(DiskManagerTest, FileOperation) {
     std::vector<std::string> filenames(MAX_FILES);   // MAX_FILES=32
     std::unordered_map<int, std::string> fd2name;    // fd -> filename
     for (size_t i = 0; i < filenames.size(); i++) {  // 创建MAX_FILES个文件
-        auto &filename = filenames[i];
+        auto& filename = filenames[i];
         filename = "FileOperationTestFile" + std::to_string(i);
         // 清理残留文件
         if (disk_manager_->is_file(filename)) {
             disk_manager_->destroy_file(filename);
         }
         // 测试异常：如果没有创建文件就打开文件
-        try {
-            disk_manager_->open_file(filename);
-            assert(false);
-        } catch (const FileNotFoundError &e) {
-        }
+        EXPECT_THROW(disk_manager_->open_file(filename), FileNotFoundError);
         // 创建文件
         disk_manager_->create_file(filename);
         EXPECT_EQ(disk_manager_->is_file(filename), true);  // 检查是否创建文件成功
-        try {
-            disk_manager_->create_file(filename);
-            assert(false);
-        } catch (const FileExistsError &e) {
-        }
+        EXPECT_THROW(disk_manager_->create_file(filename), FileExistsError);
         // 打开文件
         int fd = disk_manager_->open_file(filename);
         fd2name[fd] = filename;
@@ -98,17 +90,11 @@ TEST_F(DiskManagerTest, FileOperation) {
     }
 
     // 关闭&删除文件
-    for (auto &entry : fd2name) {
-        int fd = entry.first;
-        auto &filename = entry.second;
+    for (auto& [fd, filename] : fd2name) {
         disk_manager_->close_file(fd);
         disk_manager_->destroy_file(filename);
         EXPECT_EQ(disk_manager_->is_file(filename), false);  // 检查是否删除文件成功
-        try {
-            disk_manager_->destroy_file(filename);
-            assert(false);
-        } catch (const FileNotFoundError &e) {
-        }
+        EXPECT_THROW(disk_manager_->destroy_file(filename), FileNotFoundError);
     }
 }
 

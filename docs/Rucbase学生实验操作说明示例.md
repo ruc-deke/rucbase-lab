@@ -44,7 +44,7 @@ Mode                 LastWriteTime         Length Name
  * @return true if a victim frame was found, false otherwise
  */
 bool LRUReplacer::Victim(frame_id_t *frame_id) {
-    // C++17 std::scoped_lock
+    // std::scoped_lock 同时保护容量和链表状态。
     // 它能够避免死锁发生，其构造函数能够自动进行上锁操作，析构函数会对互斥量进行解锁操作，保证线程安全。
     std::scoped_lock lock{latch_};
 

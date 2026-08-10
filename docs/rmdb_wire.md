@@ -1,4 +1,4 @@
-# RMDB Wire Protocol v3.0
+# RMDB Wire Protocol v3.1
 
 RMDB Wire 是 Rucbase 服务端、课程客户端和黑盒测试之间的稳定二进制协议。学生代码通常不需要处理协议细节；推荐直接使用 `net/client.h` 中的 `rucbase::wire::Client`。
 
@@ -12,12 +12,12 @@ TCP 或 Unix stream socket 建立后，客户端首先发送 8 字节：
 | --- | ---: | --- |
 | 0 | 4 | ASCII `RUCB` |
 | 4 | 2 | major version，当前为 `3` |
-| 6 | 2 | minor version，当前为 `0` |
+| 6 | 2 | minor version，当前为 `1` |
 
 当前握手的完整十六进制字节为：
 
 ```text
-52 55 43 42 00 03 00 00
+52 55 43 42 00 03 00 01
 ```
 
 服务端只接受完全匹配的版本，并原样回写这 8 字节。任何一方读到 EOF、超时或不匹配版本，都必须关闭连接。
@@ -30,7 +30,7 @@ TCP 或 Unix stream socket 建立后，客户端首先发送 8 字节：
 | --- | ---: | --- |
 | 0 | 4 | payload 长度，不包含 8 字节帧头 |
 | 4 | 1 | tag |
-| 5 | 1 | flags，v3.0 必须为 `0` |
+| 5 | 1 | flags；请求必须为 `0`，`META` 响应可使用 `0x01` 表示原始文本 |
 | 6 | 2 | reserved，必须为 `0` |
 | 8 | N | payload |
 
@@ -110,7 +110,8 @@ TRANSACTION_ABORT
 
 `ERROR` 或 `TRANSACTION_ABORT` 也可以终止已经发送 `META` 的结果。它们是完整的协议响应，因此连接仍保持同步，可以继续执行下一条 SQL。
 
-未知 tag、非零 flags、帧顺序错误、截断帧或行数不一致属于协议错误；客户端必须将连接视为不可复用并关闭。
+未知 tag、非法 flags、帧顺序错误、截断帧或行数不一致属于协议错误；客户端必须将连接视为不可复用并关闭。
+除 `META` 可使用 `0x01` 原始文本标志外，其他响应帧的 flags 必须为 `0`。
 
 ## 6. 教学扩展
 
@@ -120,7 +121,7 @@ TRANSACTION_ABORT
 __RUCBASE_DATABASE_NAME__
 ```
 
-服务端以名为 `database` 的单列 `CHAR` 结果返回数据库名。该扩展用于交互式客户端提示符，不进入 SQL 解析器。
+服务端以带 `META 0x01` 标志的单列 `CHAR` 结果返回数据库名。该扩展用于交互式客户端提示符，不进入 SQL 解析器。
 
 测试用 `crash` 控制命令默认关闭。只有服务端进程显式设置 `RUCBASE_ALLOW_TEST_CRASH=1` 时才启用。
 
@@ -128,7 +129,7 @@ __RUCBASE_DATABASE_NAME__
 
 - 官方客户端默认连接超时 5 秒、单次 socket I/O 超时 120 秒。
 - 服务端默认只监听 `127.0.0.1`；需要远程实验环境时可显式传入 `-b 0.0.0.0` 或其他地址。
-- 服务端限制同时活跃的连接数，并在退出时 shutdown 所有会话、等待处理线程结束后再关闭数据库。
+- 当前教学服务端采用每连接一线程，尚未设置活跃连接硬上限；不要直接暴露到不受信任的公网。
 - 大结果应通过 `ExecuteOptions::on_row` 逐行消费并设置 `format_text = false`，避免在客户端保存完整文本。
 
 ## 8. 推荐调用方式

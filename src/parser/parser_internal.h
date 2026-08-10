@@ -68,7 +68,7 @@ struct ParseContext {
 
     void RecordError(int line, int column, std::string message) {
         if (!error.has_value()) {
-            error = ParseError{line, column, std::move(message)};
+            error = ParseError{.line = line, .column = column, .message = std::move(message)};
         }
     }
 };

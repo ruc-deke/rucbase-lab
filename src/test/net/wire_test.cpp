@@ -44,14 +44,18 @@ class SocketPair {
 };
 
 struct ResponseFrame {
+    ResponseFrame(const uint8_t tag_value, std::string payload_value, const uint8_t flag_value = 0)
+        : tag(tag_value), payload(std::move(payload_value)), flags(flag_value) {}
+
     uint8_t tag;
     std::string payload;
+    uint8_t flags = 0;
 };
 
 bool RunExecStream(const std::vector<ResponseFrame>& responses, std::string* text, std::string* diagnostic) {
     SocketPair sockets;
     for (const auto& response : responses) {
-        if (!rucbase::wire::WriteFrame(sockets.server(), response.tag, 0, response.payload)) {
+        if (!rucbase::wire::WriteFrame(sockets.server(), response.tag, response.flags, response.payload)) {
             return false;
         }
     }
@@ -63,7 +67,7 @@ rucbase::wire::ExecuteResult RunExecStreamResult(
     const rucbase::wire::ExecuteOptions& options = rucbase::wire::ExecuteOptions{}) {
     SocketPair sockets;
     for (const auto& response : responses) {
-        if (!rucbase::wire::WriteFrame(sockets.server(), response.tag, 0, response.payload)) {
+        if (!rucbase::wire::WriteFrame(sockets.server(), response.tag, response.flags, response.payload)) {
             rucbase::wire::ExecuteResult result;
             result.status = rucbase::wire::ExecuteStatus::TransportError;
             result.diagnostic = "test response write failed";
@@ -83,7 +87,7 @@ TEST(WireHandshakeTest, WritesStableVersionBytes) {
 
     std::array<uint8_t, 8> actual{};
     ASSERT_TRUE(rucbase::wire::ReadExact(sockets.server(), actual.data(), actual.size()));
-    const std::array<uint8_t, 8> expected{{'R', 'U', 'C', 'B', 0, 3, 0, 0}};
+    const std::array<uint8_t, 8> expected{{'R', 'U', 'C', 'B', 0, 3, 0, 1}};
     EXPECT_EQ(actual, expected);
 }
 
@@ -241,6 +245,40 @@ TEST(WireExecStreamTest, AcceptsValidTypedResponse) {
                               &text, &diagnostic));
     EXPECT_TRUE(diagnostic.empty());
     EXPECT_NE(text.find("hello"), std::string::npos);
+}
+
+TEST(WireExecStreamTest, RawTextRequiresExplicitMetaFlag) {
+    rucbase::wire::Cell cell;
+    cell.sql_type = rucbase::wire::kTypeChar;
+    cell.str_val = "hello";
+
+    const auto ordinary = RunExecStreamResult(
+        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output")},
+         {rucbase::wire::kTagRow, rucbase::wire::EncodeRow({cell})},
+         {rucbase::wire::kTagResultEnd, rucbase::wire::EncodeResultEnd(1)}});
+    EXPECT_TRUE(ordinary.ok());
+    EXPECT_NE(ordinary.text.find("Total record(s): 1"), std::string::npos);
+
+    const auto raw = RunExecStreamResult(
+        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"),
+          rucbase::wire::kFlagRawText},
+         {rucbase::wire::kTagRow, rucbase::wire::EncodeRow({cell})},
+         {rucbase::wire::kTagResultEnd, rucbase::wire::EncodeResultEnd(1)}});
+    EXPECT_TRUE(raw.ok());
+    EXPECT_EQ(raw.text, "hello");
+}
+
+TEST(WireExecStreamTest, RejectsInvalidRawTextFlags) {
+    const auto unknown_flag = RunExecStreamResult(
+        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"), 0x80}});
+    EXPECT_EQ(unknown_flag.status, rucbase::wire::ExecuteStatus::ProtocolError);
+
+    const auto non_char_schema = RunExecStreamResult(
+        {{rucbase::wire::kTagMeta,
+          rucbase::wire::EncodeMeta(
+              {{.name = "id", .sql_type = rucbase::wire::kTypeInt32}}),
+          rucbase::wire::kFlagRawText}});
+    EXPECT_EQ(non_char_schema.status, rucbase::wire::ExecuteStatus::ProtocolError);
 }
 
 TEST(WireExecStreamTest, StreamsRowsWithoutCollectingText) {

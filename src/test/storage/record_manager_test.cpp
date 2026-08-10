@@ -8,37 +8,43 @@
 #undef private  // for use private variables in "rm.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <ctime>
+#include <functional>
 #include <iostream>
 #include <unordered_map>
 
 #include "gtest/gtest.h"
 #define BUFFER_LENGTH 8192
 
-void rand_buf(int size, char *out_buf) {
+void rand_buf(int size, char* out_buf) {
     for (int i = 0; i < size; i++) {
-        out_buf[i] = rand() & 0xff;
+        out_buf[i] = static_cast<char>(static_cast<unsigned>(rand()) & 0xFFU);
     }
 }
 
 struct rid_hash_t {
-    size_t operator()(const Rid &rid) const { return (rid.page_no << 16) | rid.slot_no; }
+    /** @brief 使用两个无符号 32 位分量构造测试用 RID 哈希。 */
+    size_t operator()(const Rid& rid) const {
+        const uint64_t page_no = static_cast<uint32_t>(rid.page_no);
+        const uint64_t slot_no = static_cast<uint32_t>(rid.slot_no);
+        return std::hash<uint64_t>{}((page_no << 32U) | slot_no);
+    }
 };
 
 struct rid_equal_t {
-    bool operator()(const Rid &x, const Rid &y) const { return x.page_no == y.page_no && x.slot_no == y.slot_no; }
+    bool operator()(const Rid& x, const Rid& y) const { return x.page_no == y.page_no && x.slot_no == y.slot_no; }
 };
 
-void check_equal(const RmFileHandle *file_handle,
-                 const std::unordered_map<Rid, std::string, rid_hash_t, rid_equal_t> &mock) {
-    char *result = new char[BUFFER_LENGTH];
+void check_equal(const RmFileHandle* file_handle,
+                 const std::unordered_map<Rid, std::string, rid_hash_t, rid_equal_t>& mock) {
+    char* result = new char[BUFFER_LENGTH];
     int offset = 0;
-    Context *context = new Context(nullptr, nullptr, nullptr, result, &offset);
+    Context* context = new Context(nullptr, nullptr, nullptr, result, &offset);
     // Test all records
-    for (auto &entry : mock) {
-        Rid rid = entry.first;
-        auto mock_buf = (char *)entry.second.c_str();
+    for (auto& [rid, value] : mock) {
+        auto mock_buf = (char*)value.c_str();
         auto rec = file_handle->get_record(rid, context);
         assert(memcmp(mock_buf, rec->data, file_handle->file_hdr_.record_size) == 0);
     }
@@ -46,14 +52,14 @@ void check_equal(const RmFileHandle *file_handle,
     for (int i = 0; i < 10; i++) {
         Rid rid = {.page_no = 1 + rand() % (file_handle->file_hdr_.num_pages - 1),
                    .slot_no = rand() % file_handle->file_hdr_.num_records_per_page};
-        bool mock_exist = mock.count(rid) > 0;
+        bool mock_exist = mock.contains(rid);
         bool rm_exist = file_handle->is_record(rid);
         assert(rm_exist == mock_exist);
     }
     // Test RM scan
     size_t num_records = 0;
     for (RmScan scan(file_handle); !scan.is_end(); scan.next()) {
-        assert(mock.count(scan.rid()) > 0);
+        assert(mock.contains(scan.rid()));
         auto rec = file_handle->get_record(scan.rid(), context);
         assert(memcmp(rec->data, mock.at(scan.rid()).c_str(), file_handle->file_hdr_.record_size) == 0);
         num_records++;
@@ -62,7 +68,7 @@ void check_equal(const RmFileHandle *file_handle,
 }
 
 // std::cout can call this, for example: std::cout << rid
-std::ostream &operator<<(std::ostream &os, const Rid &rid) {
+std::ostream& operator<<(std::ostream& os, const Rid& rid) {
     return os << '(' << rid.page_no << ", " << rid.slot_no << ')';
 }
 
@@ -73,9 +79,9 @@ std::ostream &operator<<(std::ostream &os, const Rid &rid) {
 TEST(RecordManagerTest, SimpleTest) {
     srand((unsigned)time(nullptr));
 
-    char *result = new char[BUFFER_LENGTH];
+    char* result = new char[BUFFER_LENGTH];
     int offset = 0;
-    Context *context = new Context(nullptr, nullptr, nullptr, result, &offset);
+    Context* context = new Context(nullptr, nullptr, nullptr, result, &offset);
 
     // 创建RmManager类的对象rm_manager
     auto disk_manager = std::make_unique<DiskManager>();
@@ -124,19 +130,19 @@ TEST(RecordManagerTest, SimpleTest) {
     size_t upd_cnt = 0;
     size_t del_cnt = 0;
     for (int round = 0; round < 1000; round++) {
-        double insert_prob = 1. - mock.size() / 250.;
+        double insert_prob = 1. - static_cast<double>(mock.size()) / 250.;
         double dice = rand() * 1. / RAND_MAX;
         if (mock.empty() || dice < insert_prob) {
             rand_buf(file_handle->file_hdr_.record_size, write_buf);
             Rid rid = file_handle->insert_record(write_buf, context);
-            mock[rid] = std::string((char *)write_buf, file_handle->file_hdr_.record_size);
+            mock[rid] = std::string((char*)write_buf, file_handle->file_hdr_.record_size);
             add_cnt++;
             //            std::cout << "insert " << rid << '\n'; // operator<<(cout,rid)
         } else {
             // update or erase random rid
-            int rid_idx = rand() % mock.size();
+            size_t rid_idx = static_cast<size_t>(rand()) % mock.size();
             auto it = mock.begin();
-            for (int i = 0; i < rid_idx; i++) {
+            for (size_t i = 0; i < rid_idx; i++) {
                 it++;
             }
             auto rid = it->first;
@@ -144,7 +150,7 @@ TEST(RecordManagerTest, SimpleTest) {
                 // update
                 rand_buf(file_handle->file_hdr_.record_size, write_buf);
                 file_handle->update_record(rid, write_buf, context);
-                mock[rid] = std::string((char *)write_buf, file_handle->file_hdr_.record_size);
+                mock[rid] = std::string((char*)write_buf, file_handle->file_hdr_.record_size);
                 upd_cnt++;
                 //                std::cout << "update " << rid << '\n';
             } else {
@@ -190,7 +196,7 @@ TEST(RecordManagerTest, MultipleFilesTest) {
     }
 
     for (int i = 0; i < MAX_FILES; i++) {
-        std::string filename = filenames[i];
+        const std::string& filename = filenames[i];
 
         int record_size = 4 + rand() % 256;  // 元组大小随便设置，只要不超过RM_MAX_RECORD_SIZE
 
@@ -223,7 +229,7 @@ TEST(RecordManagerTest, MultipleFilesTest) {
     }
 
     for (int i = 0; i < MAX_FILES; i++) {
-        std::string filename = filenames[i];
+        const std::string& filename = filenames[i];
         rm_manager->destroy_file(filename);
     }
 }

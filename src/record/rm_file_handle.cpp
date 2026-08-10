@@ -31,7 +31,7 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
     // 4. 更新page_handle.page_hdr中的数据结构
     // 注意考虑插入一条记录后页面已满的情况，需要更新file_hdr_.first_free_page_no
 
-    return Rid{-1, -1};
+    return Rid{.page_no = RM_NO_PAGE, .slot_no = -1};
 }
 
 /**
@@ -82,7 +82,7 @@ RmPageHandle RmFileHandle::fetch_page_handle(int page_no) const {
     // 使用缓冲池获取指定页面，并生成page_handle返回给上层
     // if page_no is invalid, throw PageNotExistError exception
 
-    return RmPageHandle(&file_hdr_, nullptr);
+    return {&file_hdr_, nullptr};
 }
 
 /**
@@ -95,7 +95,7 @@ RmPageHandle RmFileHandle::create_new_page_handle() {
     // 2.更新page handle中的相关信息
     // 3.更新file_hdr_
 
-    return RmPageHandle(&file_hdr_, nullptr);
+    return {&file_hdr_, nullptr};
 }
 
 /**
@@ -111,7 +111,7 @@ RmPageHandle RmFileHandle::create_page_handle() {
     //     1.2 有空闲页：直接获取第一个空闲页
     // 2. 生成page handle并返回给上层
 
-    return RmPageHandle(&file_hdr_, nullptr);
+    return {&file_hdr_, nullptr};
 }
 
 /**

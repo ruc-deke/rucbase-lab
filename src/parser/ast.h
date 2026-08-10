@@ -90,7 +90,7 @@ struct TypeLen {
     int len = 0;
 
     TypeLen() = default;
-    TypeLen(const SvType type_, const int len_) : type(type_), len(len_) {}
+    explicit TypeLen(const SvType type_, const int len_) : type(type_), len(len_) {}
 };
 
 /** @brief CREATE TABLE 中的一项列定义。 */
@@ -99,7 +99,7 @@ struct ColDef {
     TypeLen type_len;
 
     ColDef() = default;
-    ColDef(std::string col_name_, const TypeLen type_len_) :
+    explicit ColDef(std::string col_name_, const TypeLen type_len_) :
             col_name(std::move(col_name_)), type_len(type_len_) {}
 };
 
@@ -108,7 +108,7 @@ struct CreateTable : public Statement {
     std::string tab_name;
     std::vector<ColDef> fields;
 
-    CreateTable(std::string tab_name_, std::vector<ColDef> fields_) :
+    explicit CreateTable(std::string tab_name_, std::vector<ColDef> fields_) :
             tab_name(std::move(tab_name_)), fields(std::move(fields_)) {}
 };
 
@@ -131,7 +131,7 @@ struct CreateIndex : public Statement {
     std::string tab_name;
     std::vector<std::string> col_names;
 
-    CreateIndex(std::string tab_name_, std::vector<std::string> col_names_) :
+    explicit CreateIndex(std::string tab_name_, std::vector<std::string> col_names_) :
             tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
 };
 
@@ -140,7 +140,7 @@ struct DropIndex : public Statement {
     std::string tab_name;
     std::vector<std::string> col_names;
 
-    DropIndex(std::string tab_name_, std::vector<std::string> col_names_) :
+    explicit DropIndex(std::string tab_name_, std::vector<std::string> col_names_) :
             tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
 };
 
@@ -183,7 +183,7 @@ struct Col : public Expr {
     std::string tab_name;
     std::string col_name;
 
-    Col(std::string tab_name_, std::string col_name_) :
+    explicit Col(std::string tab_name_, std::string col_name_) :
             tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
 };
 
@@ -192,7 +192,7 @@ struct SetClause {
     std::string col_name;
     std::shared_ptr<Value> val;
 
-    SetClause(std::string col_name_, std::shared_ptr<Value> val_) :
+    explicit SetClause(std::string col_name_, std::shared_ptr<Value> val_) :
             col_name(std::move(col_name_)), val(std::move(val_)) {}
 };
 
@@ -206,7 +206,7 @@ struct BinaryExpr {
     SvCompOp op;
     std::shared_ptr<Expr> rhs;
 
-    BinaryExpr(std::shared_ptr<Col> lhs_, SvCompOp op_, std::shared_ptr<Expr> rhs_) :
+    explicit BinaryExpr(std::shared_ptr<Col> lhs_, SvCompOp op_, std::shared_ptr<Expr> rhs_) :
             lhs(std::move(lhs_)), op(op_), rhs(std::move(rhs_)) {}
 };
 
@@ -214,7 +214,7 @@ struct BinaryExpr {
 struct OrderBy {
     std::shared_ptr<Col> column;
     OrderByDir direction;
-    OrderBy(std::shared_ptr<Col> column_, OrderByDir direction_) :
+    explicit OrderBy(std::shared_ptr<Col> column_, OrderByDir direction_) :
        column(std::move(column_)), direction(direction_) {}
 };
 
@@ -223,7 +223,7 @@ struct InsertStmt : public Statement {
     std::string tab_name;
     std::vector<std::shared_ptr<Value>> vals;
 
-    InsertStmt(std::string tab_name_, std::vector<std::shared_ptr<Value>> vals_) :
+    explicit InsertStmt(std::string tab_name_, std::vector<std::shared_ptr<Value>> vals_) :
             tab_name(std::move(tab_name_)), vals(std::move(vals_)) {}
 };
 
@@ -232,7 +232,7 @@ struct DeleteStmt : public Statement {
     std::string tab_name;
     std::vector<std::shared_ptr<BinaryExpr>> conds;
 
-    DeleteStmt(std::string tab_name_, std::vector<std::shared_ptr<BinaryExpr>> conds_) :
+    explicit DeleteStmt(std::string tab_name_, std::vector<std::shared_ptr<BinaryExpr>> conds_) :
             tab_name(std::move(tab_name_)), conds(std::move(conds_)) {}
 };
 
@@ -242,7 +242,7 @@ struct UpdateStmt : public Statement {
     std::vector<std::shared_ptr<SetClause>> set_clauses;
     std::vector<std::shared_ptr<BinaryExpr>> conds;
 
-    UpdateStmt(std::string tab_name_,
+    explicit UpdateStmt(std::string tab_name_,
                std::vector<std::shared_ptr<SetClause>> set_clauses_,
                std::vector<std::shared_ptr<BinaryExpr>> conds_) :
             tab_name(std::move(tab_name_)), set_clauses(std::move(set_clauses_)), conds(std::move(conds_)) {}
@@ -261,7 +261,7 @@ struct SelectStmt : public Statement {
     std::vector<std::shared_ptr<BinaryExpr>> conds;
     /** nullptr 表示语句没有 ORDER BY 子句。 */
     std::shared_ptr<OrderBy> order;
-    SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
+    explicit SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
                std::vector<std::string> tabs_,
                std::vector<std::shared_ptr<BinaryExpr>> conds_,
                std::shared_ptr<OrderBy> order_) :

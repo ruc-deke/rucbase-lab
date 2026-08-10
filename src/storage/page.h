@@ -3,38 +3,45 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+
 #include "common/config.h"
 
 /**
  * @description: 存储层每个Page的id的声明
  */
 struct PageId {
-    int fd;  //  Page所在的磁盘文件开启后的文件描述符, 来定位打开的文件在内存中的位置
+    int fd = -1;  // Page所在的磁盘文件开启后的文件描述符；-1 表示尚未绑定文件。
     page_id_t page_no = INVALID_PAGE_ID;
 
-    friend bool operator==(const PageId &x, const PageId &y) { return x.fd == y.fd && x.page_no == y.page_no; }
-    bool operator<(const PageId& x) const {
-        if(fd < x.fd) return true;
+    friend bool operator==(const PageId& x, const PageId& y) noexcept {
+        return x.fd == y.fd && x.page_no == y.page_no;
+    }
+    bool operator<(const PageId& x) const noexcept {
+        if (fd != x.fd) return fd < x.fd;
         return page_no < x.page_no;
     }
 
-    std::string toString() {
-        return "{fd: " + std::to_string(fd) + " page_no: " + std::to_string(page_no) + "}"; 
-    }
+    std::string toString() const { return "{fd: " + std::to_string(fd) + " page_no: " + std::to_string(page_no) + "}"; }
 
-    inline int64_t Get() const {
-        return (static_cast<int64_t>(fd << 16) | page_no);
+    /** @brief 将文件描述符和页号编码为无符号哈希输入，避免有符号移位。 */
+    uint64_t Get() const noexcept {
+        return (static_cast<uint64_t>(static_cast<uint32_t>(fd)) << 16U) |
+               static_cast<uint32_t>(page_no);
     }
 };
 
 // PageId的自定义哈希算法, 用于构建unordered_map<PageId, frame_id_t, PageIdHash>
 struct PageIdHash {
-    size_t operator()(const PageId &x) const { return (x.fd << 16) | x.page_no; }
+    size_t operator()(const PageId& x) const noexcept { return std::hash<uint64_t>{}(x.Get()); }
 };
 
 template <>
 struct std::hash<PageId> {
-    size_t operator()(const PageId &obj) const { return std::hash<int64_t>()(obj.Get()); }
+    size_t operator()(const PageId& obj) const noexcept { return std::hash<uint64_t>{}(obj.Get()); }
 };
 
 /**
@@ -44,15 +51,14 @@ struct std::hash<PageId> {
 class Page {
     friend class BufferPoolManager;
 
-   public:
-    
+public:
     Page() { reset_memory(); }
 
     ~Page() = default;
 
     PageId get_page_id() const { return id_; }
 
-    inline char *get_data() { return data_; }
+    inline char* get_data() { return data_; }
 
     bool is_dirty() const { return is_dirty_; }
 
@@ -60,11 +66,11 @@ class Page {
     static constexpr size_t OFFSET_LSN = 0;
     static constexpr size_t OFFSET_PAGE_HDR = 4;
 
-    inline lsn_t get_page_lsn() { return *reinterpret_cast<lsn_t *>(get_data() + OFFSET_LSN) ; }
+    inline lsn_t get_page_lsn() { return *reinterpret_cast<lsn_t*>(get_data() + OFFSET_LSN); }
 
     inline void set_page_lsn(lsn_t page_lsn) { memcpy(get_data() + OFFSET_LSN, &page_lsn, sizeof(lsn_t)); }
 
-   private:
+private:
     void reset_memory() { memset(data_, OFFSET_PAGE_START, PAGE_SIZE); }  // 将data_的PAGE_SIZE个字节填充为0
 
     /** page的唯一标识符 */
@@ -73,7 +79,7 @@ class Page {
     /** The actual data that is stored within a page.
      *  该页面在bufferPool中的偏移地址
      */
-    char data_[PAGE_SIZE] = {};
+    alignas(std::max_align_t) char data_[PAGE_SIZE] = {};
 
     /** 脏页判断 */
     bool is_dirty_ = false;

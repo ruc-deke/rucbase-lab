@@ -54,11 +54,14 @@ class Portal {
 public:
     explicit Portal(SmManager* sm_manager) : sm_manager_(sm_manager) {}
 
+    // plan 按值接收：start 会把所有权移入 PortalStmt（见实现中的 std::move(plan)）。
     std::unique_ptr<PortalStmt> start(std::shared_ptr<Plan> plan, Context* context);
+    // portal 按值接收 unique_ptr：调用方 move 后由 run 独占执行。
     void run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* txn_id, Context* context);
 
 private:
-    std::unique_ptr<AbstractExecutor> convert_plan_executor(std::shared_ptr<Plan> plan, Context* context);
+    // 仅根据 plan 构造执行器树，不接管 plan 所有权，故用 const 引用。
+    std::unique_ptr<AbstractExecutor> convert_plan_executor(const std::shared_ptr<Plan>& plan, Context* context);
 
     SmManager* sm_manager_;
 };

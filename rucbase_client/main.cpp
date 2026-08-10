@@ -5,6 +5,7 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -119,7 +120,8 @@ bool IsExitCommand(const std::string& command) {
     return trimmed == "exit" || trimmed == "exit;" || trimmed == "bye" || trimmed == "bye;";
 }
 
-rucbase::wire::ExecuteResult SendSql(rucbase::wire::Client& client, const std::string& sql,
+rucbase::wire::ExecuteResult SendSql(rucbase::wire::Client& client,
+                                     const std::string& sql,
                                      const bool highlight_errors = false) {
     const std::string command = Trim(sql);
     rucbase::wire::ExecuteResult result = client.Execute(command);
@@ -221,8 +223,7 @@ int RunInteractive(rucbase::wire::Client& client, const std::string& database_na
                 std::cout << "The client will be closed.\n";
                 return 0;
             }
-            const rucbase::wire::ExecuteResult result = SendSql(client, statement, true);
-            if (!result.ok() && !result.connection_reusable()) {
+            if (const auto result = SendSql(client, statement, true); !result.ok() && !result.connection_reusable()) {
                 return 1;
             }
         }
@@ -231,17 +232,20 @@ int RunInteractive(rucbase::wire::Client& client, const std::string& database_na
 
 }  // namespace
 
-int main(int argc, char* argv[]) {
-    const char* server_host = "127.0.0.1";
+namespace {
+
+/** @brief 解析参数并运行客户端；异常由 main 统一转换为诊断信息。 */
+int RunClient(int argc, char* argv[]) {
+    const auto* server_host = "127.0.0.1";
     int server_port = kDefaultPort;
     const char* execute_sql = nullptr;
     const char* script_file = nullptr;
 
     opterr = 0;
     constexpr int kHelpOption = 1000;
-    const option long_options[] = {
-        {"help", no_argument, nullptr, kHelpOption},
-        {nullptr, 0, nullptr, 0},
+    constexpr option long_options[] = {
+        {.name = "help", .has_arg = no_argument, .flag = nullptr, .val = kHelpOption},
+        {.name = nullptr, .has_arg = 0, .flag = nullptr, .val = 0},
     };
     int opt = 0;
     while ((opt = getopt_long(argc, argv, ":h:p:e:f:", long_options, nullptr)) != -1) {
@@ -339,4 +343,15 @@ int main(int argc, char* argv[]) {
         std::cout << "Bye.\n";
     }
     return exit_code;
+}
+
+}  // namespace
+
+int main(int argc, char* argv[]) {
+    try {
+        return RunClient(argc, argv);
+    } catch (const std::exception& error) {
+        std::cerr << "client error: " << error.what() << '\n';
+        return 1;
+    }
 }

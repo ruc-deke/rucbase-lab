@@ -9,9 +9,9 @@ class RmFileHandle;
 
 class RmScan : public RecScan {
     const RmFileHandle *file_handle_;
-    Rid rid_;
+    Rid rid_{.page_no = INVALID_PAGE_ID, .slot_no = -1};
 public:
-    RmScan(const RmFileHandle *file_handle);
+    explicit RmScan(const RmFileHandle *file_handle);
 
     void next() override;
 

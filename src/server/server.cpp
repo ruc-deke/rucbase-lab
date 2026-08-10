@@ -51,12 +51,12 @@ void print_usage(const char* program) {
     std::cerr << "Usage: " << program << " [-b ipv4_address] [-p port] <database>\n";
 }
 
-bool parse_options(int argc, char** argv, std::string* database, std::string* address, int* port) {
+bool parse_options(const int argc, char** argv, std::string* database, std::string* address, int* port) {
     *address = "127.0.0.1";
     *port = kDefaultPort;
 
     int option;
-    while ((option = ::getopt(argc, argv, "b:p:")) != -1) {
+    while ((option = getopt(argc, argv, "b:p:")) != -1) {
         if (option == 'b') {
             *address = optarg;
         } else if (option == 'p') {
@@ -83,15 +83,15 @@ bool parse_options(int argc, char** argv, std::string* database, std::string* ad
 }  // namespace
 
 struct Server::ClientSession {
-    explicit ClientSession(int client_fd) : fd(client_fd) { text_buffer.fill('\0'); }
+    explicit ClientSession(const int client_fd) : fd(client_fd) { text_buffer.fill('\0'); }
 
     int fd;
     txn_id_t txn_id = INVALID_TXN_ID;
-    std::array<char, BUFFER_LENGTH> text_buffer;
+    std::array<char, BUFFER_LENGTH> text_buffer{};
     int text_offset = 0;
 };
 
-Server::Server(std::string database_name, std::string bind_address, int port)
+Server::Server(std::string database_name, std::string bind_address, const int port)
     : database_name_(std::move(database_name)),
       bind_address_(std::move(bind_address)),
       port_(port),
@@ -165,7 +165,7 @@ int Server::create_listening_socket() const {
         throw std::runtime_error("Invalid IPv4 bind address: " + bind_address_);
     }
 
-    const int reuse_address = 1;
+    constexpr int reuse_address = 1;
     if (::setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse_address, sizeof(reuse_address)) != 0 ||
         ::bind(fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 || ::listen(fd, kListenBacklog) != 0) {
         const std::string message =
@@ -226,13 +226,16 @@ void Server::stop_clients() {
     }
 }
 
-void Server::close_client(int fd) {
+void Server::close_client(const int fd) {
     std::lock_guard<std::mutex> lock(clients_mutex_);
     ::close(fd);
-    client_fds_.erase(std::remove(client_fds_.begin(), client_fds_.end(), fd), client_fds_.end());
+    // C++20：std::erase(container, value) 删除所有等于 value 的元素。
+    // 等价于 erase-remove 惯用法：
+    //   client_fds_.erase(std::remove(...), client_fds_.end());
+    std::erase(client_fds_, fd);
 }
 
-void Server::handle_client(int fd) {
+void Server::handle_client(const int fd) {
     ClientSession session(fd);
     std::cout << "Client connected (fd=" << fd << ")" << std::endl;
 
@@ -281,10 +284,13 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql) {
 
         auto parse_result = parser::Parse(sql);
         if (!parse_result.ok()) {
-            return send_error(session->fd, parser::FormatError(sql, *parse_result.error));
+            if (!parse_result.error.has_value()) {
+                throw InternalError("parser returned neither a statement nor an error");
+            }
+            return send_error(session->fd, parser::FormatError(sql, parse_result.error.value()));
         }
         auto query = analyze_.do_analyze(std::move(parse_result.statement));
-        auto plan = optimizer_.plan_query(std::move(query), &context);
+        auto plan = optimizer_.plan_query(query, &context);
         auto statement = portal_.start(std::move(plan), &context);
         portal_.run(std::move(statement), &ql_manager_, &session->txn_id, &context);
 
@@ -333,8 +339,7 @@ void Server::prepare_transaction(ClientSession* session, Context* context) {
 bool Server::send_query_result(int fd, const WireResultSet& result) {
     std::vector<wire::ColumnDef> columns;
     for (const auto& source : result.columns) {
-        wire::ColumnDef column;
-        column.name = source.name;
+        wire::ColumnDef column{.name = source.name};
         if (!wire::ColTypeToWire(static_cast<int>(source.type), &column.sql_type)) {
             return send_error(fd, "unsupported query result type");
         }
@@ -365,11 +370,10 @@ bool Server::send_query_result(int fd, const WireResultSet& result) {
     for (const auto& row : result.rows) {
         std::vector<wire::Cell> cells;
         for (size_t i = 0; i < row.size(); ++i) {
-            wire::Cell cell;
-            cell.sql_type = columns[i].sql_type;
-            cell.int_val = row[i].int_val;
-            cell.float_val = row[i].float_val;
-            cell.str_val = row[i].str_val;
+            wire::Cell cell{.sql_type = columns[i].sql_type,
+                            .int_val = row[i].int_val,
+                            .float_val = row[i].float_val,
+                            .str_val = row[i].str_val};
             cells.push_back(std::move(cell));
         }
         if (!wire::TryEncodeRow(cells, &payload, &diagnostic) || !wire::WriteFrame(fd, wire::kTagRow, 0, payload)) {
@@ -380,7 +384,7 @@ bool Server::send_query_result(int fd, const WireResultSet& result) {
 }
 
 bool Server::send_text_result(int fd, const std::string& column_name, const std::string& text) {
-    return wire::WriteFrame(fd, wire::kTagMeta, 0, wire::EncodeMetaSingleCharColumn(column_name)) &&
+    return wire::WriteFrame(fd, wire::kTagMeta, wire::kFlagRawText, wire::EncodeMetaSingleCharColumn(column_name)) &&
            wire::WriteFrame(fd, wire::kTagRow, 0, wire::EncodeRowSingleChar(text)) &&
            wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(1));
 }
@@ -405,7 +409,7 @@ int Server::start(int argc, char** argv) {
 
     stop_requested = 0;
     // BufferPoolManager 含有较大的页数组，因此 Server 放在堆上。
-    std::unique_ptr<Server> server(new Server(std::move(database), std::move(address), port));
+    const std::unique_ptr<Server> server(new Server(std::move(database), std::move(address), port));
     return server->run();
 }
 

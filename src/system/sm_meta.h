@@ -4,7 +4,7 @@
 #pragma once
 
 #include <algorithm>
-#include <iostream>
+#include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
@@ -12,187 +12,144 @@
 #include "common/errors.h"
 #include "sm_defs.h"
 
-/* 字段元数据 */
+/** @brief 字段的目录元数据，包含其定长记录布局。 */
 struct ColMeta {
-    std::string tab_name;   // 字段所属表名称
-    std::string name;       // 字段名称
-    ColType type;           // 字段类型
-    int len;                // 字段长度
-    int offset;             // 字段位于记录中的偏移量
-    bool index;             /** unused */
-
-    friend std::ostream &operator<<(std::ostream &os, const ColMeta &col) {
-        // ColMeta中有各个基本类型的变量，然后调用重载的这些变量的操作符<<（具体实现逻辑在defs.h）
-        return os << col.tab_name << ' ' << col.name << ' ' << col.type << ' ' << col.len << ' ' << col.offset << ' '
-                  << col.index;
-    }
-
-    friend std::istream &operator>>(std::istream &is, ColMeta &col) {
-        return is >> col.tab_name >> col.name >> col.type >> col.len >> col.offset >> col.index;
-    }
+    std::string tab_name;  ///< 所属表，由 JSON 的父级表名推导。
+    std::string name;
+    ColType type{};
+    int len{};
+    int offset{};       ///< 由字段声明顺序和长度推导。
+    bool index{false};  ///< 是否参与任一索引，由 indexes 推导。
 };
 
-/* 索引元数据 */
+/** @brief 索引的目录元数据；cols 的顺序就是复合索引键顺序。 */
 struct IndexMeta {
-    std::string tab_name;           // 索引所属表名称
-    int col_tot_len;                // 索引字段长度总和
-    int col_num;                    // 索引字段数量
-    std::vector<ColMeta> cols;      // 索引包含的字段
-
-    friend std::ostream &operator<<(std::ostream &os, const IndexMeta &index) {
-        os << index.tab_name << " " << index.col_tot_len << " " << index.col_num;
-        for(auto& col: index.cols) {
-            os << "\n" << col;
-        }
-        return os;
-    }
-
-    friend std::istream &operator>>(std::istream &is, IndexMeta &index) {
-        is >> index.tab_name >> index.col_tot_len >> index.col_num;
-        for(int i = 0; i < index.col_num; ++i) {
-            ColMeta col;
-            is >> col;
-            index.cols.push_back(col);
-        }
-        return is;
-    }
+    std::string tab_name;
+    int col_tot_len{};          ///< 由 cols 推导。
+    int col_num{};              ///< 由 cols.size() 推导。
+    std::vector<ColMeta> cols;  ///< 索引包含的字段。
 };
 
-/* 表元数据 */
+/** @brief 表的目录元数据；字段和索引均保留声明顺序。 */
 struct TabMeta {
-    std::string name;                   // 表名称
-    std::vector<ColMeta> cols;          // 表包含的字段
-    std::vector<IndexMeta> indexes;     // 表上建立的索引
+    std::string name;
+    std::vector<ColMeta> cols;
+    std::vector<IndexMeta> indexes;
 
-    TabMeta(){}
-
-    TabMeta(const TabMeta &other) {
-        name = other.name;
-        for(auto col : other.cols) cols.push_back(col);
+    /**
+     * @brief 判断表中是否存在指定字段。
+     * @note C++20：`std::ranges::find_if(range, pred)` 等价于
+     *       `std::find_if(range.begin(), range.end(), pred)`，无需手写迭代器对。
+     */
+    bool is_col(const std::string& col_name) const {
+        return std::ranges::find_if(cols, [&](const ColMeta& col) { return col.name == col_name; }) != cols.end();
     }
 
-    /* 判断当前表中是否存在名为col_name的字段 */
-    bool is_col(const std::string &col_name) const {
-        auto pos = std::find_if(cols.begin(), cols.end(), [&](const ColMeta &col) { return col.name == col_name; });
-        return pos != cols.end();
+    /**
+     * @brief 判断索引的字段及顺序是否与给定字段名完全一致。
+     * @note 复合索引的字段顺序属于索引定义的一部分。
+     * @note C++20：`std::ranges::equal` 可直接比较两个 range，并可带二元谓词。
+     */
+    static bool matches_index(const IndexMeta& index, const std::vector<std::string>& col_names) {
+        return index.cols.size() == col_names.size() &&
+               std::ranges::equal(index.cols, col_names,
+                                  [](const ColMeta& col, const std::string& name) { return col.name == name; });
     }
 
-    /* 判断当前表上是否建有指定索引，索引包含的字段为col_names */
+    /**
+     * @brief 判断表中是否存在字段及顺序完全匹配的索引。
+     * @note C++20：`std::ranges::any_of` 表示「是否存在任一元素满足谓词」。
+     */
     bool is_index(const std::vector<std::string>& col_names) const {
-        for(auto& index: indexes) {
-            if(index.col_num == col_names.size()) {
-                size_t i = 0;
-                for(; i < index.col_num; ++i) {
-                    if(index.cols[i].name.compare(col_names[i]) != 0)
-                        break;
-                }
-                if(i == index.col_num) return true;
-            }
-        }
-
-        return false;
+        return std::ranges::any_of(indexes, [&](const IndexMeta& index) { return matches_index(index, col_names); });
     }
 
-    /* 根据字段名称集合获取索引元数据 */
+    /**
+     * @brief 查找可修改的索引元数据。
+     * @throws IndexNotFoundError 未找到字段及顺序完全匹配的索引。
+     */
     std::vector<IndexMeta>::iterator get_index_meta(const std::vector<std::string>& col_names) {
-        for(auto index = indexes.begin(); index != indexes.end(); ++index) {
-            if((*index).col_num != col_names.size()) continue;
-            auto& index_cols = (*index).cols;
-            size_t i = 0;
-            for(; i < col_names.size(); ++i) {
-                if(index_cols[i].name.compare(col_names[i]) != 0) 
-                    break;
-            }
-            if(i == col_names.size()) return index;
-        }
-        throw IndexNotFoundError(name, col_names);
+        // ranges::find_if 返回的迭代器类型与 vector::iterator 兼容，可继续用于 erase 等接口。
+        const auto pos =
+            std::ranges::find_if(indexes, [&](const IndexMeta& index) { return matches_index(index, col_names); });
+        if (pos == indexes.end()) throw IndexNotFoundError(name, col_names);
+        return pos;
     }
 
-    /* 根据字段名称获取字段元数据 */
-    std::vector<ColMeta>::iterator get_col(const std::string &col_name) {
-        auto pos = std::find_if(cols.begin(), cols.end(), [&](const ColMeta &col) { return col.name == col_name; });
+    /**
+     * @brief 查找只读索引元数据。
+     * @throws IndexNotFoundError 未找到字段及顺序完全匹配的索引。
+     */
+    std::vector<IndexMeta>::const_iterator get_index_meta(const std::vector<std::string>& col_names) const {
+        const auto pos =
+            std::ranges::find_if(indexes, [&](const IndexMeta& index) { return matches_index(index, col_names); });
+        if (pos == indexes.end()) throw IndexNotFoundError(name, col_names);
+        return pos;
+    }
+
+    /** @brief 查找可修改的字段元数据。 @throws ColumnNotFoundError 字段不存在。 */
+    std::vector<ColMeta>::iterator get_col(const std::string& col_name) {
+        const auto pos = std::ranges::find_if(cols, [&](const ColMeta& col) { return col.name == col_name; });
         if (pos == cols.end()) {
             throw ColumnNotFoundError(col_name);
         }
         return pos;
     }
 
-    friend std::ostream &operator<<(std::ostream &os, const TabMeta &tab) {
-        os << tab.name << '\n' << tab.cols.size() << '\n';
-        for (auto &col : tab.cols) {
-            os << col << '\n';  // col是ColMeta类型，然后调用重载的ColMeta的操作符<<
-        }
-        os << tab.indexes.size() << "\n";
-        for (auto &index : tab.indexes) {
-            os << index << "\n";
-        }
-        return os;
-    }
-
-    friend std::istream &operator>>(std::istream &is, TabMeta &tab) {
-        size_t n;
-        is >> tab.name >> n;
-        for (size_t i = 0; i < n; i++) {
-            ColMeta col;
-            is >> col;
-            tab.cols.push_back(col);
-        }
-        is >> n;
-        for(size_t i = 0; i < n; ++i) {
-            IndexMeta index;
-            is >> index;
-            tab.indexes.push_back(index);
-        }
-        return is;
+    /** @brief 查找只读字段元数据。 @throws ColumnNotFoundError 字段不存在。 */
+    std::vector<ColMeta>::const_iterator get_col(const std::string& col_name) const {
+        const auto pos = std::ranges::find_if(cols, [&](const ColMeta& col) { return col.name == col_name; });
+        if (pos == cols.end()) throw ColumnNotFoundError(col_name);
+        return pos;
     }
 };
 
-// 注意重载了操作符 << 和 >>，这需要更底层同样重载TabMeta、ColMeta的操作符 << 和 >>
-/* 数据库元数据 */
+/** @brief 当前数据库的内存目录，是 db.meta JSON 的运行时表示。 */
 class DbMeta {
     friend class SmManager;
 
-   private:
-    std::string name_;                      // 数据库名称
-    std::map<std::string, TabMeta> tabs_;   // 数据库中包含的表
+private:
+    std::string name_;
+    std::map<std::string, TabMeta> tabs_;  // map 让 JSON 输出顺序稳定
 
-   public:
-    // DbMeta(std::string name) : name_(name) {}
+public:
+    /**
+     * @brief 判断目录中是否存在指定表。
+     * @note C++20：`map::contains(k)` 等价于 `find(k) != end()`，语义更直观。
+     */
+    bool is_table(const std::string& tab_name) const { return tabs_.contains(tab_name); }
 
-    /* 判断数据库中是否存在指定名称的表 */
-    bool is_table(const std::string &tab_name) const { return tabs_.find(tab_name) != tabs_.end(); }
-
-    void SetTabMeta(const std::string &tab_name, const TabMeta &meta) {
+    /**
+     * @brief 新增或替换表元数据。
+     * @throws InternalError map 键与表元数据中的名称不一致。
+     */
+    void SetTabMeta(const std::string& tab_name, const TabMeta& meta) {
+        if (tab_name != meta.name) throw InternalError("Table metadata name mismatch: " + tab_name);
         tabs_[tab_name] = meta;
     }
 
-    /* 获取指定名称表的元数据 */
-    TabMeta &get_table(const std::string &tab_name) {
-        auto pos = tabs_.find(tab_name);
+    /** @brief 查找可修改的表元数据。 @throws TableNotFoundError 表不存在。 */
+    TabMeta& get_table(const std::string& tab_name) {
+        const auto pos = tabs_.find(tab_name);
         if (pos == tabs_.end()) {
             throw TableNotFoundError(tab_name);
         }
-
         return pos->second;
     }
 
-    // 重载操作符 <<
-    friend std::ostream &operator<<(std::ostream &os, const DbMeta &db_meta) {
-        os << db_meta.name_ << '\n' << db_meta.tabs_.size() << '\n';
-        for (auto &entry : db_meta.tabs_) {
-            os << entry.second << '\n';
-        }
-        return os;
+    /** @brief 查找只读表元数据。 @throws TableNotFoundError 表不存在。 */
+    const TabMeta& get_table(const std::string& tab_name) const {
+        const auto pos = tabs_.find(tab_name);
+        if (pos == tabs_.end()) throw TableNotFoundError(tab_name);
+        return pos->second;
     }
 
-    friend std::istream &operator>>(std::istream &is, DbMeta &db_meta) {
-        size_t n;
-        is >> db_meta.name_ >> n;
-        for (size_t i = 0; i < n; i++) {
-            TabMeta tab;
-            is >> tab;
-            db_meta.tabs_[tab.name] = tab;
-        }
-        return is;
-    }
+    /** @brief 将数据库目录写为两空格缩进的 JSON。 */
+    friend std::ostream& operator<<(std::ostream& os, const DbMeta& db_meta);
+
+    /**
+     * @brief 从 JSON 重建数据库目录。
+     * @post 仅在完整解析和校验成功后替换 db_meta。
+     */
+    friend std::istream& operator>>(std::istream& is, DbMeta& db_meta);
 };

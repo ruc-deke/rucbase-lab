@@ -4,20 +4,21 @@
 #pragma once
 
 #include "common/defs.h"
+#include "common/errors.h"
 #include "storage/buffer_pool_manager.h"
 
-constexpr int RM_NO_PAGE = -1;
-constexpr int RM_FILE_HDR_PAGE = 0;
-constexpr int RM_FIRST_RECORD_PAGE = 1;
-constexpr int RM_MAX_RECORD_SIZE = 512;
+constexpr int RM_NO_PAGE = -1;           ///< 无有效页面，用作空闲页链表的终止标记。
+constexpr int RM_FILE_HDR_PAGE = 0;      ///< 记录文件头固定占用的页号。
+constexpr int RM_FIRST_RECORD_PAGE = 1;  ///< 第一张记录数据页的页号。
+constexpr int RM_MAX_RECORD_SIZE = 512;  ///< 教学版本支持的单条定长记录最大字节数。
 
 /* 文件头，记录表数据文件的元信息，写入磁盘中文件的第0号页面 */
 struct RmFileHdr {
-    int record_size;            // 表中每条记录的大小，由于不包含变长字段，因此当前字段初始化后保持不变
-    int num_pages;              // 文件中分配的页面个数（初始化为1）
-    int num_records_per_page;   // 每个页面最多能存储的元组个数
-    int first_free_page_no;     // 文件中当前第一个包含空闲空间的页面号（初始化为-1）
-    int bitmap_size;            // 每个页面bitmap大小
+    int record_size;           // 表中每条记录的大小，由于不包含变长字段，因此当前字段初始化后保持不变
+    int num_pages;             // 文件中分配的页面个数（初始化为1）
+    int num_records_per_page;  // 每个页面最多能存储的元组个数
+    int first_free_page_no;    // 文件中当前第一个包含空闲空间的页面号（初始化为-1）
+    int bitmap_size;           // 每个页面bitmap大小
 };
 
 /* 表数据文件中每个页面的页头，记录每个页面的元信息 */
@@ -28,58 +29,126 @@ struct RmPageHdr {
 
 /* 表中的记录 */
 struct RmRecord {
-    char* data;  // 记录的数据
-    int size;    // 记录的大小
-    bool allocated_ = false;    // 是否已经为数据分配空间
+    char* data = nullptr;     // 记录的数据
+    int size = 0;             // 记录的大小
+    bool allocated_ = false;  // 是否已经为数据分配空间
 
     RmRecord() = default;
 
-    RmRecord(const RmRecord& other) {
-        size = other.size;
-        data = new char[size];
-        memcpy(data, other.data, size);
-        allocated_ = true;
-    };
+    RmRecord(const RmRecord& other) { assign_from(other); }
 
-    RmRecord &operator=(const RmRecord& other) {
-        size = other.size;
-        data = new char[size];
-        memcpy(data, other.data, size);
-        allocated_ = true;
+    RmRecord& operator=(const RmRecord& other) {
+        if (this != &other) {
+            char* new_data = copy_data(other);
+            release();
+            data = new_data;
+            size = other.size;
+            allocated_ = data != nullptr;
+        }
         return *this;
-    };
-
-    RmRecord(int size_) {
-        size = size_;
-        data = new char[size_];
-        allocated_ = true;
     }
 
-    RmRecord(int size_, char* data_) {
-        size = size_;
-        data = new char[size_];
-        memcpy(data, data_, size_);
-        allocated_ = true;
+    RmRecord(RmRecord&& other) noexcept : data(other.data), size(other.size), allocated_(other.allocated_) {
+        other.data = nullptr;
+        other.size = 0;
+        other.allocated_ = false;
     }
 
-    void SetData(char* data_) {
-        memcpy(data, data_, size);
+    RmRecord& operator=(RmRecord&& other) noexcept {
+        if (this != &other) {
+            release();
+            data = other.data;
+            size = other.size;
+            allocated_ = other.allocated_;
+            other.data = nullptr;
+            other.size = 0;
+            other.allocated_ = false;
+        }
+        return *this;
+    }
+
+    explicit RmRecord(const int size_) {
+        if (size_ < 0) {
+            throw InvalidRecordSizeError(size_);
+        }
+        size = size_;
+        if (size > 0) {
+            data = new char[size];
+            allocated_ = true;
+        }
+    }
+
+    RmRecord(const int size_, const char* data_) {
+        if (size_ < 0) {
+            throw InvalidRecordSizeError(size_);
+        }
+        size = size_;
+        if (size > 0) {
+            if (data_ == nullptr) {
+                throw InternalError("RmRecord: null source data");
+            }
+            data = new char[size];
+            allocated_ = true;
+            memcpy(data, data_, size);
+        }
+    }
+
+    void SetData(const char* data_) const {
+        if (size > 0 && data_ == nullptr) {
+            throw InternalError("RmRecord: null source data");
+        }
+        if (size > 0) {
+            memcpy(data, data_, size);
+        }
     }
 
     void Deserialize(const char* data_) {
-        size = *reinterpret_cast<const int*>(data_);
-        if(allocated_) {
-            delete[] data;
+        if (data_ == nullptr) {
+            throw InternalError("RmRecord: null serialized data");
         }
-        data = new char[size];
-        memcpy(data, data_ + sizeof(int), size);
+        int decoded_size = 0;
+        memcpy(&decoded_size, data_, sizeof(decoded_size));
+        if (decoded_size < 0 || decoded_size > RM_MAX_RECORD_SIZE) {
+            throw InvalidRecordSizeError(decoded_size);
+        }
+
+        char* new_data = decoded_size == 0 ? nullptr : new char[decoded_size];
+        if (decoded_size > 0) {
+            memcpy(new_data, data_ + sizeof(int), decoded_size);
+        }
+        release();
+        data = new_data;
+        size = decoded_size;
+        allocated_ = data != nullptr;
     }
 
-    ~RmRecord() {
-        if(allocated_) {
+    ~RmRecord() { release(); }
+
+private:
+    static char* copy_data(const RmRecord& other) {
+        if (other.size < 0 || (other.size > 0 && other.data == nullptr)) {
+            throw InternalError("RmRecord: invalid source record");
+        }
+        if (other.size == 0) {
+            return nullptr;
+        }
+        char* copy = new char[other.size];
+        memcpy(copy, other.data, other.size);
+        return copy;
+    }
+
+    void assign_from(const RmRecord& other) {
+        data = copy_data(other);
+        size = other.size;
+        allocated_ = data != nullptr;
+    }
+
+    void release() noexcept {
+        if (allocated_) {
             delete[] data;
         }
         allocated_ = false;
         data = nullptr;
+        size = 0;
     }
 };

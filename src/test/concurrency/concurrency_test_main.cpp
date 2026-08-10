@@ -36,29 +36,29 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    TestCaseAnalyzer* analyzer = new TestCaseAnalyzer();
-    analyzer->infile_path = argv[optind];
-    analyzer->analyze_test_case();
+    TestCaseAnalyzer analyzer;
+    analyzer.infile_path = argv[optind];
+    analyzer.analyze_test_case();
 
     auto preload_client = connect_database(unix_socket_path, server_host, server_port);
-    for(size_t i = 0; i < analyzer->preload.size(); ++i) {
-        if (!execute_sql(&preload_client, analyzer->preload[i]).ok()) {
+    for(size_t i = 0; i < analyzer.preload.size(); ++i) {
+        if (!execute_sql(&preload_client, analyzer.preload[i]).ok()) {
             break;
         }
     }
     preload_client.Close();
 
-    for(size_t i = 0; i < analyzer->transactions.size(); ++i) {
-        analyzer->transactions[i]->client = connect_database(unix_socket_path, server_host, server_port);
+    for(size_t i = 0; i < analyzer.transactions.size(); ++i) {
+        analyzer.transactions[i]->client = connect_database(unix_socket_path, server_host, server_port);
     }
 
-    OperationPermutation* permutation = analyzer->permutation;
-    for(size_t i = 0; i < permutation->operations.size(); ++i) {
+    const OperationPermutation& permutation = analyzer.permutation;
+    for(size_t i = 0; i < permutation.operations.size(); ++i) {
         const auto transaction_index =
-            static_cast<size_t>(permutation->operations[i]->txn_id);
-        Transaction* txn = analyzer->transactions[transaction_index];
+            static_cast<size_t>(permutation.operations[i]->txn_id);
+        Transaction* txn = analyzer.transactions[transaction_index].get();
         const rucbase::wire::ExecuteResult result =
-            execute_sql(&txn->client, permutation->operations[i]->sql);
+            execute_sql(&txn->client, permutation.operations[i]->sql);
         if (result.ok()) {
             std::cout << result.text;
         } else {

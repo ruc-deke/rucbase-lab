@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
+
+#include <utility>
+
 #include "execution_defs.h"
 #include "execution_manager.h"
 #include "executor_abstract.h"
@@ -24,8 +27,8 @@ class DeleteExecutor : public AbstractExecutor {
         tab_name_ = tab_name;
         tab_ = sm_manager_->db_.get_table(tab_name);
         fh_ = sm_manager_->fhs_.at(tab_name).get();
-        conds_ = conds;
-        rids_ = rids;
+        conds_ = std::move(conds);
+        rids_ = std::move(rids);
         context_ = context;
     }
 

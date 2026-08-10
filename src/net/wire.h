@@ -15,11 +15,11 @@
 namespace rucbase::wire {
 
 constexpr uint16_t kMajor = 3;
-constexpr uint16_t kMinor = 0;
+constexpr uint16_t kMinor = 1;
 // docs/rmdb_wire.md §1: 4-byte ASCII magic + major + minor (8 bytes total).
 constexpr char kMagic[4] = {'R', 'U', 'C', 'B'};
-constexpr uint32_t kMaxPayloadBytes = 1u << 20;      // 1 MiB
-constexpr uint32_t kMaxDiagnosticBytes = 64u << 10;  // 64 KiB
+constexpr uint32_t kMaxPayloadBytes = 1U << 20U;      // 1 MiB
+constexpr uint32_t kMaxDiagnosticBytes = 64U << 10U;  // 64 KiB
 constexpr uint32_t kDefaultIoTimeoutMs = 120u * 1000u;
 
 // Client → server
@@ -32,6 +32,9 @@ constexpr uint8_t kTagCommandOk = 0x10;
 constexpr uint8_t kTagResultEnd = 0x11;
 constexpr uint8_t kTagTransactionAbort = 0x12;
 constexpr uint8_t kTagError = 0x13;
+
+// META-only response flag: render the following single CHAR column as raw text.
+constexpr uint8_t kFlagRawText = 0x01;
 
 // SQL type tags (§3)
 constexpr uint8_t kTypeInt32 = 0x01;

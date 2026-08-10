@@ -22,6 +22,6 @@ Type 'help;' for help.
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::cout << kRucbaseBanner;
+    std::cout << kRucbaseBanner << std::flush;
     return rucbase::Server::start(argc, argv);
 }

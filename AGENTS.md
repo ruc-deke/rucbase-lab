@@ -112,6 +112,12 @@ Notes agents should keep accurate:
 >
 > Agent: *pastes a complete nested-loop join executor*
 
+## Code Documentation
+
+* Use concise Doxygen comments for public types and interfaces, and for non-trivial helpers involving validation, ownership, state reconstruction, persistence, or rollback.
+* Document contracts and invariants rather than restating each line. Obvious assignments and simple accessors do not need explanatory prose.
+* Use `@brief`, `@param`, `@return`, `@throws`, `@pre`, and `@post` where they make the teaching contract clearer.
+
 ## Academic Integrity
 
 The goal is for students to learn by implementing a DBMS kernel, not by watching an AI generate solutions.

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "common/errors.h"
 #include "execution_defs.h"
 #include "common/common.h"
@@ -11,9 +13,9 @@
 
 class AbstractExecutor {
    public:
-    Rid _abstract_rid;
+    Rid _abstract_rid{};
 
-    Context *context_;
+    Context *context_ = nullptr;
 
     virtual ~AbstractExecutor() = default;
 
@@ -39,8 +41,14 @@ class AbstractExecutor {
         throw NotImplementedError("AbstractExecutor::get_col_offset");
     };
 
-    std::vector<ColMeta>::const_iterator get_col(const std::vector<ColMeta> &rec_cols, const TabCol &target) {
-        auto pos = std::find_if(rec_cols.begin(), rec_cols.end(), [&](const ColMeta &col) {
+    /**
+     * @brief 在记录 schema 中查找目标列。
+     * @note C++20：`std::ranges::find_if` 对整个 vector 查找，返回的 const_iterator 与
+     *       旧式 `find_if(begin, end, pred)` 相同，学生作业里也可继续用后者。
+     */
+    static std::vector<ColMeta>::const_iterator get_col(const std::vector<ColMeta> &rec_cols,
+                                                        const TabCol &target) {
+        const auto pos = std::ranges::find_if(rec_cols, [&](const ColMeta &col) {
             return col.tab_name == target.tab_name && col.name == target.col_name;
         });
         if (pos == rec_cols.end()) {

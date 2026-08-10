@@ -28,10 +28,13 @@ class QlManager {
     QlManager(SmManager *sm_manager, TransactionManager *txn_mgr) 
         : sm_manager_(sm_manager),  txn_mgr_(txn_mgr) {}
 
-    void run_mutli_query(std::shared_ptr<Plan> plan, Context *context);
-    void run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Context *context);
-    void select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols,
+    // plan / sel_cols 仅只读使用，故用 const 引用，避免 shared_ptr / vector 按值拷贝。
+    // 若函数需要接管所有权，应改为按值参数并在内部 std::move（见 Portal::start）。
+    void run_mutli_query(const std::shared_ptr<Plan> &plan, Context *context) const;
+    void run_cmd_utility(const std::shared_ptr<Plan> &plan, txn_id_t *txn_id, Context *context);
+    static void select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, const std::vector<TabCol> &sel_cols,
                         Context *context);
 
-    void run_dml(std::unique_ptr<AbstractExecutor> exec);
+    // unique_ptr 按值传入：调用方 std::move 后所有权转移到本函数。
+    static void run_dml(std::unique_ptr<AbstractExecutor> exec);
 };

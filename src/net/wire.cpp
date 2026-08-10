@@ -79,7 +79,7 @@ void AppendU32(std::string* out, uint32_t v) {
 }
 
 void AppendU64(std::string* out, uint64_t v) {
-    const uint32_t hi = htonl(static_cast<uint32_t>(v >> 32));
+    const uint32_t hi = htonl(static_cast<uint32_t>(v >> 32U));
     const uint32_t lo = htonl(static_cast<uint32_t>(v & 0xffffffffu));
     out->append(reinterpret_cast<const char*>(&hi), sizeof(hi));
     out->append(reinterpret_cast<const char*>(&lo), sizeof(lo));
@@ -125,7 +125,7 @@ bool ReadU64(const std::string& buf, size_t* off, uint64_t* v) {
     if (!ReadU32(buf, off, &hi) || !ReadU32(buf, off, &lo)) {
         return false;
     }
-    *v = (static_cast<uint64_t>(hi) << 32) | lo;
+    *v = (static_cast<uint64_t>(hi) << 32U) | static_cast<uint64_t>(lo);
     return true;
 }
 
@@ -158,7 +158,7 @@ bool WriteVectorsAll(int fd, iovec* vectors, size_t vector_count) {
             return false;
         }
 
-        size_t consumed = static_cast<size_t>(written);
+        auto consumed = static_cast<size_t>(written);
         while (vector_count > 0 && consumed >= vectors[0].iov_len) {
             consumed -= vectors[0].iov_len;
             ++vectors;
@@ -256,7 +256,12 @@ bool ConfigureConnectedSocket(int fd, uint32_t timeout_ms) {
     }
 
     const int descriptor_flags = ::fcntl(fd, F_GETFD);
-    if (descriptor_flags < 0 || ::fcntl(fd, F_SETFD, descriptor_flags | FD_CLOEXEC) < 0) {
+    if (descriptor_flags < 0) {
+        return false;
+    }
+    const int close_on_exec_flags =
+        static_cast<int>(static_cast<unsigned int>(descriptor_flags) | static_cast<unsigned int>(FD_CLOEXEC));
+    if (::fcntl(fd, F_SETFD, close_on_exec_flags) < 0) {
         return false;
     }
 
@@ -267,8 +272,8 @@ bool ConfigureConnectedSocket(int fd, uint32_t timeout_ms) {
     }
 #endif
 
-    const timeval timeout{static_cast<time_t>(timeout_ms / 1000u),
-                          static_cast<suseconds_t>((timeout_ms % 1000u) * 1000u)};
+    const timeval timeout{.tv_sec = static_cast<time_t>(timeout_ms / 1000U),
+                          .tv_usec = static_cast<suseconds_t>((timeout_ms % 1000U) * 1000U)};
     if (::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0 ||
         ::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) {
         return false;
@@ -650,15 +655,9 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
             result.diagnostic = std::move(read_diagnostic);
             return result;
         }
-        if (frame.flags != 0) {
-            result.status = ExecuteStatus::ProtocolError;
-            result.diagnostic = "non-zero response flags";
-            return result;
-        }
-
         switch (frame.tag) {
             case kTagCommandOk:
-                if (state != ResponseState::AwaitFirst || !frame.payload.empty()) {
+                if (frame.flags != 0 || state != ResponseState::AwaitFirst || !frame.payload.empty()) {
                     result.status = ExecuteStatus::ProtocolError;
                     result.diagnostic = "invalid COMMAND_OK";
                     return result;
@@ -668,12 +667,22 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
 
             case kTagError:
             case kTagTransactionAbort:
+                if (frame.flags != 0) {
+                    result.status = ExecuteStatus::ProtocolError;
+                    result.diagnostic = "invalid error response flags";
+                    return result;
+                }
                 result.status = frame.tag == kTagError ? ExecuteStatus::SqlError : ExecuteStatus::TransactionAbort;
                 result.text.clear();
                 result.diagnostic = std::move(frame.payload);
                 return result;
 
             case kTagMeta: {
+                if ((static_cast<unsigned int>(frame.flags) & ~static_cast<unsigned int>(kFlagRawText)) != 0U) {
+                    result.status = ExecuteStatus::ProtocolError;
+                    result.diagnostic = "invalid META flags";
+                    return result;
+                }
                 if (state != ResponseState::AwaitFirst) {
                     result.status = ExecuteStatus::ProtocolError;
                     result.diagnostic = "duplicate META";
@@ -716,8 +725,13 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
                 }
 
                 state = ResponseState::Rows;
-                raw_text_result = result.columns.size() == 1 && result.columns[0].sql_type == kTypeChar &&
-                                  (result.columns[0].name == "output" || result.columns[0].name == "database");
+                raw_text_result = (frame.flags & kFlagRawText) != 0;
+                if (raw_text_result &&
+                    (result.columns.size() != 1 || result.columns[0].sql_type != kTypeChar)) {
+                    result.status = ExecuteStatus::ProtocolError;
+                    result.diagnostic = "raw text META must contain one CHAR column";
+                    return result;
+                }
                 if (options.on_meta) {
                     try {
                         if (!options.on_meta(result.columns)) {
@@ -739,7 +753,7 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
             }
 
             case kTagRow: {
-                if (state != ResponseState::Rows || result.columns.empty()) {
+                if (frame.flags != 0 || state != ResponseState::Rows || result.columns.empty()) {
                     result.status = ExecuteStatus::ProtocolError;
                     result.diagnostic = "ROW before META";
                     return result;
@@ -790,7 +804,7 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
             }
 
             case kTagResultEnd: {
-                if (state != ResponseState::Rows) {
+                if (frame.flags != 0 || state != ResponseState::Rows) {
                     result.status = ExecuteStatus::ProtocolError;
                     result.diagnostic = "RESULT_END before META";
                     return result;

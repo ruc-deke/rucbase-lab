@@ -30,5 +30,6 @@ CMakeUserPresets.json
 /src/parser/build/
 *.zip
 
-deps/
+deps/*
+!deps/nlohmann/
 .dockerignore

@@ -1,15 +1,15 @@
 // Copyright (c) 2023-2026 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
+#include "parser/parser.h"
+
+#include <gtest/gtest.h>
+
 #include <atomic>
 #include <memory>
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <gtest/gtest.h>
-
-#include "parser/parser.h"
 
 namespace {
 
@@ -120,8 +120,7 @@ TEST(ParserTest, RejectsMalformedLexemes) {
     ASSERT_TRUE(result.error.has_value());
     EXPECT_EQ(result.error->message, "integer literal is out of range");
 
-    const std::string oversized_float =
-        "insert into tb values (" + std::string(400, '9') + ".0);";
+    const std::string oversized_float = "insert into tb values (" + std::string(400, '9') + ".0);";
     result = Parse(oversized_float);
     ASSERT_FALSE(result.ok());
     ASSERT_TRUE(result.error.has_value());
@@ -152,9 +151,9 @@ TEST(ParserTest, RejectsMalformedLexemes) {
     EXPECT_EQ(result.error->line, 1);
     EXPECT_EQ(result.error->column, 12);
     EXPECT_EQ(result.error->message, "unexpected character");
-    EXPECT_NE(rucbase::parser::FormatError(full_width_semicolon, *result.error)
-                  .find("\nshow tables；;\n           ^\n"),
-              std::string::npos);
+    EXPECT_NE(
+        rucbase::parser::FormatError(full_width_semicolon, *result.error).find("\nshow tables；;\n           ^\n"),
+        std::string::npos);
 }
 
 TEST(ParserTest, TracksLocationsAcrossLines) {
@@ -168,6 +167,7 @@ TEST(ParserTest, TracksLocationsAcrossLines) {
 TEST(ParserTest, ConcurrentCallsAreSafe) {
     std::atomic<bool> success{true};
     std::vector<std::thread> threads;
+    threads.reserve(8);
     for (int thread_index = 0; thread_index < 8; ++thread_index) {
         threads.emplace_back([&success] {
             for (int iteration = 0; iteration < 50; ++iteration) {

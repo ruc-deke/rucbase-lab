@@ -17,6 +17,7 @@ set(RUCBASE_CORE_SOURCES
         replacer/lru_replacer.cpp
         storage/buffer_pool_manager.cpp
         storage/disk_manager.cpp
+        system/sm_meta.cpp
         system/sm_manager.cpp
         transaction/concurrency/lock_manager.cpp
         transaction/transaction_manager.cpp)
@@ -24,7 +25,8 @@ set(RUCBASE_CORE_SOURCES
 add_library(rucbase_core STATIC ${RUCBASE_CORE_SOURCES})
 add_library(rucbase::core ALIAS rucbase_core)
 target_include_directories(rucbase_core PUBLIC
-        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>")
+        "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>"
+        PRIVATE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>")
 target_link_libraries(rucbase_core
         PUBLIC Threads::Threads
         PRIVATE rucbase::project_options)

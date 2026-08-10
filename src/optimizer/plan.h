@@ -7,6 +7,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 #include "parser/ast.h"
 
@@ -54,10 +55,10 @@ class ScanPlan : public Plan
             cols_ = tab.cols;
             len_ = cols_.back().offset + cols_.back().len;
             fed_conds_ = conds_;
-            index_col_names_ = index_col_names;
+            index_col_names_ = std::move(index_col_names);
         
         }
-        ~ScanPlan(){}
+        ~ScanPlan() override = default;
         // 以下变量同ScanExecutor中的变量
         std::string tab_name_;                     
         std::vector<ColMeta> cols_;                
@@ -79,7 +80,7 @@ class JoinPlan : public Plan
             conds_ = std::move(conds);
             type = ast::JoinType::Inner;
         }
-        ~JoinPlan(){}
+        ~JoinPlan() override = default;
         // 左节点
         std::shared_ptr<Plan> left_;
         // 右节点
@@ -100,7 +101,7 @@ class ProjectionPlan : public Plan
             subplan_ = std::move(subplan);
             sel_cols_ = std::move(sel_cols);
         }
-        ~ProjectionPlan(){}
+        ~ProjectionPlan() override = default;
         std::shared_ptr<Plan> subplan_;
         std::vector<TabCol> sel_cols_;
         
@@ -113,10 +114,10 @@ class SortPlan : public Plan
         {
             Plan::tag = tag;
             subplan_ = std::move(subplan);
-            sel_col_ = sel_col;
+            sel_col_ = std::move(sel_col);
             is_desc_ = is_desc;
         }
-        ~SortPlan(){}
+        ~SortPlan() override = default;
         std::shared_ptr<Plan> subplan_;
         TabCol sel_col_;
         bool is_desc_;
@@ -138,7 +139,7 @@ class DMLPlan : public Plan
             conds_ = std::move(conds);
             set_clauses_ = std::move(set_clauses);
         }
-        ~DMLPlan(){}
+        ~DMLPlan() override = default;
         std::shared_ptr<Plan> subplan_;
         std::string tab_name_;
         std::vector<Value> values_;
@@ -157,7 +158,7 @@ class DDLPlan : public Plan
             cols_ = std::move(cols);
             tab_col_names_ = std::move(col_names);
         }
-        ~DDLPlan(){}
+        ~DDLPlan() override = default;
         std::string tab_name_;
         std::vector<std::string> tab_col_names_;
         std::vector<ColDef> cols_;
@@ -172,7 +173,7 @@ class OtherPlan : public Plan
             Plan::tag = tag;
             tab_name_ = std::move(tab_name);            
         }
-        ~OtherPlan(){}
+        ~OtherPlan() override = default;
         std::string tab_name_;
 };
 
@@ -184,6 +185,6 @@ class plannerInfo{
     std::shared_ptr<Plan> plan;
     std::vector<std::shared_ptr<Plan>> table_scan_executors;
     std::vector<SetClause> set_clauses;
-    plannerInfo(std::shared_ptr<ast::SelectStmt> parse_):parse(std::move(parse_)){}
+    explicit plannerInfo(std::shared_ptr<ast::SelectStmt> parse_):parse(std::move(parse_)){}
 
 };

@@ -1,6 +1,6 @@
 BasedOnStyle: Google
 Language: Cpp
-Standard: c++17
+Standard: c++20
 
 IndentWidth: 4
 ContinuationIndentWidth: 4

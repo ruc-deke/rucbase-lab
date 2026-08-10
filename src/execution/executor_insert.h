@@ -14,18 +14,19 @@ class InsertExecutor : public AbstractExecutor {
     std::vector<Value> values_;     // 需要插入的数据
     RmFileHandle *fh_;              // 表的数据文件句柄
     std::string tab_name_;          // 表名称
-    Rid rid_;                       // 插入的位置，由于系统默认插入时不指定位置，因此当前rid_在插入后才赋值
+    Rid rid_{.page_no = INVALID_PAGE_ID, .slot_no = -1};  // 成功插入后替换为实际位置。
     SmManager *sm_manager_;
 
    public:
     InsertExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<Value> values, Context *context) {
         sm_manager_ = sm_manager;
         tab_ = sm_manager_->db_.get_table(tab_name);
-        values_ = values;
         tab_name_ = tab_name;
         if (values.size() != tab_.cols.size()) {
             throw InvalidValueCountError();
         }
+        // 校验通过后再 move，避免异常路径上留下半初始化状态。
+        values_ = std::move(values);
         fh_ = sm_manager_->fhs_.at(tab_name).get();
         context_ = context;
     };
@@ -45,17 +46,16 @@ class InsertExecutor : public AbstractExecutor {
         // Insert into record file
         rid_ = fh_->insert_record(rec.data, context_);
         
-        // Insert into index
-        for(size_t i = 0; i < tab_.indexes.size(); ++i) {
-            auto& index = tab_.indexes[i];
+        // 范围 for 遍历 indexes；内层再遍历 index.cols 拼复合键。
+        for (auto& index : tab_.indexes) {
             auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
-            char* key = new char[index.col_tot_len];
+            std::vector<char> key(index.col_tot_len);
             int offset = 0;
-            for(size_t i = 0; i < index.col_num; ++i) {
-                memcpy(key + offset, rec.data + index.cols[i].offset, index.cols[i].len);
-                offset += index.cols[i].len;
+            for (const auto& index_col : index.cols) {
+                memcpy(key.data() + offset, rec.data + index_col.offset, index_col.len);
+                offset += index_col.len;
             }
-            ih->insert_entry(key, rid_, context_->txn_);
+            ih->insert_entry(key.data(), rid_, context_->txn_);
         }
         return nullptr;
     }

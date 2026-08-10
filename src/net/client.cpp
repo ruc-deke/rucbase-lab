@@ -81,7 +81,12 @@ ClientStatus ConnectAddress(const sockaddr* address, socklen_t address_length,
     }
 
     const int original_flags = ::fcntl(candidate.get(), F_GETFL);
-    if (original_flags < 0 || ::fcntl(candidate.get(), F_SETFL, original_flags | O_NONBLOCK) < 0) {
+    if (original_flags < 0) {
+        return Error(ClientError::ConnectFailed, ErrnoMessage("failed to read socket flags", errno));
+    }
+    const int nonblocking_flags =
+        static_cast<int>(static_cast<unsigned int>(original_flags) | static_cast<unsigned int>(O_NONBLOCK));
+    if (::fcntl(candidate.get(), F_SETFL, nonblocking_flags) < 0) {
         return Error(ClientError::ConnectFailed, ErrnoMessage("failed to configure nonblocking connect", errno));
     }
 
@@ -97,7 +102,7 @@ ClientStatus ConnectAddress(const sockaddr* address, socklen_t address_length,
             }
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now);
             const int timeout_ms = static_cast<int>(std::max<int64_t>(1, remaining.count()));
-            pollfd descriptor{candidate.get(), POLLOUT, 0};
+            pollfd descriptor{.fd = candidate.get(), .events = POLLOUT, .revents = 0};
             const int poll_result = ::poll(&descriptor, 1, timeout_ms);
             if (poll_result < 0 && errno == EINTR) {
                 continue;
@@ -240,7 +245,7 @@ ClientStatus Client::Connect(const Endpoint& endpoint, const ClientOptions& opti
         return Error(ClientError::ConfigureFailed, ErrnoMessage("failed to configure connected socket", errno));
     }
     if (!ClientHandshake(connected.get())) {
-        return Error(ClientError::HandshakeFailed, "wire handshake failed; server must speak RMDB wire protocol v3.0");
+        return Error(ClientError::HandshakeFailed, "wire handshake failed; server must speak RMDB wire protocol v3.1");
     }
 
     impl_->fd = connected.Release();

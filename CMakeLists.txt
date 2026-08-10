@@ -30,7 +30,7 @@ endif()
 
 add_library(rucbase_project_options INTERFACE)
 add_library(rucbase::project_options ALIAS rucbase_project_options)
-target_compile_features(rucbase_project_options INTERFACE cxx_std_17)
+target_compile_features(rucbase_project_options INTERFACE cxx_std_20)
 target_compile_options(rucbase_project_options INTERFACE
         $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wall>
         # Lab skeletons intentionally leave members unused until students implement them.
@@ -62,8 +62,34 @@ endif()
 find_package(Threads REQUIRED)
 include(CTest)
 
+# GoogleTest: prefer vendored submodule, then system package, then optional FetchContent.
 if(BUILD_TESTING)
-    include(cmake/Dependencies.cmake)
+    option(RUCBASE_FETCH_DEPENDENCIES
+            "Download missing third-party dependencies during configuration" ON)
+
+    if(EXISTS "${PROJECT_SOURCE_DIR}/deps/googletest/CMakeLists.txt")
+        set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+        add_subdirectory("${PROJECT_SOURCE_DIR}/deps/googletest"
+                "${CMAKE_BINARY_DIR}/_deps/googletest-build" EXCLUDE_FROM_ALL)
+    else()
+        find_package(GTest CONFIG QUIET)
+
+        if(NOT GTest_FOUND AND RUCBASE_FETCH_DEPENDENCIES)
+            include(FetchContent)
+            FetchContent_Declare(
+                    googletest
+                    URL https://github.com/google/googletest/archive/52eb8108c5bdec04579160ae17225d66034bd723.zip
+                    TIMEOUT 60)
+            set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+            FetchContent_MakeAvailable(googletest)
+        endif()
+    endif()
+
+    if(NOT TARGET GTest::gtest_main)
+        message(FATAL_ERROR
+                "GoogleTest was not found. Initialize deps/googletest, install GTest, "
+                "or configure with RUCBASE_FETCH_DEPENDENCIES=ON.")
+    endif()
 endif()
 
 add_subdirectory(src)

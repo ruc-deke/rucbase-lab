@@ -1,0 +1,11 @@
+---
+InheritParentConfig: true
+Checks: >
+  -bugprone-command-processor,
+  -bugprone-exception-escape,
+  -bugprone-random-generator-seed,
+  -bugprone-throwing-static-initialization,
+  -bugprone-unchecked-optional-access,
+  -clang-analyzer-security.insecureAPI.rand,
+  -clang-analyzer-security.insecureAPI.strcpy
+...
