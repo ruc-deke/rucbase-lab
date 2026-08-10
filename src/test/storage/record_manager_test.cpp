@@ -3,19 +3,22 @@
 
 #undef NDEBUG
 
-#define private public
-#include "record/rm.h"
-#undef private  // for use private variables in "rm.h"
-
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <unordered_map>
 
 #include "gtest/gtest.h"
+
+// Keep the access-control shim from rewriting declarations in libstdc++ headers.
+#define private public
+#include "record/rm.h"
+#undef private  // for use private variables in "rm.h"
+
 #define BUFFER_LENGTH 8192
 
 void rand_buf(int size, char* out_buf) {
