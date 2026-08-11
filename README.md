@@ -1,4 +1,4 @@
-<div style="text-align: center;">
+<div align="center">
 
 <img src="docs/pics/RUCBase.png" alt="RUCBase" width="680">
 

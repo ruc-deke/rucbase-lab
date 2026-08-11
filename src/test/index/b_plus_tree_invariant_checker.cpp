@@ -108,7 +108,9 @@ private:
                               .is_leaf = node.is_leaf_page(),
                               .size = node.get_size(),
                               .previous_leaf = node.get_prev_leaf(),
-                              .next_leaf = node.get_next_leaf()};
+                              .next_leaf = node.get_next_leaf(),
+                              .keys = {},
+                              .children = {}};
         if (snapshot.size < 0 || snapshot.size > header_.tree_order_ + 1) {
             add(context + ": page " + std::to_string(page_no) + " has invalid size " + std::to_string(snapshot.size));
             return std::nullopt;

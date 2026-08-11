@@ -28,7 +28,7 @@ TEST(PageGuardValueTest, DefaultAndMovedFromGuardsAreHarmless) {
     EXPECT_TRUE(guard.drop());
 
     PageGuard moved = std::move(guard);
-    EXPECT_FALSE(guard);
+    EXPECT_FALSE(guard);  // NOLINT(bugprone-use-after-move): verifies the documented moved-from state.
     EXPECT_FALSE(moved);
     EXPECT_TRUE(moved.drop());
 }
@@ -71,7 +71,7 @@ TEST_F(PageGuardTest, ScopeAndExplicitDropReleaseExactlyOnePin) {
         guard.mark_dirty();
 
         PageGuard moved = std::move(guard);
-        EXPECT_FALSE(guard);
+        EXPECT_FALSE(guard);  // NOLINT(bugprone-use-after-move): verifies the documented moved-from state.
         ASSERT_TRUE(moved);
         EXPECT_EQ(std::strcmp((*moved).get_data(), "guard"), 0);
     }
@@ -97,7 +97,7 @@ TEST_F(PageGuardTest, MoveAssignmentReleasesThePreviousPin) {
     ASSERT_TRUE(second);
     first = std::move(second);
     EXPECT_TRUE(first);
-    EXPECT_FALSE(second);
+    EXPECT_FALSE(second);  // NOLINT(bugprone-use-after-move): verifies the documented moved-from state.
     EXPECT_EQ(first.page_id().page_no, second_id.page_no);
     PinSnapshot expected = baseline;
     ++expected[second_id];
