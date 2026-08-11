@@ -1,0 +1,4 @@
+{"status":"result_set","columns":[{"name":"id","type":"int32"},{"name":"name","type":"string"},{"name":"score","type":"float32"}],"rows":[[2,"xiaoming",95.0]]}
+{"status":"result_set","columns":[{"name":"id","type":"int32"},{"name":"name","type":"string"},{"name":"score","type":"float32"}],"rows":[[2,"xiaoming",95.0]]}
+{"status":"transaction_abort"}
+{"status":"result_set","columns":[{"name":"id","type":"int32"},{"name":"name","type":"string"},{"name":"score","type":"float32"}],"rows":[[2,"xiaoming",75.5]]}

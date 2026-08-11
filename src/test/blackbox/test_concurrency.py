@@ -1,7 +1,7 @@
-from collections import Counter
 from pathlib import Path
 
 import pytest
+from wire_assertions import assert_typed_output
 
 CONCURRENCY_DIR = Path(__file__).parents[1] / "concurrency" / "concurrency_sql"
 BASIC_CASES = [
@@ -15,15 +15,6 @@ BASIC_CASES = [
 BONUS_CASES = [f"phantom_read_test_{index}" for index in range(1, 5)]
 
 
-def nonempty_lines(path: Path) -> list[str]:
-    assert path.is_file(), f"expected output file was not created: {path}"
-    return [line.rstrip("\n") for line in path.read_text().splitlines() if line]
-
-
-def normalized_lines(path: Path) -> list[str]:
-    return ["".join(line.split()) for line in nonempty_lines(path)]
-
-
 @pytest.mark.parametrize("case_name", BASIC_CASES + BONUS_CASES)
 def test_concurrency(case_name, rmdb_server, binary_path) -> None:
     server = rmdb_server()
@@ -33,9 +24,5 @@ def test_concurrency(case_name, rmdb_server, binary_path) -> None:
         label=case_name,
     )
 
-    expected = CONCURRENCY_DIR / f"{case_name}_output.txt"
-    if case_name in BASIC_CASES:
-        assert Counter(result.stdout.splitlines()) == Counter(nonempty_lines(expected))
-    else:
-        actual = ["".join(line.split()) for line in result.stdout.splitlines() if line]
-        assert actual == normalized_lines(expected)
+    expected = CONCURRENCY_DIR / f"{case_name}_output.typed.jsonl"
+    assert_typed_output(result.stdout, expected, ordered_rows=case_name in BONUS_CASES)

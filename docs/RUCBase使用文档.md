@@ -150,7 +150,7 @@ cmake --build --preset debug --target lab1_lru_replacer_test -j 4
 ./build/debug/bin/lab1_lru_replacer_test
 ```
 
-黑盒测试需要 pytest。缺少 pytest 时，`blackbox_pytest_dependency` 会明确失败，不会把“没有运行黑盒测试”误报为成功。测试程序会为每个用例创建独立的临时数据库并选择动态端口；失败日志位于 `build/debug/test-logs/`。
+黑盒测试需要 pytest。缺少 pytest 时，`blackbox_pytest_dependency` 会明确失败，不会把“没有运行黑盒测试”误报为成功。测试程序会为每个用例创建独立的临时数据库并选择动态端口；失败日志位于 `build/debug/test-logs/`。黑盒客户端通过 Wire callback 收集类型化单元格，测试直接比较列名、SQL 类型、NULL 和未经展示格式化的值；CLI 的定宽表格、字符串截断和浮点格式化不参与判分。测试用 `CHAR` 数据约定为合法 UTF-8 文本。
 
 各 Lab 文档还保留了与课程讲义兼容的 Python 测试入口。测试范围和评分以对应 Lab 文档为准。
 

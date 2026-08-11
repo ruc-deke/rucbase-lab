@@ -47,12 +47,19 @@ endfunction()
 rucbase_add_gtest(lab1_disk_manager_test storage/disk_manager_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_lru_replacer_test storage/lru_replacer_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_buffer_pool_manager_test storage/buffer_pool_manager_test.cpp rucbase::core unit lab1)
+rucbase_add_gtest(lab1_page_guard_test storage/page_guard_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_record_manager_test storage/record_manager_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_record_types_test record/rm_record_test.cpp rucbase::core unit lab1)
 
 rucbase_add_gtest(lab2_b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp rucbase::core unit lab2)
+foreach(target IN ITEMS
+        lab2_b_plus_tree_insert_test
+        lab2_b_plus_tree_delete_test
+        lab2_b_plus_tree_concurrent_test)
+    target_sources(${target} PRIVATE index/b_plus_tree_invariant_checker.cpp)
+endforeach()
 rucbase_add_gtest(lab2_index_layout_test index/index_layout_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_index_manager_test index/index_manager_test.cpp rucbase::core unit lab2)
 
@@ -62,10 +69,17 @@ rucbase_add_gtest(framework_parser_test parser/parser_test.cpp rucbase::parser u
 rucbase_add_gtest(framework_query_planning_test query/analyze_planner_test.cpp rucbase::core unit framework smoke lab3)
 target_link_libraries(framework_query_planning_test PRIVATE rucbase::parser)
 
+add_library(rucbase_blackbox_support STATIC typed_result.cpp)
+add_library(rucbase::blackbox_support ALIAS rucbase_blackbox_support)
+target_include_directories(rucbase_blackbox_support PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(rucbase_blackbox_support
+        PUBLIC rucbase::wire
+        PRIVATE rucbase::project_options)
+
 function(rucbase_add_blackbox_client target_name)
     add_executable(${target_name} ${ARGN})
     target_link_libraries(${target_name} PRIVATE
-            rucbase::wire
+            rucbase::blackbox_support
             rucbase::project_options)
 endfunction()
 
@@ -126,6 +140,10 @@ if(Python3_Interpreter_FOUND)
                 FIXTURES_REQUIRED blackbox_dependencies
                 TIMEOUT 180)
     endfunction()
+
+    rucbase_add_blackbox_test(blackbox_typed_result_assertions_test
+            LABELS blackbox
+            NODES "test_wire_assertions.py")
 
     # Handout-compatible "basic" suites (match transaction_test.py / concurrency_test.py).
     # Bonus cases are registered separately so students who only finished basics pass CTest.

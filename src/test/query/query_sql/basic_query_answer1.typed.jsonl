@@ -1,0 +1,7 @@
+{"status":"result_set","columns":[{"name":"Tables","type":"string"}],"rows":[["student"],["grade"]]}
+{"status":"result_set","columns":[{"name":"Tables","type":"string"}],"rows":[["grade"]]}
+{"status":"sql_error"}
+{"status":"sql_error"}
+{"status":"result_set","columns":[{"name":"Tables","type":"string"}],"rows":[["grade"]]}
+{"status":"sql_error"}
+{"status":"sql_error"}

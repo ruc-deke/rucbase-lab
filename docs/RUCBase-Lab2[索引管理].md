@@ -387,6 +387,8 @@ cmake --build --preset debug -j 4
 ctest --preset lab2
 ```
 
+三个 B+ 树测试共用一个只读 invariant checker。它会在小规模操作后或大批量操作的分批边界检查节点占用率、键顺序、父子指针、子树范围、叶子深度、叶链，以及非空树的 `page_count` 与可达节点数是否一致。checker 仅能在没有线程正在修改树时运行；并发用例会在所有 worker `join` 后检查。测试还会直接比较操作前后的 pin 快照，以发现未释放的页面引用。
+
 注意：
 1. 在本实验中的所有测试只调用`get_value()`、`insert_entry()`、`delete_entry()`这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
 2. 索引单元测试直接使用 `IndexManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。

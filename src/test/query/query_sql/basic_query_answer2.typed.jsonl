@@ -1,0 +1,8 @@
+{"status":"result_set","columns":[{"name":"id","type":"int32"},{"name":"name","type":"string"},{"name":"major","type":"string"}],"rows":[[1,"TomTomTom","Computer ScienceComputer Science"],[2,"JerryJerr","Computer ScienceComputer Science"],[3,"JackJackJ","Electrical Engineeringer Science"],[3,"JerryJerr","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]]}
+{"status":"result_set","columns":[{"name":"id","type":"int32"}],"rows":[[2]]}
+{"status":"result_set","columns":[{"name":"major","type":"string"}],"rows":[["Computer ScienceComputer Science"],["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]]}
+{"status":"result_set","columns":[{"name":"name","type":"string"},{"name":"major","type":"string"}],"rows":[]}
+{"status":"result_set","columns":[{"name":"name","type":"string"},{"name":"major","type":"string"}],"rows":[["JerryJerr","Computer ScienceComputer Science"]]}
+{"status":"result_set","columns":[{"name":"name","type":"string"},{"name":"id","type":"int32"}],"rows":[["KangKanga",0],["JerryJerr",3]]}
+{"status":"sql_error"}
+{"status":"sql_error"}

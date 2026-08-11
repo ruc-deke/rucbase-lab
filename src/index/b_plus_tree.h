@@ -142,6 +142,7 @@ public:
 class BPlusTree {
     friend class IndexScan;
     friend class IndexManager;
+    friend class BPlusTreeInvariantChecker;
 
 private:
     DiskManager* disk_manager_;               ///< 非拥有指针。

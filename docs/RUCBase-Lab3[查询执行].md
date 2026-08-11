@@ -133,6 +133,4 @@ python3 query_test_basic.py  # 100分
 
 **注意⚠️：**
 
-当前版本通过 Wire 客户端接收 `SELECT` 的类型化结果，测试客户端将格式化结果输出到
-stdout，黑盒测试直接比较客户端输出。服务端不再生成或维护 `output.txt`；执行错误以
-Wire `ERROR` 响应返回，测试客户端将其归一化为 `failure`。
+当前版本通过 Wire 客户端接收 `SELECT` 的类型化结果。黑盒客户端关闭 CLI 文本格式化，把列名、`INT32` / `FLOAT32` / `CHAR`、NULL 和未经展示格式化的单元格编码为 JSONL 测试事件，再与独立的 `*.typed.jsonl` golden 比较；测试用 `CHAR` 数据约定为合法 UTF-8 文本。因此长字符串不会被 16 字符定宽表格截断，浮点也不会先格式化成 6 位小数再判分。同目录旧 `.txt` 结果仅作为人类可读参考，不参与运行时判分。服务端不生成或维护 `output.txt`；Wire `ERROR` 和 `TRANSACTION_ABORT` 会作为不同的类型化状态比较。

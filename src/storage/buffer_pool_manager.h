@@ -10,6 +10,7 @@
 
 #include "common/config.h"
 #include "page.h"
+#include "page_guard.h"
 #include "replacer/lru_replacer.h"
 #include "replacer/replacer.h"
 
@@ -23,8 +24,8 @@ private:
         page_table_;                   // 帧号和页面号的映射哈希表，用于根据页面的PageId定位该页面的帧编号
     std::list<frame_id_t> free_list_;  // 空闲帧编号的链表
     DiskManager* disk_manager_;
-    Replacer* replacer_;  // buffer_pool的置换策略，当前赛题中为LRU置换策略
-    std::mutex latch_;    // 用于共享数据结构的并发控制
+    Replacer* replacer_;        // buffer_pool的置换策略，当前赛题中为LRU置换策略
+    mutable std::mutex latch_;  // 用于共享数据结构的并发控制；诊断快照也需要同步读取。
 
 public:
     BufferPoolManager(size_t pool_size, DiskManager* disk_manager)
@@ -53,15 +54,24 @@ public:
 public:
     Page* fetch_page(PageId page_id);
 
+    /** @brief 获取页面并用 move-only guard 管理本次 pin。 */
+    [[nodiscard]] PageGuard fetch_page_guard(PageId page_id);
+
     bool unpin_page(PageId page_id, bool is_dirty);
 
     bool flush_page(PageId page_id);
 
     Page* new_page(PageId* page_id);
 
+    /** @brief 新建页面并用 move-only guard 管理本次 pin。 */
+    [[nodiscard]] PageGuard new_page_guard(PageId* page_id);
+
     bool delete_page(PageId page_id);
 
     void flush_all_pages(int fd);
+
+    /** @brief 捕获所有仍被固定页面及其 pin_count，不改变缓冲池状态。 */
+    [[nodiscard]] PinSnapshot get_pin_snapshot() const;
 
 private:
     bool find_victim_page(frame_id_t* frame_id);

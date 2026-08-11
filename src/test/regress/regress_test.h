@@ -10,7 +10,6 @@
 
 constexpr int kDefaultPort = 8765;
 
-rucbase::wire::Client connect_database(const char *unix_socket_path, const char *server_host,
-                                       int server_port);
-rucbase::wire::ExecuteResult execute_sql(rucbase::wire::Client *client, const std::string &sql);
-void start_test(rucbase::wire::Client *client, const std::string &infile);
+rucbase::wire::Client connect_database(const char* unix_socket_path, const char* server_host, int server_port);
+rucbase::wire::ExecuteResult execute_sql(rucbase::wire::Client* client, const std::string& sql);
+bool start_test(rucbase::wire::Client* client, const std::string& infile);

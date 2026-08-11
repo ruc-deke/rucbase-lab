@@ -1,16 +1,18 @@
 // Copyright (c) 2023-2026 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
-#include "concurrency_test.h"
-#include "../regress/regress_test.h"
-#include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+
 #include <iostream>
 
+#include "../regress/regress_test.h"
+#include "concurrency_test.h"
+#include "typed_result.h"
+
 int main(int argc, char* argv[]) {
-    const char *unix_socket_path = nullptr;
-    const char *server_host = "127.0.0.1";
+    const char* unix_socket_path = nullptr;
+    const char* server_host = "127.0.0.1";
     int server_port = kDefaultPort;
     int opt;
 
@@ -20,7 +22,7 @@ int main(int argc, char* argv[]) {
                 unix_socket_path = optarg;
                 break;
             case 'p':
-                char *ptr;
+                char* ptr;
                 server_port = (int)strtol(optarg, &ptr, 10);
                 break;
             case 'h':
@@ -41,30 +43,27 @@ int main(int argc, char* argv[]) {
     analyzer.analyze_test_case();
 
     auto preload_client = connect_database(unix_socket_path, server_host, server_port);
-    for(size_t i = 0; i < analyzer.preload.size(); ++i) {
-        if (!execute_sql(&preload_client, analyzer.preload[i]).ok()) {
-            break;
+    for (size_t i = 0; i < analyzer.preload.size(); ++i) {
+        const auto preload_result = execute_sql(&preload_client, analyzer.preload[i]);
+        if (!preload_result.ok()) {
+            std::cerr << "preload failed: "
+                      << (preload_result.diagnostic.empty() ? "unknown error" : preload_result.diagnostic) << '\n';
+            return 1;
         }
     }
     preload_client.Close();
 
-    for(size_t i = 0; i < analyzer.transactions.size(); ++i) {
+    for (size_t i = 0; i < analyzer.transactions.size(); ++i) {
         analyzer.transactions[i]->client = connect_database(unix_socket_path, server_host, server_port);
     }
 
     const OperationPermutation& permutation = analyzer.permutation;
-    for(size_t i = 0; i < permutation.operations.size(); ++i) {
-        const auto transaction_index =
-            static_cast<size_t>(permutation.operations[i]->txn_id);
+    for (size_t i = 0; i < permutation.operations.size(); ++i) {
+        const auto transaction_index = static_cast<size_t>(permutation.operations[i]->txn_id);
         Transaction* txn = analyzer.transactions[transaction_index].get();
-        const rucbase::wire::ExecuteResult result =
-            execute_sql(&txn->client, permutation.operations[i]->sql);
-        if (result.ok()) {
-            std::cout << result.text;
-        } else {
-            std::cerr << "EXEC_STREAM failed: "
-                      << (result.diagnostic.empty() ? "unknown error" : result.diagnostic) << '\n';
-            std::cout << "failure\n";
+        if (!rucbase::test::ExecuteAndWriteTypedResult(&txn->client, permutation.operations[i]->sql, std::cout,
+                                                       std::cerr)) {
+            return 1;
         }
     }
     return 0;

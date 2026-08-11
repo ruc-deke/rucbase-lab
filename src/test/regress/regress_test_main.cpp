@@ -7,8 +7,8 @@
 #include "regress_test.h"
 
 int main(int argc, char** argv) {
-    const char *unix_socket_path = nullptr;
-    const char *server_host = "127.0.0.1";
+    const char* unix_socket_path = nullptr;
+    const char* server_host = "127.0.0.1";
     int server_port = kDefaultPort;
     int opt;
 
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
                 unix_socket_path = optarg;
                 break;
             case 'p':
-                char *ptr;
+                char* ptr;
                 server_port = (int)strtol(optarg, &ptr, 10);
                 break;
             case 'h':
@@ -36,5 +36,5 @@ int main(int argc, char** argv) {
     std::string infile = argv[optind];
 
     auto client = connect_database(unix_socket_path, server_host, server_port);
-    start_test(&client, infile);
+    return start_test(&client, infile) ? 0 : 1;
 }

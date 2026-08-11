@@ -19,6 +19,7 @@ set(RUCBASE_CORE_SOURCES
         replacer/lru_replacer.cpp
         storage/buffer_pool_manager.cpp
         storage/disk_manager.cpp
+        storage/page_guard.cpp
         system/sm_meta.cpp
         system/sm_manager.cpp
         transaction/concurrency/lock_manager.cpp

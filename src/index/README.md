@@ -31,5 +31,6 @@
 - `BPlusTree` 对应一个已打开的索引文件，持有内存中的文件头副本。
 - `BPlusTreeNode` 只是缓冲池页面的临时视图，不拥有页面；获取节点后必须正确解固定页面。
 - `IndexScan` 不拥有 B+ 树，只记录当前叶子页与槽号。
+- Lab2 测试中的 `b_plus_tree_invariant_checker` 是只读诊断工具，不代替学生实现查找、插入或删除算法。
 
 具体实验要求和接口说明见 [Lab 2：索引管理](<../../docs/RUCBase-Lab2[索引管理].md>)。

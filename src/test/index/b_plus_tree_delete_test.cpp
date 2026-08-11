@@ -13,6 +13,7 @@
 #include "index/b_plus_tree.h"
 #undef private  // 测试需要检查 B+ 树的内部不变式。
 
+#include "b_plus_tree_invariant_checker.h"
 #include "index/index_manager.h"
 #include "index/index_scan.h"
 #include "record/rm.h"
@@ -41,6 +42,7 @@ public:
     std::unique_ptr<Transaction> txn_;
     std::unique_ptr<RmManager> rm_;
     std::unique_ptr<SmManager> sm_;
+    PinSnapshot pin_baseline_;
 
 public:
     // This function is called before every test.
@@ -81,10 +83,12 @@ public:
         // 打开测试文件
         tree_ = index_manager_->open_index(TEST_FILE_NAME, TEST_COL);
         assert(tree_ != nullptr);
+        pin_baseline_ = buffer_pool_manager_->get_pin_snapshot();
     }
 
     // This function is called after every test.
     void TearDown() override {
+        EXPECT_EQ(buffer_pool_manager_->get_pin_snapshot(), pin_baseline_) << "buffer pool pin state changed";
         index_manager_->close_index(tree_.get());
         // index_manager_->destroy_index(TEST_FILE_NAME, index_no);  // 若不删除数据库文件，则将保留最后一个测试点的数据
 
@@ -94,6 +98,12 @@ public:
         }
         assert(disk_manager_->is_dir(TEST_DB_NAME));
     };
+
+    ::testing::AssertionResult tree_invariants_hold() const {
+        const auto report = BPlusTreeInvariantChecker::check(*tree_);
+        if (report.ok()) return ::testing::AssertionSuccess();
+        return ::testing::AssertionFailure() << report.describe();
+    }
 
     void ToGraph(const BPlusTree* tree, BPlusTreeNode* node, BufferPoolManager* bpm, std::ofstream& out) const {
         std::string leaf_prefix("LEAF_");
@@ -164,18 +174,20 @@ public:
             // Print leaves
             for (int i = 0; i < inner->get_size(); i++) {
                 BPlusTreeNode* child_node = tree->fetch_node(inner->value_at(i));
+                const bool child_is_leaf = child_node->is_leaf_page();
+                const page_id_t child_page_no = child_node->get_page_no();
                 ToGraph(tree, child_node, bpm, out);  // 继续递归
                 if (i > 0) {
                     BPlusTreeNode* sibling_node = tree->fetch_node(inner->value_at(i - 1));
-                    if (!sibling_node->is_leaf_page() && !child_node->is_leaf_page()) {
+                    if (!sibling_node->is_leaf_page() && !child_is_leaf) {
                         out << "{rank=same " << internal_prefix << sibling_node->get_page_no() << " " << internal_prefix
-                            << child_node->get_page_no() << "};\n";
+                            << child_page_no << "};\n";
                     }
-                    bpm->unpin_page(sibling_node->get_page_id(), false);
+                    tree->unpin_node(sibling_node, false);
                 }
             }
         }
-        bpm->unpin_page(node->get_page_id(), false);
+        tree->unpin_node(node, false);
     }
 
     /**
@@ -207,74 +219,13 @@ public:
     /**------ 以下为辅助检查函数 ------*/
 
     /**
-     * @brief 检查叶子层的前驱指针和后继指针
-     *
-     * @param tree
-     */
-    void check_leaf(const BPlusTree* tree) {
-        // check leaf list
-        page_id_t leaf_no = tree->file_header_->first_leaf_;
-        while (leaf_no != INDEX_LEAF_HEADER_PAGE) {
-            BPlusTreeNode* curr = tree->fetch_node(leaf_no);
-            BPlusTreeNode* prev = tree->fetch_node(curr->get_prev_leaf());
-            BPlusTreeNode* next = tree->fetch_node(curr->get_next_leaf());
-            // Ensure prev->next == curr && next->prev == curr
-            ASSERT_EQ(prev->get_next_leaf(), leaf_no);
-            ASSERT_EQ(next->get_prev_leaf(), leaf_no);
-            leaf_no = curr->get_next_leaf();
-            buffer_pool_manager_->unpin_page(curr->get_page_id(), false);
-            buffer_pool_manager_->unpin_page(prev->get_page_id(), false);
-            buffer_pool_manager_->unpin_page(next->get_page_id(), false);
-        }
-    }
-
-    /**
-     * @brief dfs遍历整个树，检查孩子结点的第一个和最后一个key是否正确
-     *
-     * @param tree 树
-     * @param now_page_no 当前遍历到的结点
-     */
-    void check_tree(const BPlusTree* tree, int now_page_no) {
-        BPlusTreeNode* node = tree->fetch_node(now_page_no);
-        if (node->is_leaf_page()) {
-            buffer_pool_manager_->unpin_page(node->get_page_id(), false);
-            return;
-        }
-        for (int i = 0; i < node->get_size(); i++) {                     // 遍历node的所有孩子
-            BPlusTreeNode* child = tree->fetch_node(node->value_at(i));  // 第i个孩子
-            // check parent
-            assert(child->get_parent_page_no() == now_page_no);
-            // check first key
-            int node_key = node->key_at(i);  // node的第i个key
-            int child_first_key = child->key_at(0);
-            int child_last_key = child->key_at(child->get_size() - 1);
-            if (i != 0) {
-                // 除了第0个key之外，node的第i个key与其第i个孩子的第0个key的值相同
-                ASSERT_EQ(node_key, child_first_key);
-            }
-            if (i + 1 < node->get_size()) {
-                // 满足制约大小关系
-                ASSERT_LT(child_last_key, node->key_at(i + 1));  // child_last_key < node->KeyAt(i + 1)
-            }
-
-            buffer_pool_manager_->unpin_page(child->get_page_id(), false);
-
-            check_tree(tree, node->value_at(i));  // 递归子树
-        }
-        buffer_pool_manager_->unpin_page(node->get_page_id(), false);
-    }
-
-    /**
      * @brief
      *
      * @param tree
      * @param mock 函数外部记录插入/删除后的(key,rid)
      */
     void check_all(BPlusTree* tree, const std::multimap<int, Rid>& mock) {
-        check_tree(tree, tree->file_header_->root_page_);
-        if (!tree->is_empty()) {
-            check_leaf(tree);
-        }
+        ASSERT_TRUE(tree_invariants_hold());
 
         for (auto& [mock_key, _] : mock) {
             // test lower bound
@@ -342,6 +293,7 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
         bool insert_ret = tree_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
     }
+    ASSERT_TRUE(tree_invariants_hold());
     Draw(buffer_pool_manager_.get(), "insert10.dot");
 
     // scan keys by GetValue()
@@ -365,6 +317,8 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest1) {
         index_key = (const char*)&key;
         bool delete_ret = tree_->delete_entry(index_key, txn_.get());  // 调用Delete
         ASSERT_EQ(delete_ret, true);
+        SCOPED_TRACE("after deleting key " + std::to_string(key));
+        ASSERT_TRUE(tree_invariants_hold());
 
         // Draw(buffer_pool_manager_.get(), "InsertAndDeleteTest1_delete" + std::to_string(key) + ".dot");
     }
@@ -413,6 +367,7 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
         bool insert_ret = tree_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
     }
+    ASSERT_TRUE(tree_invariants_hold());
     // Draw(buffer_pool_manager_.get(), "insert10.dot");
 
     // scan keys by GetValue()
@@ -433,6 +388,8 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
         index_key = (const char*)&key;
         bool delete_ret = tree_->delete_entry(index_key, txn_.get());  // 调用Delete
         ASSERT_EQ(delete_ret, true);
+        SCOPED_TRACE("after deleting key " + std::to_string(key));
+        ASSERT_TRUE(tree_invariants_hold());
 
         // Draw(buffer_pool_manager_.get(), "InsertAndDeleteTest2_delete" + std::to_string(key) + ".dot");
     }
@@ -494,7 +451,10 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
             // Draw(buffer_pool_manager_.get(),
             //      "MixTest2_" + std::to_string(num) + "_delete" + std::to_string(key) + ".dot");
         }
-        // check_all(tree_.get(), mock);
+        if ((add_cnt + del_cnt) % 256 == 0) {
+            SCOPED_TRACE("after randomized operation " + std::to_string(add_cnt + del_cnt));
+            ASSERT_TRUE(tree_invariants_hold());
+        }
     }
     std::cout << "Insert keys count: " << add_cnt << '\n' << "Delete keys count: " << del_cnt << '\n';
     check_all(tree_.get(), mock);
