@@ -1,29 +1,29 @@
-    /**
-     * @file lex.l
-     * @brief 将 SQL 文本转换为 Bison token 的 Flex 词法规则。
-     *
-     * 关键字不区分大小写；空白和注释会被忽略。token 位置采用从 1 开始计数的
-     * UTF-8 字节列号，用于生成解析诊断。字面量转换失败时，先把准确原因记录到
-     * 本次调用的 ParseContext，再向 Bison 返回 INVALID。
-     *
-     * Copyright (c) 2023-2026 Renmin University of China
-     * SPDX-License-Identifier: MulanPSL-2.0
-     */
+/**
+ * @file lex.l
+ * @brief 将 SQL 文本转换为 Bison token 的 Flex 词法规则。
+ *
+ * 关键字不区分大小写；空白和注释会被忽略。token 位置采用从 1 开始计数的
+ * UTF-8 字节列号，用于生成解析诊断。字面量转换失败时，先把准确原因记录到
+ * 本次调用的 ParseContext，再向 Bison 返回 INVALID。
+ *
+ * Copyright (c) 2023-2026 Renmin University of China
+ * SPDX-License-Identifier: MulanPSL-2.0
+ */
 
-    /* 关键字不区分大小写。 */
+/* 关键字不区分大小写。 */
 %option caseless
-    /* 扫描完整个输入缓冲区后直接结束，不调用 yywrap()。 */
+/* 扫描完整个输入缓冲区后直接结束，不调用 yywrap()。 */
 %option noyywrap
-    /* 词法规则不需要把字符放回输入流。 */
+/* 词法规则不需要把字符放回输入流。 */
 %option nounput
-    /* 词法规则不直接读取单个字符。 */
+/* 词法规则不直接读取单个字符。 */
 %option noinput
-    /* 让 Flex 同时接收 Bison 的语义值和源码位置。 */
+/* 让 Flex 同时接收 Bison 的语义值和源码位置。 */
 %option bison-bridge
 %option bison-locations
 
 %{
-#include "parser_internal.h"
+#include "parser/parser_internal.h"
 #include "yacc.tab.h"
 
 #define YY_DECL int yylex(YYSTYPE *yylval_param, YYLTYPE *yylloc_param, \
@@ -104,7 +104,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "FLOAT" { return FLOAT; }
 "INDEX" { return INDEX; }
 "AND" { return AND; }
-"JOIN" {return JOIN;}
+"JOIN" { return JOIN; }
 "HELP" { return HELP; }
 "ORDER" { return ORDER; }
 "BY" {  return BY;  }
@@ -117,12 +117,12 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 {single_op} { return yytext[0]; }
     /* 标识符 */
 {identifier} {
-    yylval->sv_str = yytext;
+    yylval->text = yytext;
     return IDENTIFIER;
 }
     /* 字面量 */
 {value_int} {
-    if (!rucbase::parser::ParseIntegerLiteral(yytext, yyleng, &yylval->sv_int)) {
+    if (!rucbase::parser::ParseIntegerLiteral(yytext, yyleng, &yylval->integer)) {
         context->RecordError(yylloc->first_line, yylloc->first_column,
                              "integer literal is out of range");
         return INVALID;
@@ -130,7 +130,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
     return VALUE_INT;
 }
 {value_float} {
-    if (!rucbase::parser::ParseFloatLiteral(yytext, yyleng, &yylval->sv_float)) {
+    if (!rucbase::parser::ParseFloatLiteral(yytext, yyleng, &yylval->floating_point)) {
         context->RecordError(yylloc->first_line, yylloc->first_column,
                              "floating-point literal is out of range");
         return INVALID;
@@ -138,7 +138,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
     return VALUE_FLOAT;
 }
 {value_string} {
-    yylval->sv_str = rucbase::parser::DecodeStringLiteral(yytext, yyleng);
+    yylval->text = rucbase::parser::DecodeStringLiteral(yytext, yyleng);
     return VALUE_STRING;
 }
 \'([^']|\'\')* {

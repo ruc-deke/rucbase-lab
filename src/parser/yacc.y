@@ -2,7 +2,7 @@
  * @file yacc.y
  * @brief 将 Bison token 组合成一条 SQL 语句 AST 的语法规则。
  *
- * 语法动作只负责构造语法对象；目录查找、列绑定和类型兼容性检查由 Analyze
+ * 语法动作只负责构造语法对象；目录查找、列绑定和类型兼容性检查由 Analyzer
  * 完成。解析成功要求输入中恰好有一条以分号结束的语句，并且随后到达真正的
  * 输入末尾。
  *
@@ -11,7 +11,7 @@
  */
 
 %{
-#include "parser_internal.h"
+#include "parser/parser_internal.h"
 #include "yacc.tab.h"
 #include <memory>
 
@@ -27,7 +27,7 @@ using namespace ast;
 %}
 
 %code requires {
-#include "parser_internal.h"
+#include "parser/parser_internal.h"
 }
 
 // Bison 的解析状态是局部的；不可重入的 Flex scanner 在 parser.cpp 内部
@@ -47,29 +47,30 @@ WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN HELP TXN_BEGIN TXN_COMMIT 
 %token LEQ NEQ GEQ INVALID
 
 // 携带语义值的 token。
-%token <sv_str> IDENTIFIER VALUE_STRING
-%token <sv_int> VALUE_INT
-%token <sv_float> VALUE_FLOAT
+%token <text> IDENTIFIER VALUE_STRING
+%token <integer> VALUE_INT
+%token <floating_point> VALUE_FLOAT
 
 // 指定各非终结符使用的 SemanticValue 成员。
-%type <sv_node> stmt dbStmt ddl dml txnStmt
-%type <sv_field> field
-%type <sv_fields> fieldList
-%type <sv_type_len> type
-%type <sv_comp_op> op
-%type <sv_expr> expr
-%type <sv_val> value
-%type <sv_vals> valueList
-%type <sv_str> tbName colName
-%type <sv_strs> tableList colNameList
-%type <sv_col> col
-%type <sv_cols> colList selector
-%type <sv_set_clause> setClause
-%type <sv_set_clauses> setClauses
-%type <sv_cond> condition
-%type <sv_conds> whereClause optWhereClause
-%type <sv_orderby>  order_clause opt_order_clause
-%type <sv_orderby_dir> opt_asc_desc
+%type <statement> stmt utility_stmt ddl_stmt dml_stmt transaction_stmt
+%type <column_definition> column_definition
+%type <column_definitions> column_definition_list
+%type <type_length> column_type
+%type <comparison_operator> comparison_operator
+%type <expression> comparison_operand scalar_expression function_call predicate optional_where select_item
+%type <expressions> select_list select_item_list scalar_expression_list
+%type <value> value
+%type <values> value_list
+%type <text> table_name column_name
+%type <column_names> column_name_list
+%type <from_node> from_tree
+%type <column> column_reference
+%type <set_clause> set_clause
+%type <set_clauses> set_clause_list
+%type <condition> comparison
+%type <order_by> order_item
+%type <order_by_items> optional_order_by
+%type <order_direction> optional_order_direction
 
 %%
 start:
@@ -80,140 +81,140 @@ start:
     ;
 
 stmt:
-        dbStmt
-    |   ddl
-    |   dml
-    |   txnStmt
+        utility_stmt
+    |   ddl_stmt
+    |   dml_stmt
+    |   transaction_stmt
     ;
 
-txnStmt:
+transaction_stmt:
         TXN_BEGIN
     {
-        $$ = std::make_shared<TxnBegin>();
+        $$ = std::make_shared<TxnBeginStmt>();
     }
     |   TXN_COMMIT
     {
-        $$ = std::make_shared<TxnCommit>();
+        $$ = std::make_shared<TxnCommitStmt>();
     }
     |   TXN_ABORT
     {
-        $$ = std::make_shared<TxnAbort>();
+        $$ = std::make_shared<TxnAbortStmt>();
     }
-    | TXN_ROLLBACK
+    |   TXN_ROLLBACK
     {
-        $$ = std::make_shared<TxnRollback>();
+        $$ = std::make_shared<TxnRollbackStmt>();
     }
     ;
 
-dbStmt:
+utility_stmt:
         SHOW DATABASE
     {
-        $$ = std::make_shared<ShowDatabase>();
+        $$ = std::make_shared<ShowDatabaseStmt>();
     }
     |   SHOW TABLES
     {
-        $$ = std::make_shared<ShowTables>();
+        $$ = std::make_shared<ShowTablesStmt>();
     }
     |   HELP
     {
-        $$ = std::make_shared<Help>();
+        $$ = std::make_shared<HelpStmt>();
     }
     ;
 
-ddl:
-        CREATE TABLE tbName '(' fieldList ')'
+ddl_stmt:
+        CREATE TABLE table_name '(' column_definition_list ')'
     {
-        $$ = std::make_shared<CreateTable>($3, $5);
+        $$ = std::make_shared<CreateTableStmt>(std::move($3), std::move($5));
     }
-    |   DROP TABLE tbName
+    |   DROP TABLE table_name
     {
-        $$ = std::make_shared<DropTable>($3);
+        $$ = std::make_shared<DropTableStmt>(std::move($3));
     }
-    |   DESC tbName
+    |   DESC table_name
     {
-        $$ = std::make_shared<DescTable>($2);
+        $$ = std::make_shared<DescTableStmt>(std::move($2));
     }
-    |   CREATE INDEX tbName '(' colNameList ')'
+    |   CREATE INDEX table_name '(' column_name_list ')'
     {
-        $$ = std::make_shared<CreateIndex>($3, $5);
+        $$ = std::make_shared<CreateIndexStmt>(std::move($3), std::move($5));
     }
-    |   DROP INDEX tbName '(' colNameList ')'
+    |   DROP INDEX table_name '(' column_name_list ')'
     {
-        $$ = std::make_shared<DropIndex>($3, $5);
-    }
-    ;
-
-dml:
-        INSERT INTO tbName VALUES '(' valueList ')'
-    {
-        $$ = std::make_shared<InsertStmt>($3, $6);
-    }
-    |   DELETE FROM tbName optWhereClause
-    {
-        $$ = std::make_shared<DeleteStmt>($3, $4);
-    }
-    |   UPDATE tbName SET setClauses optWhereClause
-    {
-        $$ = std::make_shared<UpdateStmt>($2, $4, $5);
-    }
-    |   SELECT selector FROM tableList optWhereClause opt_order_clause
-    {
-        $$ = std::make_shared<SelectStmt>($2, $4, $5, $6);
+        $$ = std::make_shared<DropIndexStmt>(std::move($3), std::move($5));
     }
     ;
 
-fieldList:
-        field
+dml_stmt:
+        INSERT INTO table_name VALUES '(' value_list ')'
+    {
+        $$ = std::make_shared<InsertStmt>(std::move($3), std::move($6));
+    }
+    |   DELETE FROM table_name optional_where
+    {
+        $$ = std::make_shared<DeleteStmt>(std::move($3), std::move($4));
+    }
+    |   UPDATE table_name SET set_clause_list optional_where
+    {
+        $$ = std::make_shared<UpdateStmt>(std::move($2), std::move($4), std::move($5));
+    }
+    |   SELECT select_list FROM from_tree optional_where optional_order_by
+    {
+        $$ = std::make_shared<SelectStmt>(std::move($2), std::move($4), std::move($5), std::move($6));
+    }
+    ;
+
+column_definition_list:
+        column_definition
     {
         $$ = std::vector<ColDef>{std::move($1)};
     }
-    |   fieldList ',' field
+    |   column_definition_list ',' column_definition
     {
         $$.push_back(std::move($3));
     }
     ;
 
-colNameList:
-        colName
+column_name_list:
+        column_name
     {
-        $$ = std::vector<std::string>{$1};
+        $$ = std::vector<std::string>{std::move($1)};
     }
-    | colNameList ',' colName
+    |   column_name_list ',' column_name
     {
-        $$.push_back($3);
+        $$.push_back(std::move($3));
     }
     ;
 
-field:
-        colName type
+column_definition:
+        column_name column_type
     {
         $$ = ColDef(std::move($1), $2);
     }
     ;
 
-type:
+column_type:
         INT
     {
-        $$ = TypeLen(SV_TYPE_INT, sizeof(int));
+        $$ = TypeLen(DataType::Int, sizeof(int));
     }
     |   CHAR '(' VALUE_INT ')'
     {
-        $$ = TypeLen(SV_TYPE_STRING, $3);
+        $$ = TypeLen(DataType::String, $3);
     }
     |   FLOAT
     {
-        $$ = TypeLen(SV_TYPE_FLOAT, sizeof(float));
+        $$ = TypeLen(DataType::Float, sizeof(float));
     }
     ;
 
-valueList:
+value_list:
         value
     {
-        $$ = std::vector<std::shared_ptr<Value>>{$1};
+        $$ = std::vector<std::shared_ptr<Value>>{std::move($1)};
     }
-    |   valueList ',' value
+    |   value_list ',' value
     {
-        $$.push_back($3);
+        $$.push_back(std::move($3));
     }
     ;
 
@@ -228,172 +229,228 @@ value:
     }
     |   VALUE_STRING
     {
-        $$ = std::make_shared<StringLit>($1);
+        $$ = std::make_shared<StringLit>(std::move($1));
     }
     ;
 
-condition:
-        col op expr
+comparison:
+        column_reference comparison_operator comparison_operand
     {
-        $$ = std::make_shared<BinaryExpr>($1, $2, $3);
+        $$ = std::make_shared<BinaryExpr>(std::move($1), $2, std::move($3));
     }
     ;
 
-optWhereClause:
-        /* epsilon */
+optional_where:
+        %empty
     {
-        $$ = {};
+        $$ = nullptr;
     }
-    |   WHERE whereClause
+    |   WHERE predicate
     {
-        $$ = $2;
-    }
-    ;
-
-whereClause:
-        condition 
-    {
-        $$ = std::vector<std::shared_ptr<BinaryExpr>>{$1};
-    }
-    |   whereClause AND condition
-    {
-        $$.push_back($3);
+        $$ = std::move($2);
     }
     ;
 
-col:
-        tbName '.' colName
+predicate:
+        comparison
     {
-        $$ = std::make_shared<Col>($1, $3);
+        $$ = std::move($1);
     }
-    |   colName
+    |   predicate AND comparison
     {
-        $$ = std::make_shared<Col>("", $1);
-    }
-    ;
-
-colList:
-        col
-    {
-        $$ = std::vector<std::shared_ptr<Col>>{$1};
-    }
-    |   colList ',' col
-    {
-        $$.push_back($3);
+        $$ = std::make_shared<LogicalExpr>(LogicalOp::And, std::move($1), std::move($3));
     }
     ;
 
-op:
+column_reference:
+        table_name '.' column_name
+    {
+        $$ = std::make_shared<Col>(std::move($1), std::move($3));
+    }
+    |   column_name
+    {
+        $$ = std::make_shared<Col>("", std::move($1));
+    }
+    ;
+
+comparison_operator:
         '='
     {
-        $$ = SV_OP_EQ;
+        $$ = CompOp::Eq;
     }
     |   '<'
     {
-        $$ = SV_OP_LT;
+        $$ = CompOp::Lt;
     }
     |   '>'
     {
-        $$ = SV_OP_GT;
+        $$ = CompOp::Gt;
     }
     |   NEQ
     {
-        $$ = SV_OP_NE;
+        $$ = CompOp::Ne;
     }
     |   LEQ
     {
-        $$ = SV_OP_LE;
+        $$ = CompOp::Le;
     }
     |   GEQ
     {
-        $$ = SV_OP_GE;
+        $$ = CompOp::Ge;
     }
     ;
 
-expr:
+comparison_operand:
         value
     {
-        $$ = std::static_pointer_cast<Expr>($1);
+        $$ = std::move($1);
     }
-    |   col
-    {
-        $$ = std::static_pointer_cast<Expr>($1);
-    }
-    ;
-
-setClauses:
-        setClause
-    {
-        $$ = std::vector<std::shared_ptr<SetClause>>{$1};
-    }
-    |   setClauses ',' setClause
-    {
-        $$.push_back($3);
-    }
-    ;
-
-setClause:
-        colName '=' value
-    {
-        $$ = std::make_shared<SetClause>($1, $3);
-    }
-    ;
-
-selector:
-        '*'
-    {
-        $$ = {};
-    }
-    |   colList
+    |   column_reference
     {
         $$ = std::move($1);
     }
     ;
 
-tableList:
-        tbName
+scalar_expression:
+        value
     {
-        $$ = std::vector<std::string>{$1};
+        $$ = std::move($1);
     }
-    |   tableList ',' tbName
+    |   column_reference
     {
-        $$.push_back($3);
+        $$ = std::move($1);
     }
-    |   tableList JOIN tbName
+    |   function_call
     {
-        $$.push_back($3);
+        $$ = std::move($1);
+    }
+    |   '(' scalar_expression ')'
+    {
+        $$ = std::move($2);
     }
     ;
 
-opt_order_clause:
-    ORDER BY order_clause      
-    { 
-        $$ = $3; 
-    }
-    |   /* epsilon */
+scalar_expression_list:
+        scalar_expression
     {
-        $$ = nullptr;
+        $$ = std::vector<std::shared_ptr<Expr>>{std::move($1)};
+    }
+    |   scalar_expression_list ',' scalar_expression
+    {
+        $$.push_back(std::move($3));
     }
     ;
 
-order_clause:
-      col  opt_asc_desc 
+function_call:
+        IDENTIFIER '(' ')'
+    {
+        $$ = std::make_shared<FunctionCallExpr>(std::move($1), std::vector<std::shared_ptr<Expr>>{});
+    }
+    |   IDENTIFIER '(' scalar_expression_list ')'
+    {
+        $$ = std::make_shared<FunctionCallExpr>(std::move($1), std::move($3));
+    }
+    |   IDENTIFIER '(' '*' ')'
+    {
+        std::vector<std::shared_ptr<Expr>> arguments;
+        arguments.push_back(std::make_shared<StarExpr>());
+        $$ = std::make_shared<FunctionCallExpr>(std::move($1), std::move(arguments));
+    }
+    ;
+
+set_clause_list:
+        set_clause
+    {
+        $$ = std::vector<std::shared_ptr<SetClause>>{std::move($1)};
+    }
+    |   set_clause_list ',' set_clause
+    {
+        $$.push_back(std::move($3));
+    }
+    ;
+
+set_clause:
+        column_reference '=' scalar_expression
+    {
+        $$ = std::make_shared<SetClause>(std::move($1), std::move($3));
+    }
+    ;
+
+select_item:
+        column_reference
+    {
+        $$ = std::move($1);
+    }
+    ;
+
+select_item_list:
+        select_item
+    {
+        $$ = std::vector<std::shared_ptr<Expr>>{std::move($1)};
+    }
+    |   select_item_list ',' select_item
+    {
+        $$.push_back(std::move($3));
+    }
+    ;
+
+select_list:
+        '*'
+    {
+        $$ = std::vector<std::shared_ptr<Expr>>{std::make_shared<StarExpr>()};
+    }
+    |   select_item_list
+    {
+        $$ = std::move($1);
+    }
+    ;
+
+from_tree:
+        table_name
+    {
+        $$ = std::make_shared<TableRef>(std::move($1));
+    }
+    |   from_tree ',' table_name
+    {
+        $$ = std::make_shared<JoinNode>(JoinType::Cross, std::move($1),
+                                        std::make_shared<TableRef>(std::move($3)));
+    }
+    |   from_tree JOIN table_name
+    {
+        $$ = std::make_shared<JoinNode>(JoinType::Inner, std::move($1),
+                                        std::make_shared<TableRef>(std::move($3)));
+    }
+    ;
+
+optional_order_by:
+        ORDER BY order_item
     { 
-        $$ = std::make_shared<OrderBy>($1, $2);
+        $$ = std::vector<std::shared_ptr<OrderBy>>{std::move($3)};
+    }
+    |   %empty
+    {
+        $$ = {};
+    }
+    ;
+
+order_item:
+        column_reference optional_order_direction
+    { 
+        $$ = std::make_shared<OrderBy>(std::move($1), $2);
     }
     ;   
 
-opt_asc_desc:
-    ASC          { $$ = OrderBy_ASC;     }
-    |  DESC      { $$ = OrderBy_DESC;    }
-    |  /* epsilon */ { $$ = OrderBy_DEFAULT; }
-    ;    
+optional_order_direction:
+        ASC             { $$ = OrderByDir::Asc; }
+    |   DESC            { $$ = OrderByDir::Desc; }
+    |   %empty          { $$ = OrderByDir::Default; }
+    ;
 
-tbName:
+table_name:
     IDENTIFIER { $$ = std::move($1); }
     ;
 
-colName:
+column_name:
     IDENTIFIER { $$ = std::move($1); }
     ;
 %%

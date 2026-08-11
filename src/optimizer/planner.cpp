@@ -124,7 +124,10 @@ std::shared_ptr<Plan> Planner::physical_optimization(const std::shared_ptr<Analy
 }
 
 std::shared_ptr<Plan> Planner::make_one_rel(const std::shared_ptr<AnalyzedQuery>& query) {
-    const std::vector<std::string>& tables = query->bound_tables;
+    if (query->bound_tables.empty()) {
+        throw InternalError("SELECT query has no bound tables");
+    }
+    const auto& tables = query->bound_tables;
     std::vector<Condition> remaining_conds = query->bound_conds;
     // // Scan table , 生成表算子列表tab_nodes
     std::vector<std::shared_ptr<Plan>> table_scan_executors(tables.size());
@@ -256,90 +259,84 @@ std::shared_ptr<Plan> Planner::generate_select_plan(std::shared_ptr<AnalyzedQuer
 
 // 生成DDL语句和DML语句的查询执行计划
 std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context) {
-    std::shared_ptr<Plan> plannerRoot;
-    if (const auto create_table = std::dynamic_pointer_cast<const ast::CreateTable>(query->bound_statement)) {
-        // create table;
-        std::vector<ColDef> col_defs;
-        col_defs.reserve(create_table->fields.size());
-        for (const auto& field : create_table->fields) {
-            col_defs.push_back(ColDef{.name = field.col_name,
-                                      .type = interp_sv_type(field.type_len.type),
-                                      .len = field.type_len.len});
+    switch (query->bound_statement->kind()) {
+        case ast::StatementKind::CreateTable: {
+            const auto& statement = static_cast<const ast::CreateTableStmt&>(*query->bound_statement);
+            std::vector<ColDef> col_defs;
+            col_defs.reserve(statement.fields.size());
+            for (const auto& field : statement.fields) {
+                col_defs.push_back(ColDef{.name = field.col_name,
+                                          .type = interpret_type(field.type_len.type),
+                                          .len = field.type_len.declared_len});
+            }
+            return std::make_shared<DDLPlan>(T_CreateTable, statement.tab_name, std::vector<std::string>(), col_defs);
         }
-        plannerRoot =
-            std::make_shared<DDLPlan>(T_CreateTable, create_table->tab_name, std::vector<std::string>(), col_defs);
-    } else if (const auto drop_table = std::dynamic_pointer_cast<const ast::DropTable>(query->bound_statement)) {
-        // drop table;
-        plannerRoot =
-            std::make_shared<DDLPlan>(T_DropTable, drop_table->tab_name, std::vector<std::string>(),
-                                      std::vector<ColDef>());
-    } else if (const auto create_index = std::dynamic_pointer_cast<const ast::CreateIndex>(query->bound_statement)) {
-        // create index;
-        plannerRoot = std::make_shared<DDLPlan>(T_CreateIndex, create_index->tab_name, create_index->col_names,
-                                                std::vector<ColDef>());
-    } else if (const auto drop_index = std::dynamic_pointer_cast<const ast::DropIndex>(query->bound_statement)) {
-        // drop index
-        plannerRoot = std::make_shared<DDLPlan>(T_DropIndex, drop_index->tab_name, drop_index->col_names,
-                                                std::vector<ColDef>());
-    } else if (const auto insert_stmt = std::dynamic_pointer_cast<const ast::InsertStmt>(query->bound_statement)) {
-        // insert;
-        plannerRoot = std::make_shared<DMLPlan>(T_Insert, std::shared_ptr<Plan>(), insert_stmt->tab_name,
-                                                query->bound_values, std::vector<Condition>(),
-                                                std::vector<SetClause>());
-    } else if (const auto delete_stmt =
-                   std::dynamic_pointer_cast<const ast::DeleteStmt>(query->bound_statement)) {
-        // delete;
-        // 生成表扫描方式
-        std::shared_ptr<Plan> table_scan_executors;
-        // 只有一张表，不需要进行物理优化了
-        // int index_no = get_indexNo(x->tab_name, query->bound_conds);
-        std::vector<std::string> index_col_names;
-        const bool index_exist = get_index_cols(delete_stmt->tab_name, query->bound_conds, index_col_names);
-
-        if (index_exist == false) {  // 该表没有索引
-            index_col_names.clear();
-            table_scan_executors =
-                std::make_shared<ScanPlan>(T_SeqScan, sm_manager_, delete_stmt->tab_name, query->bound_conds,
-                                           index_col_names);
-        } else {  // 存在索引
-            table_scan_executors =
-                std::make_shared<ScanPlan>(T_IndexScan, sm_manager_, delete_stmt->tab_name, query->bound_conds,
-                                           index_col_names);
+        case ast::StatementKind::DropTable: {
+            const auto& statement = static_cast<const ast::DropTableStmt&>(*query->bound_statement);
+            return std::make_shared<DDLPlan>(T_DropTable, statement.tab_name, std::vector<std::string>(),
+                                             std::vector<ColDef>());
         }
-
-        plannerRoot = std::make_shared<DMLPlan>(T_Delete, table_scan_executors, delete_stmt->tab_name,
-                                                std::vector<Value>(),
-                                                query->bound_conds, std::vector<SetClause>());
-    } else if (const auto update_stmt =
-                   std::dynamic_pointer_cast<const ast::UpdateStmt>(query->bound_statement)) {
-        // update;
-        // 生成表扫描方式
-        std::shared_ptr<Plan> table_scan_executors;
-        // 只有一张表，不需要进行物理优化了
-        // int index_no = get_indexNo(x->tab_name, query->bound_conds);
-        std::vector<std::string> index_col_names;
-        const bool index_exist = get_index_cols(update_stmt->tab_name, query->bound_conds, index_col_names);
-
-        if (index_exist == false) {  // 该表没有索引
-            index_col_names.clear();
-            table_scan_executors =
-                std::make_shared<ScanPlan>(T_SeqScan, sm_manager_, update_stmt->tab_name, query->bound_conds,
-                                           index_col_names);
-        } else {  // 存在索引
-            table_scan_executors =
-                std::make_shared<ScanPlan>(T_IndexScan, sm_manager_, update_stmt->tab_name, query->bound_conds,
-                                           index_col_names);
+        case ast::StatementKind::CreateIndex: {
+            const auto& statement = static_cast<const ast::CreateIndexStmt&>(*query->bound_statement);
+            return std::make_shared<DDLPlan>(T_CreateIndex, statement.tab_name, statement.col_names,
+                                             std::vector<ColDef>());
         }
-        plannerRoot = std::make_shared<DMLPlan>(T_Update, table_scan_executors, update_stmt->tab_name,
-                                                std::vector<Value>(),
-                                                query->bound_conds, query->bound_set_clauses);
-    } else if (std::dynamic_pointer_cast<const ast::SelectStmt>(query->bound_statement)) {
-        // 生成select语句的查询执行计划
-        std::shared_ptr<Plan> projection = generate_select_plan(std::move(query), context);
-        plannerRoot = std::make_shared<DMLPlan>(T_select, projection, std::string(), std::vector<Value>(),
-                                                std::vector<Condition>(), std::vector<SetClause>());
-    } else {
-        throw InternalError("Unexpected AST root");
+        case ast::StatementKind::DropIndex: {
+            const auto& statement = static_cast<const ast::DropIndexStmt&>(*query->bound_statement);
+            return std::make_shared<DDLPlan>(T_DropIndex, statement.tab_name, statement.col_names,
+                                             std::vector<ColDef>());
+        }
+        case ast::StatementKind::Insert: {
+            if (query->bound_target_table.empty()) {
+                throw InternalError("INSERT query has no bound target table");
+            }
+            return std::make_shared<DMLPlan>(T_Insert, std::shared_ptr<Plan>(), query->bound_target_table,
+                                             query->bound_values, std::vector<Condition>(), std::vector<SetClause>());
+        }
+        case ast::StatementKind::Delete: {
+            if (query->bound_target_table.empty()) {
+                throw InternalError("DELETE query has no bound target table");
+            }
+            std::vector<std::string> index_col_names;
+            const bool index_exists = get_index_cols(query->bound_target_table, query->bound_conds, index_col_names);
+            if (!index_exists) {
+                index_col_names.clear();
+            }
+            const PlanTag scan_tag = index_exists ? T_IndexScan : T_SeqScan;
+            auto scan = std::make_shared<ScanPlan>(scan_tag, sm_manager_, query->bound_target_table, query->bound_conds,
+                                                   index_col_names);
+            return std::make_shared<DMLPlan>(T_Delete, std::move(scan), query->bound_target_table, std::vector<Value>(),
+                                             query->bound_conds, std::vector<SetClause>());
+        }
+        case ast::StatementKind::Update: {
+            if (query->bound_target_table.empty()) {
+                throw InternalError("UPDATE query has no bound target table");
+            }
+            std::vector<std::string> index_col_names;
+            const bool index_exists = get_index_cols(query->bound_target_table, query->bound_conds, index_col_names);
+            if (!index_exists) {
+                index_col_names.clear();
+            }
+            const PlanTag scan_tag = index_exists ? T_IndexScan : T_SeqScan;
+            auto scan = std::make_shared<ScanPlan>(scan_tag, sm_manager_, query->bound_target_table, query->bound_conds,
+                                                   index_col_names);
+            return std::make_shared<DMLPlan>(T_Update, std::move(scan), query->bound_target_table, std::vector<Value>(),
+                                             query->bound_conds, query->bound_set_clauses);
+        }
+        case ast::StatementKind::Select: {
+            auto projection = generate_select_plan(std::move(query), context);
+            return std::make_shared<DMLPlan>(T_select, std::move(projection), std::string(), std::vector<Value>(),
+                                             std::vector<Condition>(), std::vector<SetClause>());
+        }
+        case ast::StatementKind::Help:
+        case ast::StatementKind::ShowTables:
+        case ast::StatementKind::ShowDatabase:
+        case ast::StatementKind::TxnBegin:
+        case ast::StatementKind::TxnCommit:
+        case ast::StatementKind::TxnAbort:
+        case ast::StatementKind::TxnRollback:
+        case ast::StatementKind::DescTable:
+            break;
     }
-    return plannerRoot;
+    throw InternalError("Planner received a non-plannable statement kind");
 }

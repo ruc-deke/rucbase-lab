@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "analyze/analyzer.h"
@@ -26,6 +27,11 @@ void AddTestTables(SmManager& sm_manager) {
               {.tab_name = "b", .name = "x", .type = TYPE_INT, .len = 4, .offset = 4, .index = false},
               {.tab_name = "b", .name = "y", .type = TYPE_INT, .len = 4, .offset = 8, .index = false}};
     sm_manager.db_.SetTabMeta(b.name, b);
+
+    TabMeta c;
+    c.name = "c";
+    c.cols = {{.tab_name = "c", .name = "value", .type = TYPE_INT, .len = 4, .offset = 0, .index = false}};
+    sm_manager.db_.SetTabMeta(c.name, c);
 }
 
 std::shared_ptr<ScanPlan> FindScan(const std::shared_ptr<Plan>& plan, const std::string& table) {
@@ -106,11 +112,16 @@ TEST_F(QueryPlanningTest, PreservesParsedAstAndAnalyzedConditionsDuringPlanning)
     ASSERT_TRUE(parsed.ok());
     auto select_stmt = std::dynamic_pointer_cast<ast::SelectStmt>(parsed.statement);
     ASSERT_NE(select_stmt, nullptr);
-    const auto parsed_tables = select_stmt->tabs;
+    auto table_ref = std::dynamic_pointer_cast<ast::TableRef>(select_stmt->from);
+    ASSERT_NE(table_ref, nullptr);
+    const auto parsed_table = std::get<std::string>(table_ref->source);
 
     auto query = analyzer_.analyze(parsed.statement);
     ASSERT_EQ(query->bound_statement.get(), parsed.statement.get());
-    EXPECT_EQ(select_stmt->tabs, parsed_tables);
+    EXPECT_EQ(parsed.statement->kind(), ast::StatementKind::Select);
+    table_ref = std::dynamic_pointer_cast<ast::TableRef>(select_stmt->from);
+    ASSERT_NE(table_ref, nullptr);
+    EXPECT_EQ(std::get<std::string>(table_ref->source), parsed_table);
     ASSERT_EQ(query->bound_conds.size(), 1U);
 
     auto plan = planner_.do_planner(query, nullptr);
@@ -125,11 +136,26 @@ TEST_F(QueryPlanningTest, AnalyzesAndEncodesInsertValues) {
     ASSERT_TRUE(parsed.ok());
 
     auto query = analyzer_.analyze(parsed.statement);
+    EXPECT_EQ(query->bound_target_table, "a");
     ASSERT_EQ(query->bound_values.size(), 2U);
     ASSERT_NE(query->bound_values[0].raw, nullptr);
     ASSERT_NE(query->bound_values[1].raw, nullptr);
     EXPECT_EQ(query->bound_values[0].raw->size, 4);
     EXPECT_EQ(query->bound_values[1].raw->size, 8);
+}
+
+TEST_F(QueryPlanningTest, PlansDmlFromBoundTargetInsteadOfMutableAst) {
+    auto parsed = rucbase::parser::Parse("insert into a values (1, 'short');");
+    ASSERT_TRUE(parsed.ok());
+    auto query = analyzer_.analyze(parsed.statement);
+
+    const auto insert = std::dynamic_pointer_cast<ast::InsertStmt>(parsed.statement);
+    ASSERT_NE(insert, nullptr);
+    insert->tab_name = "b";
+
+    const auto plan = std::dynamic_pointer_cast<DMLPlan>(planner_.do_planner(query, nullptr));
+    ASSERT_NE(plan, nullptr);
+    EXPECT_EQ(plan->tab_name_, "a");
 }
 
 TEST_F(QueryPlanningTest, RejectsInvalidInsertBeforePlanning) {
@@ -151,7 +177,7 @@ TEST_F(QueryPlanningTest, RejectsInvalidInsertBeforePlanning) {
 }
 
 TEST_F(QueryPlanningTest, BindsUpdateTargetColumn) {
-    auto parsed = rucbase::parser::Parse("update a set text = 'short' where id = 1;");
+    auto parsed = rucbase::parser::Parse("update a set a.text = 'short' where id = 1;");
     ASSERT_TRUE(parsed.ok());
 
     auto query = analyzer_.analyze(parsed.statement);
@@ -162,10 +188,28 @@ TEST_F(QueryPlanningTest, BindsUpdateTargetColumn) {
     EXPECT_EQ(query->bound_set_clauses[0].rhs.raw->size, 8);
 }
 
+TEST_F(QueryPlanningTest, RejectsUnimplementedSelectExtensionsExplicitly) {
+    auto parsed = rucbase::parser::Parse("select a.id from a;");
+    ASSERT_TRUE(parsed.ok());
+    auto select = std::dynamic_pointer_cast<ast::SelectStmt>(parsed.statement);
+    ASSERT_NE(select, nullptr);
+    select->limit = ast::LimitClause{.count = 1, .offset = std::nullopt};
+
+    EXPECT_THROW(analyzer_.analyze(parsed.statement), NotImplementedError);
+}
+
+TEST_F(QueryPlanningTest, RejectsUnimplementedUpdateSetExpressionExplicitly) {
+    auto parsed = rucbase::parser::Parse("update a set a.id = abs(a.id);");
+    ASSERT_TRUE(parsed.ok());
+
+    EXPECT_THROW(analyzer_.analyze(parsed.statement), NotImplementedError);
+}
+
 TEST_F(QueryPlanningTest, AssignsSameTableColumnPredicateToThatTable) {
     auto parsed = rucbase::parser::Parse("select * from a join b where b.x = b.y;");
     ASSERT_TRUE(parsed.ok());
     auto query = analyzer_.analyze(parsed.statement);
+    EXPECT_EQ(query->bound_tables, (std::vector<std::string>{"a", "b"}));
 
     auto plan = planner_.do_planner(std::move(query), nullptr);
     auto a_scan = FindScan(plan, "a");
@@ -176,6 +220,14 @@ TEST_F(QueryPlanningTest, AssignsSameTableColumnPredicateToThatTable) {
     ASSERT_EQ(b_scan->conds_.size(), 1U);
     EXPECT_EQ(b_scan->conds_[0].lhs_col.tab_name, "b");
     EXPECT_EQ(b_scan->conds_[0].rhs_col.tab_name, "b");
+}
+
+TEST_F(QueryPlanningTest, PreservesFromTableOrderDuringAnalysis) {
+    auto parsed = rucbase::parser::Parse("select a.id from a join b, c;");
+    ASSERT_TRUE(parsed.ok());
+    auto query = analyzer_.analyze(parsed.statement);
+
+    EXPECT_EQ(query->bound_tables, (std::vector<std::string>{"a", "b", "c"}));
 }
 
 TEST_F(QueryPlanningTest, RejectsNonPositiveCharLengthsBeforeFileCreation) {
@@ -201,11 +253,10 @@ TEST_F(QueryPlanningTest, RejectsOtherInvalidRecordLayoutsBeforeFileCreation) {
                  InvalidColLengthError);
     EXPECT_THROW(sm_manager_.create_table("bad_float", {{.name = "score", .type = TYPE_FLOAT, .len = 8}}, nullptr),
                  InvalidColLengthError);
-    EXPECT_THROW(sm_manager_.create_table(
-                     "too_wide",
-                     {{.name = "left", .type = TYPE_STRING, .len = 300},
-                      {.name = "right", .type = TYPE_STRING, .len = 300}},
-                     nullptr),
+    EXPECT_THROW(sm_manager_.create_table("too_wide",
+                                          {{.name = "left", .type = TYPE_STRING, .len = 300},
+                                           {.name = "right", .type = TYPE_STRING, .len = 300}},
+                                          nullptr),
                  InvalidRecordSizeError);
 }
 

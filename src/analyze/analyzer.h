@@ -35,11 +35,12 @@ private:
     void analyze_delete(const ast::DeleteStmt& statement, AnalyzedQuery& query) const;
     void analyze_insert(const ast::InsertStmt& statement, AnalyzedQuery& query) const;
 
+    [[nodiscard]] static std::vector<std::string> get_table_names(const std::shared_ptr<ast::FromNode>& from);
     static TabCol check_column(const std::vector<ColMeta>& all_cols, TabCol target);
     [[nodiscard]] std::vector<ColMeta> get_all_cols(const std::vector<std::string>& tab_names) const;
-    static void get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>>& ast_conds,
-                           std::vector<Condition>& conds);
+    static void get_clause(const std::shared_ptr<ast::Expr>& ast_predicate, std::vector<Condition>& conds);
+    static void append_clause(const std::shared_ptr<ast::Expr>& ast_predicate, std::vector<Condition>& conds);
     void check_clause(const std::vector<ColMeta>& all_cols, std::vector<Condition>& conds) const;
-    static Value convert_ast_value(const std::shared_ptr<ast::Value>& ast_value);
-    static CompOp convert_ast_comp_op(ast::SvCompOp op);
+    static Value convert_ast_value(const ast::Value& ast_value);
+    static CompOp convert_ast_comp_op(ast::CompOp op);
 };

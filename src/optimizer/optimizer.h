@@ -15,43 +15,44 @@ class Context;
 class SmManager;
 
 class Optimizer {
-   private:
-    [[maybe_unused]] SmManager *sm_manager_;
-    Planner *planner_;
+private:
+    [[maybe_unused]] SmManager* sm_manager_;
+    Planner* planner_;
 
-   public:
-    Optimizer(SmManager *sm_manager,  Planner *planner) 
-        : sm_manager_(sm_manager),  planner_(planner)
-        {}
-    
-    // query 仅只读使用（dynamic_pointer_cast / 读字段），用 const 引用避免 shared_ptr 拷贝。
+public:
+    Optimizer(SmManager* sm_manager, Planner* planner) : sm_manager_(sm_manager), planner_(planner) {}
+
+    // query 仅只读使用，用 const 引用避免 shared_ptr 拷贝。
     std::shared_ptr<Plan> plan_query(const std::shared_ptr<AnalyzedQuery>& query, Context* context) const {
-        if (std::dynamic_pointer_cast<const ast::Help>(query->bound_statement)) {
-            // help;
-            return std::make_shared<OtherPlan>(T_Help, std::string());
-        } else if (std::dynamic_pointer_cast<const ast::ShowDatabase>(query->bound_statement)) {
-            // show database;
-            return std::make_shared<OtherPlan>(T_ShowDatabase, std::string());
-        } else if (std::dynamic_pointer_cast<const ast::ShowTables>(query->bound_statement)) {
-            // show tables;
-            return std::make_shared<OtherPlan>(T_ShowTable, std::string());
-        } else if (const auto desc_table = std::dynamic_pointer_cast<const ast::DescTable>(query->bound_statement)) {
-            // desc table;
-            return std::make_shared<OtherPlan>(T_DescTable, desc_table->tab_name);
-        } else if (std::dynamic_pointer_cast<const ast::TxnBegin>(query->bound_statement)) {
-            // begin;
-            return std::make_shared<OtherPlan>(T_Transaction_begin, std::string());
-        } else if (std::dynamic_pointer_cast<const ast::TxnAbort>(query->bound_statement)) {
-            // abort;
-            return std::make_shared<OtherPlan>(T_Transaction_abort, std::string());
-        } else if (std::dynamic_pointer_cast<const ast::TxnCommit>(query->bound_statement)) {
-            // commit;
-            return std::make_shared<OtherPlan>(T_Transaction_commit, std::string());
-        } else if (std::dynamic_pointer_cast<const ast::TxnRollback>(query->bound_statement)) {
-            // rollback;
-            return std::make_shared<OtherPlan>(T_Transaction_rollback, std::string());
-        } else {
-            return planner_->do_planner(query, context);
+        switch (query->bound_statement->kind()) {
+            case ast::StatementKind::Help:
+                return std::make_shared<OtherPlan>(T_Help, std::string());
+            case ast::StatementKind::ShowDatabase:
+                return std::make_shared<OtherPlan>(T_ShowDatabase, std::string());
+            case ast::StatementKind::ShowTables:
+                return std::make_shared<OtherPlan>(T_ShowTable, std::string());
+            case ast::StatementKind::DescTable: {
+                const auto& desc_table = static_cast<const ast::DescTableStmt&>(*query->bound_statement);
+                return std::make_shared<OtherPlan>(T_DescTable, desc_table.tab_name);
+            }
+            case ast::StatementKind::TxnBegin:
+                return std::make_shared<OtherPlan>(T_Transaction_begin, std::string());
+            case ast::StatementKind::TxnAbort:
+                return std::make_shared<OtherPlan>(T_Transaction_abort, std::string());
+            case ast::StatementKind::TxnCommit:
+                return std::make_shared<OtherPlan>(T_Transaction_commit, std::string());
+            case ast::StatementKind::TxnRollback:
+                return std::make_shared<OtherPlan>(T_Transaction_rollback, std::string());
+            case ast::StatementKind::CreateTable:
+            case ast::StatementKind::DropTable:
+            case ast::StatementKind::CreateIndex:
+            case ast::StatementKind::DropIndex:
+            case ast::StatementKind::Insert:
+            case ast::StatementKind::Delete:
+            case ast::StatementKind::Update:
+            case ast::StatementKind::Select:
+                return planner_->do_planner(query, context);
         }
+        throw InternalError("Unexpected statement kind");
     }
 };

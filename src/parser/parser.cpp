@@ -6,7 +6,7 @@
  * @brief 实现 Parser 公共门面，并集中管理全部 Flex scanner 状态。
  */
 
-#include "parser.h"
+#include "parser/parser.h"
 
 #include <algorithm>
 #include <cerrno>
@@ -18,7 +18,7 @@
 #include <stdexcept>
 #include <system_error>
 
-#include "parser_internal.h"
+#include "parser/parser_internal.h"
 #include "yacc.tab.h"
 
 struct yy_buffer_state;
@@ -34,7 +34,7 @@ std::mutex parser_mutex;
 
 /** @brief 通过 RAII 管理由 yy_scan_string() 创建的 buffer。 */
 class ScannerBuffer {
-   public:
+public:
     explicit ScannerBuffer(YY_BUFFER_STATE buffer) : buffer_(buffer) {
         if (buffer_ == nullptr) {
             throw std::runtime_error("failed to allocate parser buffer");
@@ -46,7 +46,7 @@ class ScannerBuffer {
     ScannerBuffer(const ScannerBuffer&) = delete;
     ScannerBuffer& operator=(const ScannerBuffer&) = delete;
 
-   private:
+private:
     YY_BUFFER_STATE buffer_;
 };
 
@@ -107,7 +107,7 @@ ParseResult Parse(const std::string_view sql) {
     }
 
     // Flex 仍持有进程级 scanner 状态，因此在 Parser 模块内部串行化访问；
-    // 调用方获得的 Parse() 接口仍然是线程安全的。（PS：可以实现可重入，开启并行解析）
+    // 调用方获得的 Parse() 接口仍然是线程安全的。
     std::lock_guard<std::mutex> lock(parser_mutex);
     ParseContext context;
     const std::string input(sql);

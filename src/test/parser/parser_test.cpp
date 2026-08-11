@@ -19,27 +19,27 @@ using rucbase::parser::ParseResult;
 TEST(ParserTest, ParsesUtilityAndDdlStatements) {
     ParseResult result = Parse("show database;");
     ASSERT_TRUE(result.ok());
-    EXPECT_NE(std::dynamic_pointer_cast<ast::ShowDatabase>(result.statement), nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<ast::ShowDatabaseStmt>(result.statement), nullptr);
 
     result = Parse("show tables;");
     ASSERT_TRUE(result.ok());
-    EXPECT_NE(std::dynamic_pointer_cast<ast::ShowTables>(result.statement), nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<ast::ShowTablesStmt>(result.statement), nullptr);
 
     result = Parse("help;");
     ASSERT_TRUE(result.ok());
-    EXPECT_NE(std::dynamic_pointer_cast<ast::Help>(result.statement), nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<ast::HelpStmt>(result.statement), nullptr);
 
     result = Parse("create table tb (a int, b float, c char(4));");
     ASSERT_TRUE(result.ok());
-    const auto create = std::dynamic_pointer_cast<ast::CreateTable>(result.statement);
+    const auto create = std::dynamic_pointer_cast<ast::CreateTableStmt>(result.statement);
     ASSERT_NE(create, nullptr);
     EXPECT_EQ(create->tab_name, "tb");
     ASSERT_EQ(create->fields.size(), 3U);
     EXPECT_EQ(create->fields[0].col_name, "a");
-    EXPECT_EQ(create->fields[0].type_len.type, ast::SV_TYPE_INT);
-    EXPECT_EQ(create->fields[1].type_len.type, ast::SV_TYPE_FLOAT);
-    EXPECT_EQ(create->fields[2].type_len.type, ast::SV_TYPE_STRING);
-    EXPECT_EQ(create->fields[2].type_len.len, 4);
+    EXPECT_EQ(create->fields[0].type_len.type, ast::DataType::Int);
+    EXPECT_EQ(create->fields[1].type_len.type, ast::DataType::Float);
+    EXPECT_EQ(create->fields[2].type_len.type, ast::DataType::String);
+    EXPECT_EQ(create->fields[2].type_len.declared_len, 4);
 }
 
 TEST(ParserTest, ParsesDmlAndDecodesEscapedQuotes) {
@@ -47,8 +47,8 @@ TEST(ParserTest, ParsesDmlAndDecodesEscapedQuotes) {
     ASSERT_TRUE(result.ok());
     const auto insert = std::dynamic_pointer_cast<ast::InsertStmt>(result.statement);
     ASSERT_NE(insert, nullptr);
-    ASSERT_EQ(insert->vals.size(), 3U);
-    const auto text = std::dynamic_pointer_cast<ast::StringLit>(insert->vals[2]);
+    ASSERT_EQ(insert->values.size(), 3U);
+    const auto text = std::dynamic_pointer_cast<ast::StringLit>(insert->values[2]);
     ASSERT_NE(text, nullptr);
     EXPECT_EQ(text->val, "Tom's book");
 
@@ -58,13 +58,23 @@ TEST(ParserTest, ParsesDmlAndDecodesEscapedQuotes) {
     ASSERT_TRUE(result.ok());
     const auto select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
     ASSERT_NE(select, nullptr);
-    ASSERT_EQ(select->cols.size(), 2U);
-    ASSERT_EQ(select->tabs, (std::vector<std::string>{"x", "y"}));
-    ASSERT_EQ(select->conds.size(), 2U);
-    ASSERT_NE(select->order, nullptr);
-    EXPECT_EQ(select->order->column->tab_name, "x");
-    EXPECT_EQ(select->order->column->col_name, "a");
-    EXPECT_EQ(select->order->direction, ast::OrderBy_DESC);
+    ASSERT_EQ(select->select_items.size(), 2U);
+    const auto join = std::dynamic_pointer_cast<ast::JoinNode>(select->from);
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->type, ast::JoinType::Inner);
+    const auto left_table = std::dynamic_pointer_cast<ast::TableRef>(join->left);
+    const auto right_table = std::dynamic_pointer_cast<ast::TableRef>(join->right);
+    ASSERT_NE(left_table, nullptr);
+    ASSERT_NE(right_table, nullptr);
+    EXPECT_EQ(std::get<std::string>(left_table->source), "x");
+    EXPECT_EQ(std::get<std::string>(right_table->source), "y");
+    ASSERT_NE(std::dynamic_pointer_cast<ast::LogicalExpr>(select->where), nullptr);
+    ASSERT_EQ(select->order_by.size(), 1U);
+    const auto order_column = std::dynamic_pointer_cast<ast::Col>(select->order_by[0]->expression);
+    ASSERT_NE(order_column, nullptr);
+    EXPECT_EQ(order_column->tab_name, "x");
+    EXPECT_EQ(order_column->col_name, "a");
+    EXPECT_EQ(select->order_by[0]->direction, ast::OrderByDir::Desc);
 }
 
 TEST(ParserTest, SupportsBothNotEqualSpellings) {
@@ -73,9 +83,70 @@ TEST(ParserTest, SupportsBothNotEqualSpellings) {
         ASSERT_TRUE(result.ok());
         const auto select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
         ASSERT_NE(select, nullptr);
-        ASSERT_EQ(select->conds.size(), 1U);
-        EXPECT_EQ(select->conds.front()->op, ast::SV_OP_NE);
+        const auto comparison = std::dynamic_pointer_cast<ast::BinaryExpr>(select->where);
+        ASSERT_NE(comparison, nullptr);
+        EXPECT_EQ(comparison->op, ast::CompOp::Ne);
     }
+}
+
+TEST(ParserTest, ParsesQualifiedSetTargetAndExpressionRightHandSide) {
+    const ParseResult result = Parse("update t set t.total = t.score, t.rank = abs(t.score);");
+    ASSERT_TRUE(result.ok());
+    const auto update = std::dynamic_pointer_cast<ast::UpdateStmt>(result.statement);
+    ASSERT_NE(update, nullptr);
+    ASSERT_EQ(update->set_clauses.size(), 2U);
+
+    ASSERT_NE(update->set_clauses[0]->target_column, nullptr);
+    EXPECT_EQ(update->set_clauses[0]->target_column->tab_name, "t");
+    EXPECT_EQ(update->set_clauses[0]->target_column->col_name, "total");
+    const auto source_column = std::dynamic_pointer_cast<ast::Col>(update->set_clauses[0]->assigned_expr);
+    ASSERT_NE(source_column, nullptr);
+    EXPECT_EQ(source_column->tab_name, "t");
+    EXPECT_EQ(source_column->col_name, "score");
+
+    const auto abs = std::dynamic_pointer_cast<ast::FunctionCallExpr>(update->set_clauses[1]->assigned_expr);
+    ASSERT_NE(abs, nullptr);
+    EXPECT_EQ(abs->name, "abs");
+    ASSERT_EQ(abs->arguments.size(), 1U);
+    const auto argument = std::dynamic_pointer_cast<ast::Col>(abs->arguments[0]);
+    ASSERT_NE(argument, nullptr);
+    EXPECT_EQ(argument->tab_name, "t");
+    EXPECT_EQ(argument->col_name, "score");
+}
+
+TEST(ParserTest, PreservesCommaAndExplicitJoinKinds) {
+    ParseResult result = Parse("select * from x, y;");
+    ASSERT_TRUE(result.ok());
+    auto select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
+    ASSERT_NE(select, nullptr);
+    auto join = std::dynamic_pointer_cast<ast::JoinNode>(select->from);
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->type, ast::JoinType::Cross);
+
+    result = Parse("select * from x join y;");
+    ASSERT_TRUE(result.ok());
+    select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
+    ASSERT_NE(select, nullptr);
+    join = std::dynamic_pointer_cast<ast::JoinNode>(select->from);
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->type, ast::JoinType::Inner);
+}
+
+TEST(ParserTest, BuildsRecursiveLeftDeepJoinTree) {
+    const ParseResult result = Parse("select * from x join y, z;");
+    ASSERT_TRUE(result.ok());
+    const auto select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
+    ASSERT_NE(select, nullptr);
+
+    const auto root = std::dynamic_pointer_cast<ast::JoinNode>(select->from);
+    ASSERT_NE(root, nullptr);
+    EXPECT_EQ(root->type, ast::JoinType::Cross);
+    const auto left_join = std::dynamic_pointer_cast<ast::JoinNode>(root->left);
+    const auto right_table = std::dynamic_pointer_cast<ast::TableRef>(root->right);
+    ASSERT_NE(left_join, nullptr);
+    ASSERT_NE(right_table, nullptr);
+    EXPECT_EQ(left_join->type, ast::JoinType::Inner);
+    EXPECT_EQ(std::get<std::string>(right_table->source), "z");
 }
 
 TEST(ParserTest, OptionalClausesDoNotLeakAcrossCalls) {
@@ -87,8 +158,10 @@ TEST(ParserTest, OptionalClausesDoNotLeakAcrossCalls) {
         ASSERT_TRUE(result.ok());
         const auto select = std::dynamic_pointer_cast<ast::SelectStmt>(result.statement);
         ASSERT_NE(select, nullptr);
-        EXPECT_TRUE(select->conds.empty());
-        EXPECT_EQ(select->order, nullptr);
+        ASSERT_EQ(select->select_items.size(), 1U);
+        EXPECT_NE(std::dynamic_pointer_cast<ast::StarExpr>(select->select_items[0]), nullptr);
+        EXPECT_EQ(select->where, nullptr);
+        EXPECT_TRUE(select->order_by.empty());
     }
 }
 

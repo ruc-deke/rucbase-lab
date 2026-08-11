@@ -27,9 +27,10 @@
 
 `src/parser/lex.l` 和 `src/parser/yacc.y` 是词法、语法的源文件。CMake 会在构建目录中生成并编译 `lex.yy.cpp`、`yacc.tab.cpp` 和相关头文件，不要手工生成到 `src/parser/`，也不要提交生成文件。
 
-Parser 文件职责：
+Parser 文件职责（详细扩展流程见 [`src/parser/README.md`](../src/parser/README.md)）：
 
-- `ast.h`：SQL 抽象语法树；
+- `ast.h`：完整语句、公共子句及递归 FROM/JOIN 树；
+- `expression.h`：字面量、列、谓词、函数和子查询表达式；
 - `lex.l`：把 SQL 文本转换为 token；
 - `yacc.y`：把 token 组合成 AST；
 - `parser.h/.cpp`：对外提供 `Parse(sql)` 和错误诊断；

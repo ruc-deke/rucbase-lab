@@ -3,275 +3,318 @@
 
 /**
  * @file ast.h
- * @brief 定义 SQL 解析器生成的抽象语法树（AST）。
+ * @brief 定义 SQL 语句、公共子句和 FROM/JOIN 语法树。
  *
- * Parser 只负责语法分析；表查找、列绑定和类型检查属于 Analyzer 层，
- * 因此不应出现在这些节点中。
+ * 表达式节点单独放在 expression.h。Parser 只记录语法结构；表查找、
+ * 列绑定和类型检查由 Analyzer 完成。
  */
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
+#include "parser/expression.h"
 
 namespace ast {
 
-/** @brief SQL 字面量和列定义支持的数据类型。 */
-enum SvType {
-    SV_TYPE_INT,    ///< 32 位有符号整数。
-    SV_TYPE_FLOAT,  ///< 单精度浮点数。
-    SV_TYPE_STRING  ///< 定长字符数据。
+/** @brief CREATE TABLE 列定义支持的数据类型。 */
+enum class DataType {
+    Int,     ///< 32 位有符号整数。
+    Float,   ///< 单精度浮点数。
+    String,  ///< 定长字符数据。
 };
 
-/** @brief WHERE 子句支持的比较运算符。 */
-enum SvCompOp {
-    SV_OP_EQ,  ///< 等于（=）。
-    SV_OP_NE,  ///< 不等于（<> 或 !=）。
-    SV_OP_LT,  ///< 小于（<）。
-    SV_OP_GT,  ///< 大于（>）。
-    SV_OP_LE,  ///< 小于等于（<=）。
-    SV_OP_GE   ///< 大于等于（>=）。
+/** @brief 完整 SQL 语句的类别。 */
+enum class StatementKind {
+    Help,
+    ShowTables,
+    ShowDatabase,
+    TxnBegin,
+    TxnCommit,
+    TxnAbort,
+    TxnRollback,
+    CreateTable,
+    DropTable,
+    DescTable,
+    CreateIndex,
+    DropIndex,
+    Insert,
+    Delete,
+    Update,
+    Select,
 };
 
-/** @brief ORDER BY 子句的排序方向。 */
-enum OrderByDir {
-    OrderBy_DEFAULT,  ///< 未显式指定方向，默认按升序处理。
-    OrderBy_ASC,
-    OrderBy_DESC
+/** @brief 所有完整 SQL 语句的共同基类。 */
+struct Statement {
+    virtual ~Statement() = default;
+
+    StatementKind kind() const { return kind_; }
+
+protected:
+    explicit Statement(const StatementKind kind) : kind_(kind) {}
+
+private:
+    StatementKind kind_;
 };
 
-/**
- * @brief 显式 JOIN 子句的连接类型。
- *
- * 连接类型属于 SQL 的语法语义：Parser 在后续支持 INNER、LEFT、RIGHT 和
- * FULL JOIN 时将其写入 AST，Analyzer 与 Planner 只消费解析结果。
- */
+/** @brief ORDER BY 的排序方向。 */
+enum class OrderByDir {
+    Default,
+    Asc,
+    Desc,
+};
+
+/** @brief FROM 中的连接类型。逗号连接记为 Cross。 */
 enum class JoinType {
+    Cross,
     Inner,
     Left,
     Right,
     Full,
 };
 
-/** @brief 所有完整 SQL 语句 AST 节点的多态基类。 */
-struct Statement {
-    virtual ~Statement() = default;
+/** @brief FROM 树中的节点类别。 */
+enum class FromNodeKind {
+    Table,
+    Join,
 };
 
-/** @brief HELP 辅助语句。 */
-struct Help : public Statement {
+/** @brief 跟随在From后面的表引用和 JOIN 节点的共同基类。 */
+struct FromNode {
+    virtual ~FromNode() = default;
+
+    FromNodeKind kind() const { return kind_; }
+
+protected:
+    explicit FromNode(const FromNodeKind kind) : kind_(kind) {}
+
+private:
+    FromNodeKind kind_;
 };
 
-/** @brief SHOW TABLES 辅助语句。 */
-struct ShowTables : public Statement {
-};
+// CREATE TABLE、UPDATE、ORDER BY 等语句共用的小型语法结构。
 
-/** @brief SHOW DATABASE 辅助语句，返回当前打开的数据库名。 */
-struct ShowDatabase : public Statement {
-};
-
-/** @brief BEGIN 事务语句。 */
-struct TxnBegin : public Statement {
-};
-
-/** @brief COMMIT 事务语句。 */
-struct TxnCommit : public Statement {
-};
-
-/** @brief ABORT 事务语句。 */
-struct TxnAbort : public Statement {
-};
-
-/** @brief ROLLBACK 事务语句。 */
-struct TxnRollback : public Statement {
-};
-
-/** @brief 解析后的列类型及其物理字节长度。 */
 struct TypeLen {
-    SvType type = SV_TYPE_INT;
-    int len = 0;
+    DataType type = DataType::Int;
+    int declared_len = 0;
 
     TypeLen() = default;
-    explicit TypeLen(const SvType type_, const int len_) : type(type_), len(len_) {}
+    TypeLen(const DataType type_, const int declared_len_) : type(type_), declared_len(declared_len_) {}
 };
 
-/** @brief CREATE TABLE 中的一项列定义。 */
 struct ColDef {
     std::string col_name;
     TypeLen type_len;
 
     ColDef() = default;
-    explicit ColDef(std::string col_name_, const TypeLen type_len_) :
-            col_name(std::move(col_name_)), type_len(type_len_) {}
+    ColDef(std::string col_name_, const TypeLen type_len_) : col_name(std::move(col_name_)), type_len(type_len_) {}
 };
 
-/** @brief CREATE TABLE 语句及按声明顺序保存的列定义。 */
-struct CreateTable : public Statement {
+/** @brief UPDATE 中的一项赋值，例如 `student.score = ABS(student.score)`。 */
+struct SetClause {
+    std::shared_ptr<Col> target_column;   ///< 赋值目标，支持 `column` 和 `table.column`。
+    std::shared_ptr<Expr> assigned_expr;  ///< 右侧标量表达式；具体支持范围由 Analyzer 决定。
+
+    SetClause(std::shared_ptr<Col> target_column_, std::shared_ptr<Expr> assigned_expr_)
+        : target_column(std::move(target_column_)),
+          assigned_expr(std::move(assigned_expr_)) {}
+};
+
+struct OrderBy {
+    std::shared_ptr<Expr> expression;
+    OrderByDir direction = OrderByDir::Default;
+
+    OrderBy(std::shared_ptr<Expr> expression_, const OrderByDir direction_)
+        : expression(std::move(expression_)),
+          direction(direction_) {}
+};
+
+struct LimitClause {
+    std::int64_t count = 0;              ///< 用户声明的行数，留待 Analyzer 检查非负。
+    std::optional<std::int64_t> offset;  ///< 可选偏移量，同样保留有符号输入。
+};
+
+// FROM 使用递归树，因此左右孩子都可以继续是 TableRef 或 JoinNode。
+
+struct TableRef : public FromNode {
+    std::variant<std::string, std::shared_ptr<SelectStmt>> source;
+    std::string alias;
+
+    TableRef() = delete;
+    explicit TableRef(std::string table_name, std::string alias_ = {})
+        : FromNode(FromNodeKind::Table),
+          source(std::move(table_name)),
+          alias(std::move(alias_)) {}
+    TableRef(std::shared_ptr<SelectStmt> subquery, std::string alias_)
+        : FromNode(FromNodeKind::Table),
+          source(std::move(subquery)),
+          alias(std::move(alias_)) {}
+};
+
+struct JoinNode : public FromNode {
+    JoinType type;
+    std::shared_ptr<FromNode> left;
+    std::shared_ptr<FromNode> right;
+    std::shared_ptr<Expr> condition;  ///< nullptr 表示没有 ON 条件。
+
+    JoinNode(const JoinType type_,
+             std::shared_ptr<FromNode> left_,
+             std::shared_ptr<FromNode> right_,
+             std::shared_ptr<Expr> condition_ = nullptr)
+        : FromNode(FromNodeKind::Join),
+          type(type_),
+          left(std::move(left_)),
+          right(std::move(right_)),
+          condition(std::move(condition_)) {}
+};
+
+// 不携带额外数据的辅助语句和事务语句。
+
+struct HelpStmt : public Statement {
+    HelpStmt() : Statement(StatementKind::Help) {}
+};
+
+struct ShowTablesStmt : public Statement {
+    ShowTablesStmt() : Statement(StatementKind::ShowTables) {}
+};
+
+struct ShowDatabaseStmt : public Statement {
+    ShowDatabaseStmt() : Statement(StatementKind::ShowDatabase) {}
+};
+
+struct TxnBeginStmt : public Statement {
+    TxnBeginStmt() : Statement(StatementKind::TxnBegin) {}
+};
+
+struct TxnCommitStmt : public Statement {
+    TxnCommitStmt() : Statement(StatementKind::TxnCommit) {}
+};
+
+struct TxnAbortStmt : public Statement {
+    TxnAbortStmt() : Statement(StatementKind::TxnAbort) {}
+};
+
+struct TxnRollbackStmt : public Statement {
+    TxnRollbackStmt() : Statement(StatementKind::TxnRollback) {}
+};
+
+// DDL 语句。
+
+struct CreateTableStmt : public Statement {
     std::string tab_name;
     std::vector<ColDef> fields;
 
-    explicit CreateTable(std::string tab_name_, std::vector<ColDef> fields_) :
-            tab_name(std::move(tab_name_)), fields(std::move(fields_)) {}
+    CreateTableStmt(std::string tab_name_, std::vector<ColDef> fields_)
+        : Statement(StatementKind::CreateTable),
+          tab_name(std::move(tab_name_)),
+          fields(std::move(fields_)) {}
 };
 
-/** @brief DROP TABLE 语句。 */
-struct DropTable : public Statement {
+struct DropTableStmt : public Statement {
     std::string tab_name;
 
-    explicit DropTable(std::string tab_name_) : tab_name(std::move(tab_name_)) {}
+    explicit DropTableStmt(std::string tab_name_)
+        : Statement(StatementKind::DropTable),
+          tab_name(std::move(tab_name_)) {}
 };
 
-/** @brief 用于显示表结构的 DESC 语句。 */
-struct DescTable : public Statement {
+struct DescTableStmt : public Statement {
     std::string tab_name;
 
-    explicit DescTable(std::string tab_name_) : tab_name(std::move(tab_name_)) {}
+    explicit DescTableStmt(std::string tab_name_)
+        : Statement(StatementKind::DescTable),
+          tab_name(std::move(tab_name_)) {}
 };
 
-/** @brief 在有序列集合上创建索引的 CREATE INDEX 语句。 */
-struct CreateIndex : public Statement {
-    std::string tab_name;
-    std::vector<std::string> col_names;
-
-    explicit CreateIndex(std::string tab_name_, std::vector<std::string> col_names_) :
-            tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
-};
-
-/** @brief 删除指定列集合索引的 DROP INDEX 语句。 */
-struct DropIndex : public Statement {
+struct CreateIndexStmt : public Statement {
     std::string tab_name;
     std::vector<std::string> col_names;
 
-    explicit DropIndex(std::string tab_name_, std::vector<std::string> col_names_) :
-            tab_name(std::move(tab_name_)), col_names(std::move(col_names_)) {}
+    CreateIndexStmt(std::string tab_name_, std::vector<std::string> col_names_)
+        : Statement(StatementKind::CreateIndex),
+          tab_name(std::move(tab_name_)),
+          col_names(std::move(col_names_)) {}
 };
 
-/** @brief 谓词表达式 AST 节点的多态基类。 */
-struct Expr {
-    virtual ~Expr() = default;
-};
-
-/** @brief 字面量 AST 节点的多态基类。 */
-struct Value : public Expr {
-};
-
-/** @brief 整数字面量。 */
-struct IntLit : public Value {
-    int val;
-
-    explicit IntLit(int val_) : val(val_) {}
-};
-
-/** @brief 浮点数字面量。 */
-struct FloatLit : public Value {
-    float val;
-
-    explicit FloatLit(float val_) : val(val_) {}
-};
-
-/** @brief 已完成 SQL 双单引号转义解码的字符串字面量。 */
-struct StringLit : public Value {
-    std::string val;
-
-    explicit StringLit(std::string val_) : val(std::move(val_)) {}
-};
-
-/**
- * @brief 列引用，可以带表名前缀，也可以省略表名。
- *
- * @c tab_name 为空表示这是未限定列名，后续由 Analyzer 完成列绑定。
- */
-struct Col : public Expr {
+struct DropIndexStmt : public Statement {
     std::string tab_name;
-    std::string col_name;
+    std::vector<std::string> col_names;
 
-    explicit Col(std::string tab_name_, std::string col_name_) :
-            tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
+    DropIndexStmt(std::string tab_name_, std::vector<std::string> col_names_)
+        : Statement(StatementKind::DropIndex),
+          tab_name(std::move(tab_name_)),
+          col_names(std::move(col_names_)) {}
 };
 
-/** @brief UPDATE SET 子句中的一项赋值。 */
-struct SetClause {
-    std::string col_name;
-    std::shared_ptr<Value> val;
+// DML 语句。
 
-    explicit SetClause(std::string col_name_, std::shared_ptr<Value> val_) :
-            col_name(std::move(col_name_)), val(std::move(val_)) {}
-};
-
-/**
- * @brief 二元谓词，例如 `student.id = grade.student_id`。
- *
- * 语法要求左操作数必须是列；右操作数可以是字面量，也可以是另一个列引用。
- */
-struct BinaryExpr {
-    std::shared_ptr<Col> lhs;
-    SvCompOp op;
-    std::shared_ptr<Expr> rhs;
-
-    explicit BinaryExpr(std::shared_ptr<Col> lhs_, SvCompOp op_, std::shared_ptr<Expr> rhs_) :
-            lhs(std::move(lhs_)), op(op_), rhs(std::move(rhs_)) {}
-};
-
-/** @brief ORDER BY 的排序列与可选方向。 */
-struct OrderBy {
-    std::shared_ptr<Col> column;
-    OrderByDir direction;
-    explicit OrderBy(std::shared_ptr<Col> column_, OrderByDir direction_) :
-       column(std::move(column_)), direction(direction_) {}
-};
-
-/** @brief INSERT 语句及按源码顺序保存的值。 */
 struct InsertStmt : public Statement {
     std::string tab_name;
-    std::vector<std::shared_ptr<Value>> vals;
+    std::vector<std::shared_ptr<Value>> values;
 
-    explicit InsertStmt(std::string tab_name_, std::vector<std::shared_ptr<Value>> vals_) :
-            tab_name(std::move(tab_name_)), vals(std::move(vals_)) {}
+    InsertStmt(std::string tab_name_, std::vector<std::shared_ptr<Value>> values_)
+        : Statement(StatementKind::Insert),
+          tab_name(std::move(tab_name_)),
+          values(std::move(values_)) {}
 };
 
-/** @brief DELETE 语句及可选的合取谓词。 */
 struct DeleteStmt : public Statement {
     std::string tab_name;
-    std::vector<std::shared_ptr<BinaryExpr>> conds;
+    std::shared_ptr<Expr> where;
 
-    explicit DeleteStmt(std::string tab_name_, std::vector<std::shared_ptr<BinaryExpr>> conds_) :
-            tab_name(std::move(tab_name_)), conds(std::move(conds_)) {}
+    DeleteStmt(std::string tab_name_, std::shared_ptr<Expr> where_)
+        : Statement(StatementKind::Delete),
+          tab_name(std::move(tab_name_)),
+          where(std::move(where_)) {}
 };
 
-/** @brief UPDATE 语句、赋值列表及可选谓词。 */
 struct UpdateStmt : public Statement {
     std::string tab_name;
     std::vector<std::shared_ptr<SetClause>> set_clauses;
-    std::vector<std::shared_ptr<BinaryExpr>> conds;
+    std::shared_ptr<Expr> where;
 
-    explicit UpdateStmt(std::string tab_name_,
+    UpdateStmt(std::string tab_name_,
                std::vector<std::shared_ptr<SetClause>> set_clauses_,
-               std::vector<std::shared_ptr<BinaryExpr>> conds_) :
-            tab_name(std::move(tab_name_)), set_clauses(std::move(set_clauses_)), conds(std::move(conds_)) {}
+               std::shared_ptr<Expr> where_)
+        : Statement(StatementKind::Update),
+          tab_name(std::move(tab_name_)),
+          set_clauses(std::move(set_clauses_)),
+          where(std::move(where_)) {}
 };
 
-/**
- * @brief 尚未经过目录相关语义分析的 SELECT 语句。
- *
- * 此处按解析结果保存表名和列名；后续由 Analyzer 解析未限定列名、检查歧义，
- * 并验证被引用的表和列。
- */
 struct SelectStmt : public Statement {
-    /** 空列表表示投影项为 `*`。 */
-    std::vector<std::shared_ptr<Col>> cols;
-    std::vector<std::string> tabs;
-    std::vector<std::shared_ptr<BinaryExpr>> conds;
-    /** nullptr 表示语句没有 ORDER BY 子句。 */
-    std::shared_ptr<OrderBy> order;
-    explicit SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
-               std::vector<std::string> tabs_,
-               std::vector<std::shared_ptr<BinaryExpr>> conds_,
-               std::shared_ptr<OrderBy> order_) :
-            cols(std::move(cols_)), tabs(std::move(tabs_)), conds(std::move(conds_)), 
-            order(std::move(order_)) {}
+    std::vector<std::shared_ptr<Expr>> select_items;
+    std::shared_ptr<FromNode> from;
+    std::shared_ptr<Expr> where;
+
+    // GROUP BY、HAVING 和 LIMIT 尚未进入当前 Parser/执行层。
+    std::vector<std::shared_ptr<Expr>> group_by;
+    std::shared_ptr<Expr> having;
+    // ORDER BY 已支持，但与其他 SELECT 尾部子句放在一起更容易对应 SQL 顺序。
+    std::vector<std::shared_ptr<OrderBy>> order_by;
+    std::optional<LimitClause> limit;
+
+    SelectStmt(std::vector<std::shared_ptr<Expr>> select_items_,
+               std::shared_ptr<FromNode> from_,
+               std::shared_ptr<Expr> where_,
+               std::vector<std::shared_ptr<OrderBy>> order_by_,
+               std::vector<std::shared_ptr<Expr>> group_by_ = {},
+               std::shared_ptr<Expr> having_ = nullptr,
+               std::optional<LimitClause> limit_ = std::nullopt)
+        : Statement(StatementKind::Select),
+          select_items(std::move(select_items_)),
+          from(std::move(from_)),
+          where(std::move(where_)),
+          group_by(std::move(group_by_)),
+          having(std::move(having_)),
+          order_by(std::move(order_by_)),
+          limit(limit_) {}
 };
 
 }  // namespace ast

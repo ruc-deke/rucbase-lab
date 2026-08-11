@@ -16,14 +16,14 @@
 #include <string>
 #include <string_view>
 
-#include "ast.h"
+#include "parser/ast.h"
 
 namespace rucbase::parser {
 
 /** @brief 词法错误或语法错误的位置与原因。 */
 struct ParseError {
-    int line = 1;    ///< 从 1 开始计数的源码行号。
-    int column = 1;  ///< 从 1 开始计数的 UTF-8 字节列号。
+    int line = 1;         ///< 从 1 开始计数的源码行号。
+    int column = 1;       ///< 从 1 开始计数的 UTF-8 字节列号。
     std::string message;  ///< 不包含源码上下文的错误说明。
 };
 
@@ -38,7 +38,7 @@ struct ParseResult {
     std::optional<ParseError> error;
 
     /** @return 成功解析出一条完整语句时返回 true。 */
-    bool ok() const { return statement != nullptr && !error.has_value(); }
+    [[nodiscard]] bool ok() const noexcept { return statement != nullptr && !error.has_value(); }
 };
 
 /**

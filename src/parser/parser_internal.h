@@ -18,8 +18,7 @@
 #include <utility>
 #include <vector>
 
-#include "ast.h"
-#include "parser.h"
+#include "parser/parser.h"
 
 namespace rucbase::parser {
 
@@ -30,27 +29,28 @@ namespace rucbase::parser {
  * 每个语法符号只使用 yacc.y 中通过 `%token` 或 `%type` 为其声明的成员。
  */
 struct SemanticValue {
-    int sv_int = 0;
-    float sv_float = 0;
-    std::string sv_str;
-    ast::OrderByDir sv_orderby_dir = ast::OrderBy_DEFAULT;
-    std::vector<std::string> sv_strs;
+    int integer = 0;
+    float floating_point = 0;
+    std::string text;
+    std::vector<std::string> column_names;
 
-    std::shared_ptr<ast::Statement> sv_node;
-    ast::SvCompOp sv_comp_op = ast::SV_OP_EQ;
-    ast::TypeLen sv_type_len;
-    ast::ColDef sv_field;
-    std::vector<ast::ColDef> sv_fields;
-    std::shared_ptr<ast::Expr> sv_expr;
-    std::shared_ptr<ast::Value> sv_val;
-    std::vector<std::shared_ptr<ast::Value>> sv_vals;
-    std::shared_ptr<ast::Col> sv_col;
-    std::vector<std::shared_ptr<ast::Col>> sv_cols;
-    std::shared_ptr<ast::SetClause> sv_set_clause;
-    std::vector<std::shared_ptr<ast::SetClause>> sv_set_clauses;
-    std::shared_ptr<ast::BinaryExpr> sv_cond;
-    std::vector<std::shared_ptr<ast::BinaryExpr>> sv_conds;
-    std::shared_ptr<ast::OrderBy> sv_orderby;
+    std::shared_ptr<ast::Statement> statement;
+    ast::CompOp comparison_operator = ast::CompOp::Eq;
+    ast::TypeLen type_length;
+    ast::ColDef column_definition;
+    std::vector<ast::ColDef> column_definitions;
+    std::shared_ptr<ast::Expr> expression;
+    std::vector<std::shared_ptr<ast::Expr>> expressions;
+    std::shared_ptr<ast::Value> value;
+    std::vector<std::shared_ptr<ast::Value>> values;
+    std::shared_ptr<ast::Col> column;
+    std::shared_ptr<ast::SetClause> set_clause;
+    std::vector<std::shared_ptr<ast::SetClause>> set_clauses;
+    std::shared_ptr<ast::BinaryExpr> condition;
+    std::shared_ptr<ast::FromNode> from_node;
+    std::shared_ptr<ast::OrderBy> order_by;
+    std::vector<std::shared_ptr<ast::OrderBy>> order_by_items;
+    ast::OrderByDir order_direction = ast::OrderByDir::Default;
 };
 
 /**
@@ -75,7 +75,7 @@ struct ParseContext {
 };
 
 /**
- * @brief 转换一个完整的整数 token，并拒绝溢出。
+ * @brief 转换一个完整的整数 token，并防止溢出。
  * @param text token 字节序列，不要求以 NUL 结尾。
  * @param length @p text 的字节数。
  * @param value 成功时接收解析后的值。
@@ -84,7 +84,7 @@ struct ParseContext {
 bool ParseIntegerLiteral(const char* text, int length, int* value);
 
 /**
- * @brief 转换一个完整的浮点数 token，并拒绝溢出。
+ * @brief 转换一个完整的浮点数 token，并防止溢出。
  * @param text token 字节序列，不要求以 NUL 结尾。
  * @param length @p text 的字节数。
  * @param value 成功时接收解析后的值。

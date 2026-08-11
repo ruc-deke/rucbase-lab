@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -18,11 +17,11 @@ struct AnalyzedQuery;
 class SmManager;
 
 class Planner {
-   private:
-    SmManager *sm_manager_;
+private:
+    SmManager* sm_manager_;
 
-   public:
-    explicit Planner(SmManager *sm_manager) : sm_manager_(sm_manager) {}
+public:
+    explicit Planner(SmManager* sm_manager) : sm_manager_(sm_manager) {}
 
     std::shared_ptr<Plan> do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context);
 
@@ -44,9 +43,15 @@ private:
                         const std::vector<Condition>& curr_conds,
                         std::vector<std::string>& index_col_names) const;
 
-    static ColType interp_sv_type(ast::SvType sv_type) {
-        const std::map<ast::SvType, ColType> m = {
-            {ast::SV_TYPE_INT, TYPE_INT}, {ast::SV_TYPE_FLOAT, TYPE_FLOAT}, {ast::SV_TYPE_STRING, TYPE_STRING}};
-        return m.at(sv_type);
+    static ColType interpret_type(ast::DataType type) {
+        switch (type) {
+            case ast::DataType::Int:
+                return TYPE_INT;
+            case ast::DataType::Float:
+                return TYPE_FLOAT;
+            case ast::DataType::String:
+                return TYPE_STRING;
+        }
+        throw InternalError("Unexpected AST data type");
     }
 };
