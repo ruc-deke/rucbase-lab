@@ -99,16 +99,20 @@ private:
     bool handle_request(ClientSession* session, const wire::Frame& request);
 
     /**
-     * @brief 执行一条 SQL 的 parse/analyze、plan、portal/executor 完整流程。
+     * @brief 执行一条 SQL 的解析、语义分析、计划、执行与响应编码流程。
      * @param session 当前客户端会话，用于保存事务 ID 和文本结果。
-     * @param sql 待执行的单条 SQL 语句。
+     * @param sql_text 待执行的单条 SQL 语句。
      * @return 响应完整发送时返回 true，网络或编码失败时返回 false。
+     * @pre session 不为 nullptr。
      * @note Lab4 需要在此函数中启用两个带锚点的事务教学开关。
      */
-    bool execute_sql(ClientSession* session, const std::string& sql);
+    bool execute_sql(ClientSession* session, const std::string& sql_text);
 
     /** @brief 为当前语句取得已有事务，或创建一个新的隐式事务。 */
     void prepare_transaction(ClientSession* session, Context* context);
+
+    /** @brief 按“结构化结果、文本结果、成功状态”的优先级发送语句响应。 */
+    static bool send_statement_result(ClientSession* session, const WireResultSet& structured_result);
 
     /** @brief 将结构化查询结果编码为 META、ROW 和 RESULT_END 帧。 */
     static bool send_query_result(int fd, const WireResultSet& result);

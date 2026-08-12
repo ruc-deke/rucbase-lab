@@ -9,18 +9,18 @@ RUCBase 并发控制模块采用基于封锁的并发控制协议，要求事务
 ## 声明
 
 在完成本实验之前，需要在
-`src/server/server.cpp` 的 `Server::execute_statement()` 中启用两处事务教学开关。
+`src/server/server.cpp` 的 `Server::execute_sql()` 中启用两处事务教学开关。
 请按注释锚点搜索，不要依赖会随重构变化的行号。
 
 - `RUCBASE_LAB4_BEGIN_TRANSACTION`：
 ```
-prepare_transaction(session, &context);
+prepare_transaction(session, &execution_context);
 ```
 
 - `RUCBASE_LAB4_AUTO_COMMIT`：
 ```
-if (context.txn_->get_txn_mode() == false) {
-    transaction_manager_.commit(context.txn_, context.log_mgr_);
+if (execution_context.txn_->get_txn_mode() == false) {
+    transaction_manager_.commit(execution_context.txn_, execution_context.log_mgr_);
 }
 ```
 

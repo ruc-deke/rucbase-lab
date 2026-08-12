@@ -84,13 +84,19 @@ bool parse_options(const int argc, char** argv, std::string* database, std::stri
 }  // namespace
 
 struct Server::ClientSession {
-    explicit ClientSession(const int client_fd) : fd(client_fd) { text_buffer.fill('\0'); }
+    explicit ClientSession(const int client_fd) : socket_fd(client_fd) { reset_statement_output(); }
 
-    int fd;
-    // 事务身份随连接保留，文本结果缓冲区则在每条 SQL 执行前清空。
-    txn_id_t txn_id = INVALID_TXN_ID;
-    std::array<char, BUFFER_LENGTH> text_buffer{};
-    int text_offset = 0;
+    void reset_statement_output() noexcept {
+        text_result_buffer.fill('\0');
+        text_result_length = 0;
+    }
+
+    int socket_fd;
+    // 事务标识属于会话，需要在多条语句之间保留。
+    txn_id_t transaction_id = INVALID_TXN_ID;
+    // 兼容仍通过 Context::data_send_ 返回文本的旧执行路径。
+    std::array<char, BUFFER_LENGTH> text_result_buffer{};
+    int text_result_length = 0;
 };
 
 Server::Server(std::string database_name, std::string bind_address, const int port)
@@ -260,83 +266,95 @@ void Server::handle_client(const int fd) {
 
 bool Server::handle_request(ClientSession* session, const wire::Frame& request) {
     if (request.flags != 0 || request.tag != wire::kTagExecStream) {
-        return send_error(session->fd, "unsupported request (only EXEC_STREAM is implemented)");
+        return send_error(session->socket_fd, "unsupported request (only EXEC_STREAM is implemented)");
     }
     if (request.payload.empty()) {
-        return send_error(session->fd, "empty SQL");
+        return send_error(session->socket_fd, "empty SQL");
     }
 
-    std::cout << "[fd=" << session->fd << "] " << request.payload << '\n';
+    std::cout << "[fd=" << session->socket_fd << "] " << request.payload << '\n';
     return execute_sql(session, request.payload);
 }
 
-// 一条 SQL 的完整的处理主线：parse/analyze -> plan -> portal/executor。
-bool Server::execute_sql(ClientSession* session, const std::string& sql) {
-    // 文本结果缓冲区属于单条语句，每次执行前都要重置。
-    session->text_buffer.fill('\0');
-    session->text_offset = 0;
-    // Context 汇集一次语句执行所需的事务、日志、锁和结果状态。
-    Context context(&lock_manager_, &log_manager_, nullptr, session->text_buffer.data(), &session->text_offset);
+bool Server::execute_sql(ClientSession* session, const std::string& sql_text) {
+    session->reset_statement_output();
+    // Context 为本条语句集中传递事务、日志、锁与执行结果。
+    Context execution_context(&lock_manager_, &log_manager_, nullptr, session->text_result_buffer.data(),
+                              &session->text_result_length);
 
     try {
         // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一行。
         // RUCBASE_LAB4_BEGIN_TRANSACTION
-        // prepare_transaction(session, &context);
+        // prepare_transaction(session, &execution_context);
 
-        auto parse_result = parser::Parse(sql);
+        // 阶段一：语法解析。解析失败属于客户端输入错误，返回带位置信息的诊断。
+        const auto parse_result = parser::Parse(sql_text);
         if (!parse_result.ok()) {
             if (!parse_result.error.has_value()) {
                 throw InternalError("parser returned neither a statement nor an error");
             }
-            return send_error(session->fd, parser::FormatError(sql, parse_result.error.value()));
+            return send_error(session->socket_fd, parser::FormatError(sql_text, parse_result.error.value()));
         }
-        auto query = analyzer_.analyze(parse_result.statement);
-        auto plan = optimizer_.plan_query(query, &context);
-        auto statement = portal_.start(std::move(plan), &context);
-        portal_.run(std::move(statement), &ql_manager_, &session->txn_id, &context);
+
+        // 阶段二：语义分析。完成表、列和类型绑定，形成语义化查询。
+        const auto analyzed_query = analyzer_.analyze(parse_result.statement);
+
+        // 阶段三：计划生成。Optimizer 根据语义化查询构造可执行计划。
+        auto execution_plan = optimizer_.plan_query(analyzed_query, &execution_context);
+
+        // 阶段四：语句执行。Portal 构造执行器树，并将语句交由查询层运行。
+        auto executable_statement = portal_.start(std::move(execution_plan), &execution_context);
+        portal_.run(std::move(executable_statement), &ql_manager_, &session->transaction_id, &execution_context);
 
         // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一段。
         // RUCBASE_LAB4_AUTO_COMMIT
-        // if (context.txn_->get_txn_mode() == false) {
-        //     transaction_manager_.commit(context.txn_, context.log_mgr_);
+        // if (execution_context.txn_->get_txn_mode() == false) {
+        //     transaction_manager_.commit(execution_context.txn_, execution_context.log_mgr_);
         // }
 
-        // 查询返回结构化结果，文本型命令返回单列文本，其余命令只返回成功状态。
-        if (context.wire_result_.has_query_result) {
-            return send_query_result(session->fd, context.wire_result_);
-        }
-        if (session->text_offset < 0 || session->text_offset > static_cast<int>(session->text_buffer.size())) {
-            throw InternalError("result buffer offset is out of range");
-        }
-        if (session->text_offset > 0) {
-            return send_text_result(session->fd, "output",
-                                    std::string(session->text_buffer.data(), session->text_offset));
-        }
-        return wire::WriteFrame(session->fd, wire::kTagCommandOk, 0, "");
-    } catch (TransactionAbortException& error) {
+        // 阶段五：响应编码。根据执行结果选择结果集、文本或成功响应。
+        return send_statement_result(session, execution_context.wire_result_);
+    } catch (const TransactionAbortException& exception) {
         // 事务异常需要先回滚，再发送专用终止帧以保持客户端协议同步。
-        if (context.txn_ != nullptr) {
-            transaction_manager_.abort(context.txn_, &log_manager_);
+        if (execution_context.txn_ != nullptr) {
+            transaction_manager_.abort(execution_context.txn_, &log_manager_);
         }
-        std::cout << error.GetInfo() << '\n';
-        return wire::WriteFrame(session->fd, wire::kTagTransactionAbort, 0, "abort");
-    } catch (const RMDBError& error) {
-        std::cerr << error.what() << '\n';
-        return send_error(session->fd, error.what());
-    } catch (const std::exception& error) {
-        std::cerr << error.what() << '\n';
-        return send_error(session->fd, std::string("internal server error: ") + error.what());
+        std::cout << exception.GetInfo() << '\n';
+        return wire::WriteFrame(session->socket_fd, wire::kTagTransactionAbort, 0, "abort");
+    } catch (const RMDBError& exception) {
+        std::cerr << exception.what() << '\n';
+        return send_error(session->socket_fd, exception.what());
+    } catch (const std::exception& exception) {
+        std::cerr << exception.what() << '\n';
+        return send_error(session->socket_fd, std::string("internal server error: ") + exception.what());
     }
 }
 
 void Server::prepare_transaction(ClientSession* session, Context* context) {
-    context->txn_ = transaction_manager_.get_transaction(session->txn_id);
+    context->txn_ = transaction_manager_.get_transaction(session->transaction_id);
     if (context->txn_ == nullptr || context->txn_->get_state() == TransactionState::COMMITTED ||
         context->txn_->get_state() == TransactionState::ABORTED) {
         context->txn_ = transaction_manager_.begin(nullptr, context->log_mgr_);
-        session->txn_id = context->txn_->get_transaction_id();
+        session->transaction_id = context->txn_->get_transaction_id();
         context->txn_->set_txn_mode(false);
     }
+}
+
+bool Server::send_statement_result(ClientSession* session, const WireResultSet& structured_result) {
+    if (structured_result.has_query_result) {
+        return send_query_result(session->socket_fd, structured_result);
+    }
+
+    const int text_length = session->text_result_length;
+    if (text_length < 0 || text_length > static_cast<int>(session->text_result_buffer.size())) {
+        throw InternalError("result buffer offset is out of range");
+    }
+    if (text_length > 0) {
+        const std::string text_result(session->text_result_buffer.data(), text_length);
+        return send_text_result(session->socket_fd, "output", text_result);
+    }
+
+    return wire::WriteFrame(session->socket_fd, wire::kTagCommandOk, 0, "");
 }
 
 bool Server::send_query_result(int fd, const WireResultSet& result) {
