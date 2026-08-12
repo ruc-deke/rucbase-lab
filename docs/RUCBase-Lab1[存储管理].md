@@ -230,13 +230,13 @@ class BufferPoolManager {
 
 根据字段的长度是否固定，可以分为定长字段和变长字段。根据记录是否存在变长字段，可以分为定长记录和变长记录。定长记录全部由定长字段组成，是比较简单的记录组织形式，只需要存储实际数据和固定的字段长度。本实验采用定长记录的组织形式，便于计算某个定长字段在记录中的偏移位置。
 
-在本实验中，学生需要实现存储系统中的记录管理器，它主要由`RMManager`类、`RMFileHandle`类、`RMPageHandle`类、`RMScan`类组成。此外，还有底层数据结构的`Rid`类和`RmReocrd`类。
+在本实验中，学生需要实现存储系统中的记录管理器，它主要由 `RmManager`、`RmFileHandle`、`RmPageHandle` 和 `RmScan` 组成。此外，还有底层数据结构 `Rid` 和 `RmRecord`。
 
-其中，学生只要实现`RMFileHandle`和`RMScan`类中的接口。已提供其他类的完整源码。
+其中，学生只需要实现 `RmFileHandle` 和 `RmScan` 中标有 `Todo` 的 Lab1 接口，其他类型已提供完整源码。指定 RID 的 `insert_record` 是后续恢复/回滚实验的扩展接口，不属于 Lab1 评分任务。
 
 `RMManager`类提供了创建/打开/关闭/删除记录文件的接口，其内部实现调用了任务一实现的`DiskManager`和`BufferPoolManager`类的接口。
 
-`RMPageHandle`将一个缓冲池页面解释为记录页面，并提供页头、bitmap 和记录槽位的访问。
+`RmPageHandle` 将一个已固定在缓冲池中的页面解释为记录页面，并提供页头、bitmap 和记录槽位的访问。它只是页面视图，不负责解除 pin；获取页面的调用路径必须最终恰好 unpin 一次。其构造函数直接展示页头、bitmap 和记录槽在页面中的排列方式。
 
 ### 任务2.1 记录操作
 

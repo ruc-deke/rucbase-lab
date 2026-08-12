@@ -18,7 +18,12 @@
 class Context;
 class RmManager;
 
-/* 对表数据文件中的页面进行封装 */
+/**
+ * @brief 将一张已固定在缓冲池中的页面解释为记录页布局。
+ *
+ * 本类型只是页面视图，不拥有 Page，也不负责解除 pin。持有它的作用域必须保证页面保持固定；
+ * 获取页面的一方仍负责恰好解除一次 pin。
+ */
 struct RmPageHandle {
     const RmFileHdr* file_hdr;  // 当前页面所在文件的文件头指针
     Page* page;                 // 页面的实际数据，包括页面存储的数据、元信息等
@@ -26,21 +31,22 @@ struct RmPageHandle {
     char* bitmap;               // page->data的第二部分，存储页面的bitmap，指针指向首地址，长度为file_hdr->bitmap_size
     char* slots;  // page->data的第三部分，存储表的记录，指针指向首地址，每个slot的长度为file_hdr->record_size
 
-    /**
-     * @brief 将一张已固定在缓冲池中的页面解释为记录页布局。
-     * @throws InternalError 文件头或页面为空。
-
-     */
+    /** @throws InternalError 文件头或页面为空。 */
     RmPageHandle(const RmFileHdr* fhdr_, Page* page_) : file_hdr(fhdr_), page(page_) {
         if (file_hdr == nullptr || page == nullptr) {
             throw InternalError("cannot construct a record page handle from null");
         }
-        page_hdr = reinterpret_cast<RmPageHdr*>(page->get_data() + page->OFFSET_PAGE_HDR);
-        bitmap = page->get_data() + sizeof(RmPageHdr) + page->OFFSET_PAGE_HDR;
+        // Page 的开头预留给通用页面信息（目前是 LSN），记录页头从 OFFSET_PAGE_HDR 开始。
+        page_hdr = reinterpret_cast<RmPageHdr*>(page->get_data() + Page::OFFSET_PAGE_HDR);
+
+        // bitmap 紧跟在记录页头后面，每一位表示一个 slot 是否存有记录。
+        bitmap = page->get_data() + Page::OFFSET_PAGE_HDR + sizeof(RmPageHdr);
+
+        // 定长记录槽紧跟在 bitmap 后面，可用“起始地址 + slot_no * 记录长度”定位记录。
         slots = bitmap + file_hdr->bitmap_size;
     }
 
-    // 返回指定slot_no的slot存储收地址
+    /** @return slot_no 对应记录槽的首地址。 */
     char* get_slot(int slot_no) const { return slots + static_cast<std::ptrdiff_t>(slot_no) * file_hdr->record_size; }
 };
 
@@ -63,7 +69,7 @@ public:
         // 注意：这里从磁盘中读出文件描述符为fd的文件的file_hdr，读到内存中
         // 这里实际就是初始化file_hdr，只不过是从磁盘中读出进行初始化
         // init file_hdr_
-        disk_manager_->read_page(fd, RM_FILE_HDR_PAGE, (char*)&file_hdr_, sizeof(file_hdr_));
+        disk_manager_->read_page(fd, RM_FILE_HDR_PAGE, reinterpret_cast<char*>(&file_hdr_), sizeof(file_hdr_));
         // disk_manager管理的fd对应的文件中，设置从file_hdr_.num_pages开始分配page_no
         disk_manager_->set_fd2pageno(fd, file_hdr_.num_pages);
     }
@@ -71,10 +77,10 @@ public:
     RmFileHdr get_file_hdr() const { return file_hdr_; }
     int GetFd() const noexcept { return fd_; }
 
-    /* 判断指定位置上是否已经存在一条记录，通过Bitmap来判断 */
+    /** @brief 通过 bitmap 判断指定位置是否已经存在记录。 */
     bool is_record(const Rid& rid) const {
         RmPageHandle page_handle = fetch_page_handle(rid.page_no);
-        bool exists = Bitmap::is_set(page_handle.bitmap, rid.slot_no);  // page的slot_no位置上是否有record
+        bool exists = Bitmap::is_set(page_handle.bitmap, rid.slot_no);
         bool unpinned = buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
         assert(unpinned);
         (void)unpinned;
@@ -83,13 +89,14 @@ public:
 
     std::unique_ptr<RmRecord> get_record(const Rid& rid, Context* context) const;
 
-    Rid insert_record(char* buf, Context* context);
+    Rid insert_record(const char* buf, Context* context);
 
-    void insert_record(const Rid& rid, char* buf);
+    /** @brief 在恢复或回滚时把记录恢复到指定 RID；不属于 Lab1 评分接口。 */
+    void insert_record(const Rid& rid, const char* buf);
 
     void delete_record(const Rid& rid, Context* context);
 
-    void update_record(const Rid& rid, char* buf, Context* context);
+    void update_record(const Rid& rid, const char* buf, Context* context);
 
     RmPageHandle create_new_page_handle();
 

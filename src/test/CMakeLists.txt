@@ -50,6 +50,7 @@ rucbase_add_gtest(lab1_buffer_pool_manager_test storage/buffer_pool_manager_test
 rucbase_add_gtest(lab1_page_guard_test storage/page_guard_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_record_manager_test storage/record_manager_test.cpp rucbase::core unit lab1)
 rucbase_add_gtest(lab1_record_types_test record/rm_record_test.cpp rucbase::core unit lab1)
+rucbase_add_gtest(lab1_record_layout_test record/rm_page_layout_test.cpp rucbase::core unit lab1)
 
 rucbase_add_gtest(lab2_b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core unit lab2)

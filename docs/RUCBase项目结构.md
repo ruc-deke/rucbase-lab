@@ -38,7 +38,7 @@ flowchart LR
 | `src/portal/` | 把计划转换成执行器并分发语句 | Lab 3 |
 | `src/execution/` | 顺序扫描、投影、连接和增删改算子 | Lab 3 |
 | `src/system/` | 数据库、表、索引的元数据和 DDL | Lab 3 |
-| `src/record/` | 定长记录、页面和文件扫描 | Lab 1 |
+| [`src/record/`](../src/record/README.md) | 定长记录、页面和文件扫描 | Lab 1 |
 | [`src/index/`](../src/index/README.md) | B+ 树、索引文件管理和叶链扫描 | Lab 2 |
 | `src/replacer/` | 缓冲池页面替换策略 | Lab 1 |
 | `src/storage/` | 页面、缓冲池和磁盘文件访问 | Lab 1 |
