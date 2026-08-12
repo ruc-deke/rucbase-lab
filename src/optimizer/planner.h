@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,6 +14,7 @@
 
 class Context;
 class Plan;
+class SelectPlan;
 struct AnalyzedQuery;
 class SmManager;
 
@@ -20,28 +22,43 @@ class Planner {
 private:
     SmManager* sm_manager_;
 
+    enum class ConditionCoverage {
+        None,
+        Lhs,
+        Rhs,
+        Both,
+    };
+
 public:
     explicit Planner(SmManager* sm_manager) : sm_manager_(sm_manager) {}
 
-    std::shared_ptr<Plan> do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context);
+    std::unique_ptr<Plan> do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context);
 
 private:
-    // logical_optimization 可能改写并返回 query，故按值接收 shared_ptr。
+    // 逻辑优化：改写查询结构。
     std::shared_ptr<AnalyzedQuery> logical_optimization(std::shared_ptr<AnalyzedQuery> query, Context* context);
-    // 以下接口只读 AnalyzedQuery，用 const shared_ptr&；plan 需要包装进新节点时再按值 + move。
-    std::shared_ptr<Plan> physical_optimization(const std::shared_ptr<AnalyzedQuery>& query, Context* context);
 
-    std::shared_ptr<Plan> make_one_rel(const std::shared_ptr<AnalyzedQuery>& query);
+    // 物理优化：选择扫描、连接和排序算子。
+    std::unique_ptr<Plan> physical_optimization(const AnalyzedQuery& query, Context* context);
 
-    static std::shared_ptr<Plan> generate_sort_plan(const std::shared_ptr<AnalyzedQuery>& query,
-                                                    std::shared_ptr<Plan> plan);
+    std::unique_ptr<SelectPlan> plan_select(std::shared_ptr<AnalyzedQuery> query, Context* context);
+    std::unique_ptr<Plan> build_from_plan(const AnalyzedQuery& query);
+    std::unique_ptr<Plan> build_join_tree(const std::vector<std::string>& tables,
+                                          std::vector<std::unique_ptr<Plan>> scan_plans,
+                                          std::vector<Condition> join_conditions);
+    std::unique_ptr<Plan> make_scan_plan(const std::string& table, std::vector<Condition> conds) const;
 
-    std::shared_ptr<Plan> generate_select_plan(std::shared_ptr<AnalyzedQuery> query, Context* context);
+    bool choose_index(const std::string& table,
+                      const std::vector<Condition>& conds,
+                      std::vector<std::string>& index_columns) const;
 
-    // int get_indexNo(std::string tab_name, std::vector<Condition> curr_conds);
-    bool get_index_cols(const std::string& tab_name,
-                        const std::vector<Condition>& curr_conds,
-                        std::vector<std::string>& index_col_names) const;
+    static std::vector<Condition> take_table_conditions(std::vector<Condition>& conditions, const std::string& table);
+    static std::size_t table_index(const std::vector<std::string>& tables, const std::string& table);
+    static std::unique_ptr<Plan> take_scan_plan(std::size_t index,
+                                                std::vector<bool>& joined,
+                                                std::vector<std::unique_ptr<Plan>>& scan_plans);
+    static ConditionCoverage attach_join_condition(Condition& condition, Plan& plan);
+    static CompOp reverse_comparison(CompOp op);
 
     static ColType interpret_type(ast::DataType type) {
         switch (type) {

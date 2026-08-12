@@ -50,8 +50,8 @@ constexpr char help_info[] =
 constexpr int help_info_size = static_cast<int>(sizeof(help_info) - 1);
 
 // 主要负责执行DDL语句
-void QlManager::run_mutli_query(const std::shared_ptr<Plan>& plan, Context* context) const {
-    if (const auto ddl_plan = std::dynamic_pointer_cast<DDLPlan>(plan)) {
+void QlManager::run_mutli_query(const Plan& plan, Context* context) const {
+    if (const auto* ddl_plan = dynamic_cast<const DDLPlan*>(&plan)) {
         switch (ddl_plan->tag) {
             case T_CreateTable: {
                 sm_manager_->create_table(ddl_plan->tab_name_, ddl_plan->cols_, context);
@@ -77,8 +77,8 @@ void QlManager::run_mutli_query(const std::shared_ptr<Plan>& plan, Context* cont
 }
 
 // 执行 help; show database; show tables; desc table; begin; commit; abort; 语句。
-void QlManager::run_cmd_utility(const std::shared_ptr<Plan>& plan, txn_id_t* txn_id, Context* context) {
-    if (const auto utility_plan = std::dynamic_pointer_cast<OtherPlan>(plan)) {
+void QlManager::run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* context) {
+    if (const auto* utility_plan = dynamic_cast<const OtherPlan*>(&plan)) {
         switch (utility_plan->tag) {
             case T_Help: {
                 memcpy(context->data_send_ + *(context->offset_), help_info, help_info_size);

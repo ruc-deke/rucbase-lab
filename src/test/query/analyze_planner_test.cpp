@@ -26,30 +26,47 @@ void AddTestTables(SmManager& sm_manager) {
     b.cols = {{.tab_name = "b", .name = "id", .type = TYPE_INT, .len = 4, .offset = 0, .index = false},
               {.tab_name = "b", .name = "x", .type = TYPE_INT, .len = 4, .offset = 4, .index = false},
               {.tab_name = "b", .name = "y", .type = TYPE_INT, .len = 4, .offset = 8, .index = false}};
+    b.cols[1].index = true;
+    b.cols[2].index = true;
+    b.indexes = {
+        {.tab_name = "b", .col_tot_len = 4, .col_num = 1, .cols = {b.cols[2]}},
+        {.tab_name = "b", .col_tot_len = 8, .col_num = 2, .cols = {b.cols[1], b.cols[2]}},
+    };
     sm_manager.db_.SetTabMeta(b.name, b);
 
     TabMeta c;
     c.name = "c";
     c.cols = {{.tab_name = "c", .name = "value", .type = TYPE_INT, .len = 4, .offset = 0, .index = false}};
     sm_manager.db_.SetTabMeta(c.name, c);
+
+    TabMeta d;
+    d.name = "d";
+    d.cols = {{.tab_name = "d", .name = "value", .type = TYPE_INT, .len = 4, .offset = 0, .index = false}};
+    sm_manager.db_.SetTabMeta(d.name, d);
 }
 
-std::shared_ptr<ScanPlan> FindScan(const std::shared_ptr<Plan>& plan, const std::string& table) {
-    if (auto scan = std::dynamic_pointer_cast<ScanPlan>(plan)) {
+ScanPlan* FindScan(Plan* plan, const std::string& table) {
+    if (auto* scan = dynamic_cast<ScanPlan*>(plan)) {
         return scan->tab_name_ == table ? scan : nullptr;
     }
-    if (auto dml = std::dynamic_pointer_cast<DMLPlan>(plan)) {
-        return FindScan(dml->subplan_, table);
+    if (auto* select = dynamic_cast<SelectPlan*>(plan)) {
+        return FindScan(select->projection_.get(), table);
     }
-    if (auto projection = std::dynamic_pointer_cast<ProjectionPlan>(plan)) {
-        return FindScan(projection->subplan_, table);
+    if (auto* update = dynamic_cast<UpdatePlan*>(plan)) {
+        return FindScan(update->scan_.get(), table);
     }
-    if (auto sort = std::dynamic_pointer_cast<SortPlan>(plan)) {
-        return FindScan(sort->subplan_, table);
+    if (auto* delete_plan = dynamic_cast<DeletePlan*>(plan)) {
+        return FindScan(delete_plan->scan_.get(), table);
     }
-    if (auto join = std::dynamic_pointer_cast<JoinPlan>(plan)) {
-        auto scan = FindScan(join->left_, table);
-        return scan != nullptr ? scan : FindScan(join->right_, table);
+    if (auto* projection = dynamic_cast<ProjectionPlan*>(plan)) {
+        return FindScan(projection->subplan_.get(), table);
+    }
+    if (auto* sort = dynamic_cast<SortPlan*>(plan)) {
+        return FindScan(sort->subplan_.get(), table);
+    }
+    if (auto* join = dynamic_cast<JoinPlan*>(plan)) {
+        auto* scan = FindScan(join->left_.get(), table);
+        return scan != nullptr ? scan : FindScan(join->right_.get(), table);
     }
     return nullptr;
 }
@@ -60,14 +77,14 @@ protected:
         AddTestTables(sm_manager_);
     }
 
-    std::shared_ptr<DDLPlan> PlanCreateTable(const std::string& sql) {
+    std::unique_ptr<Plan> PlanCreateTable(const std::string& sql) {
         auto parsed = rucbase::parser::Parse(sql);
         EXPECT_TRUE(parsed.ok());
         if (!parsed.ok()) {
             return nullptr;
         }
         auto query = analyzer_.analyze(parsed.statement);
-        return std::dynamic_pointer_cast<DDLPlan>(planner_.do_planner(std::move(query), nullptr));
+        return planner_.do_planner(std::move(query), nullptr);
     }
 
     SmManager sm_manager_{nullptr, nullptr, nullptr, nullptr};
@@ -81,7 +98,8 @@ TEST_F(QueryPlanningTest, PlansShowDatabaseAsUtility) {
     ASSERT_TRUE(parsed.ok());
 
     auto query = analyzer_.analyze(parsed.statement);
-    auto utility = std::dynamic_pointer_cast<OtherPlan>(optimizer_.plan_query(query, nullptr));
+    auto plan = optimizer_.plan_query(query, nullptr);
+    auto* utility = dynamic_cast<OtherPlan*>(plan.get());
     ASSERT_NE(utility, nullptr);
     EXPECT_EQ(utility->tag, T_ShowDatabase);
 }
@@ -153,9 +171,10 @@ TEST_F(QueryPlanningTest, PlansDmlFromBoundTargetInsteadOfMutableAst) {
     ASSERT_NE(insert, nullptr);
     insert->tab_name = "b";
 
-    const auto plan = std::dynamic_pointer_cast<DMLPlan>(planner_.do_planner(query, nullptr));
-    ASSERT_NE(plan, nullptr);
-    EXPECT_EQ(plan->tab_name_, "a");
+    const auto plan = planner_.do_planner(query, nullptr);
+    const auto* insert_plan = dynamic_cast<InsertPlan*>(plan.get());
+    ASSERT_NE(insert_plan, nullptr);
+    EXPECT_EQ(insert_plan->table_, "a");
 }
 
 TEST_F(QueryPlanningTest, RejectsInvalidInsertBeforePlanning) {
@@ -212,14 +231,122 @@ TEST_F(QueryPlanningTest, AssignsSameTableColumnPredicateToThatTable) {
     EXPECT_EQ(query->bound_tables, (std::vector<std::string>{"a", "b"}));
 
     auto plan = planner_.do_planner(std::move(query), nullptr);
-    auto a_scan = FindScan(plan, "a");
-    auto b_scan = FindScan(plan, "b");
+    auto* a_scan = FindScan(plan.get(), "a");
+    auto* b_scan = FindScan(plan.get(), "b");
     ASSERT_NE(a_scan, nullptr);
     ASSERT_NE(b_scan, nullptr);
     EXPECT_TRUE(a_scan->conds_.empty());
     ASSERT_EQ(b_scan->conds_.size(), 1U);
     EXPECT_EQ(b_scan->conds_[0].lhs_col.tab_name, "b");
     EXPECT_EQ(b_scan->conds_[0].rhs_col.tab_name, "b");
+}
+
+TEST_F(QueryPlanningTest, MatchesCompositeIndexRegardlessOfPredicateOrder) {
+    auto first = rucbase::parser::Parse("select * from b where x = 1 and y = 2;");
+    auto second = rucbase::parser::Parse("select * from b where y = 2 and x = 1;");
+    ASSERT_TRUE(first.ok());
+    ASSERT_TRUE(second.ok());
+
+    auto first_plan = planner_.do_planner(analyzer_.analyze(first.statement), nullptr);
+    auto second_plan = planner_.do_planner(analyzer_.analyze(second.statement), nullptr);
+    auto* first_scan = FindScan(first_plan.get(), "b");
+    auto* second_scan = FindScan(second_plan.get(), "b");
+    ASSERT_NE(first_scan, nullptr);
+    ASSERT_NE(second_scan, nullptr);
+    EXPECT_EQ(first_scan->tag, T_IndexScan);
+    EXPECT_EQ(second_scan->tag, T_IndexScan);
+    EXPECT_EQ(first_scan->index_col_names_, (std::vector<std::string>{"x", "y"}));
+    EXPECT_EQ(second_scan->index_col_names_, (std::vector<std::string>{"x", "y"}));
+}
+
+TEST_F(QueryPlanningTest, AllowsResidualPredicateWithIndexScan) {
+    auto parsed = rucbase::parser::Parse("select * from b where id = 3 and y = 2 and x = 1;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* scan = FindScan(plan.get(), "b");
+    ASSERT_NE(scan, nullptr);
+    EXPECT_EQ(scan->tag, T_IndexScan);
+    EXPECT_EQ(scan->index_col_names_, (std::vector<std::string>{"x", "y"}));
+    EXPECT_EQ(scan->conds_.size(), 3U);
+}
+
+TEST_F(QueryPlanningTest, RequiresEveryCompositeIndexColumn) {
+    auto parsed = rucbase::parser::Parse("select * from b where x = 1;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* scan = FindScan(plan.get(), "b");
+    ASSERT_NE(scan, nullptr);
+    EXPECT_EQ(scan->tag, T_SeqScan);
+    EXPECT_TRUE(scan->index_col_names_.empty());
+}
+
+TEST_F(QueryPlanningTest, DoesNotChooseIndexForUnsupportedRangeScan) {
+    auto parsed = rucbase::parser::Parse("select * from b where y > 1;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* scan = FindScan(plan.get(), "b");
+    ASSERT_NE(scan, nullptr);
+    EXPECT_EQ(scan->tag, T_SeqScan);
+    EXPECT_TRUE(scan->index_col_names_.empty());
+}
+
+TEST_F(QueryPlanningTest, UsesSameIndexRuleForDelete) {
+    auto parsed = rucbase::parser::Parse("delete from b where y = 2;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* scan = FindScan(plan.get(), "b");
+    ASSERT_NE(scan, nullptr);
+    EXPECT_EQ(scan->tag, T_IndexScan);
+    EXPECT_EQ(scan->index_col_names_, (std::vector<std::string>{"y"}));
+}
+
+TEST_F(QueryPlanningTest, AttachesEveryPredicateBetweenJoinedTables) {
+    auto parsed = rucbase::parser::Parse("select * from a join b where a.id = b.id and a.id = b.id;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto query = analyzer_.analyze(parsed.statement);
+    auto plan = planner_.do_planner(std::move(query), nullptr);
+    auto* select = dynamic_cast<SelectPlan*>(plan.get());
+    ASSERT_NE(select, nullptr);
+    auto* join = dynamic_cast<JoinPlan*>(select->projection_->subplan_.get());
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->conds_.size(), 2U);
+}
+
+TEST_F(QueryPlanningTest, RejectsJoinPredicateThatCannotBeAttached) {
+    auto parsed = rucbase::parser::Parse("select * from a join b where a.id = b.id and a.id = b.id;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto query = analyzer_.analyze(parsed.statement);
+    ASSERT_EQ(query->bound_conds.size(), 2U);
+    query->bound_conds[1].rhs_col.tab_name = "missing";
+
+    EXPECT_THROW(planner_.do_planner(std::move(query), nullptr), InternalError);
+}
+
+TEST_F(QueryPlanningTest, BuildsConnectedMultiTableJoin) {
+    auto parsed = rucbase::parser::Parse("select * from a join b, c where a.id = b.id and b.id = c.value;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "a"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "b"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "c"), nullptr);
+}
+
+TEST_F(QueryPlanningTest, BuildsJoinForDisconnectedTableGroups) {
+    auto parsed = rucbase::parser::Parse("select * from a join b, c, d where a.id = b.id and c.value = d.value;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "a"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "b"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "c"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "d"), nullptr);
 }
 
 TEST_F(QueryPlanningTest, PreservesFromTableOrderDuringAnalysis) {
@@ -231,17 +358,20 @@ TEST_F(QueryPlanningTest, PreservesFromTableOrderDuringAnalysis) {
 }
 
 TEST_F(QueryPlanningTest, RejectsNonPositiveCharLengthsBeforeFileCreation) {
-    auto negative = PlanCreateTable("create table negative_len(c char(-1));");
+    auto negative_plan = PlanCreateTable("create table negative_len(c char(-1));");
+    auto* negative = dynamic_cast<DDLPlan*>(negative_plan.get());
     ASSERT_NE(negative, nullptr);
     EXPECT_THROW(sm_manager_.create_table(negative->tab_name_, negative->cols_, nullptr), InvalidColLengthError);
 
-    auto zero = PlanCreateTable("create table zero_len(c char(0));");
+    auto zero_plan = PlanCreateTable("create table zero_len(c char(0));");
+    auto* zero = dynamic_cast<DDLPlan*>(zero_plan.get());
     ASSERT_NE(zero, nullptr);
     EXPECT_THROW(sm_manager_.create_table(zero->tab_name_, zero->cols_, nullptr), InvalidColLengthError);
 }
 
 TEST_F(QueryPlanningTest, RejectsDuplicateColumnsBeforeFileCreation) {
-    auto plan = PlanCreateTable("create table duplicate_cols(id int, id float);");
+    auto root = PlanCreateTable("create table duplicate_cols(id int, id float);");
+    auto* plan = dynamic_cast<DDLPlan*>(root.get());
     ASSERT_NE(plan, nullptr);
 
     EXPECT_THROW(sm_manager_.create_table(plan->tab_name_, plan->cols_, nullptr), ColumnExistsError);
@@ -269,11 +399,10 @@ TEST_F(QueryPlanningTest, BindsQualifiedOrderByColumnWithinFromScope) {
     EXPECT_EQ(query->bound_order_col->col_name, "id");
     EXPECT_TRUE(query->bound_order_desc);
 
-    auto dml = std::dynamic_pointer_cast<DMLPlan>(planner_.do_planner(std::move(query), nullptr));
-    ASSERT_NE(dml, nullptr);
-    auto projection = std::dynamic_pointer_cast<ProjectionPlan>(dml->subplan_);
-    ASSERT_NE(projection, nullptr);
-    auto sort = std::dynamic_pointer_cast<SortPlan>(projection->subplan_);
+    auto plan = planner_.do_planner(std::move(query), nullptr);
+    auto* select = dynamic_cast<SelectPlan*>(plan.get());
+    ASSERT_NE(select, nullptr);
+    auto* sort = dynamic_cast<SortPlan*>(select->projection_->subplan_.get());
     ASSERT_NE(sort, nullptr);
     EXPECT_EQ(sort->sel_col_.tab_name, "a");
     EXPECT_EQ(sort->sel_col_.col_name, "id");

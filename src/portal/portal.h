@@ -33,12 +33,12 @@ struct PortalStmt {
     PortalType type;
     std::vector<TabCol> sel_cols;
     std::unique_ptr<AbstractExecutor> root;
-    std::shared_ptr<Plan> plan;
+    std::unique_ptr<Plan> plan;
 
     PortalStmt(PortalType type_,
                std::vector<TabCol> sel_cols_,
                std::unique_ptr<AbstractExecutor> root_,
-               std::shared_ptr<Plan> plan_);
+               std::unique_ptr<Plan> plan_);
     ~PortalStmt();
 
     PortalStmt(const PortalStmt&) = delete;
@@ -54,14 +54,14 @@ class Portal {
 public:
     explicit Portal(SmManager* sm_manager) : sm_manager_(sm_manager) {}
 
-    // plan 按值接收：start 会把所有权移入 PortalStmt（见实现中的 std::move(plan)）。
-    std::unique_ptr<PortalStmt> start(std::shared_ptr<Plan> plan, Context* context);
+    /** @brief 接管 Planner 产生的唯一计划所有权，并创建对应执行器。 */
+    std::unique_ptr<PortalStmt> start(std::unique_ptr<Plan> plan, Context* context);
     // portal 按值接收 unique_ptr：调用方 move 后由 run 独占执行。
     void run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* txn_id, Context* context);
 
 private:
-    // 仅根据 plan 构造执行器树，不接管 plan 所有权，故用 const 引用。
-    std::unique_ptr<AbstractExecutor> convert_plan_executor(const std::shared_ptr<Plan>& plan, Context* context);
+    /** @brief 在计划仍由 PortalStmt 持有期间递归创建执行器树。 */
+    std::unique_ptr<AbstractExecutor> convert_plan_executor(Plan& plan, Context* context);
 
     SmManager* sm_manager_;
 };

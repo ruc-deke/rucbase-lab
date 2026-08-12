@@ -35,7 +35,7 @@ std::vector<Rid> collect_rids(AbstractExecutor* scan) {
 PortalStmt::PortalStmt(PortalType type_,
                        std::vector<TabCol> sel_cols_,
                        std::unique_ptr<AbstractExecutor> root_,
-                       std::shared_ptr<Plan> plan_)
+                       std::unique_ptr<Plan> plan_)
     : type(type_),
       sel_cols(std::move(sel_cols_)),
       root(std::move(root_)),
@@ -43,48 +43,37 @@ PortalStmt::PortalStmt(PortalType type_,
 
 PortalStmt::~PortalStmt() = default;
 
-std::unique_ptr<PortalStmt> Portal::start(std::shared_ptr<Plan> plan, Context* context) {
-    if (std::dynamic_pointer_cast<OtherPlan>(plan)) {
+std::unique_ptr<PortalStmt> Portal::start(std::unique_ptr<Plan> plan, Context* context) {
+    if (dynamic_cast<OtherPlan*>(plan.get()) != nullptr) {
         return std::make_unique<PortalStmt>(PortalType::Utility, std::vector<TabCol>{}, nullptr, std::move(plan));
     }
-    if (std::dynamic_pointer_cast<DDLPlan>(plan)) {
+    if (dynamic_cast<DDLPlan*>(plan.get()) != nullptr) {
         return std::make_unique<PortalStmt>(PortalType::Ddl, std::vector<TabCol>{}, nullptr, std::move(plan));
     }
 
-    const auto dml = std::dynamic_pointer_cast<DMLPlan>(plan);
-    if (dml == nullptr) {
-        throw InternalError("unexpected plan type");
+    if (auto* select = dynamic_cast<SelectPlan*>(plan.get())) {
+        auto root = convert_plan_executor(*select->projection_, context);
+        auto selected_columns = std::move(select->projection_->sel_cols_);
+        return std::make_unique<PortalStmt>(PortalType::Select, std::move(selected_columns), std::move(root),
+                                            std::move(plan));
     }
-
-    switch (dml->tag) {
-        case T_select: {
-            const auto projection = std::dynamic_pointer_cast<ProjectionPlan>(dml->subplan_);
-            auto root = convert_plan_executor(projection, context);
-            return std::make_unique<PortalStmt>(PortalType::Select, std::move(projection->sel_cols_), std::move(root),
-                                                std::move(plan));
-        }
-        case T_Update: {
-            const auto scan = convert_plan_executor(dml->subplan_, context);
-            auto root = std::make_unique<UpdateExecutor>(sm_manager_, dml->tab_name_, dml->set_clauses_, dml->conds_,
-                                                         collect_rids(scan.get()), context);
-            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
-                                                std::move(plan));
-        }
-        case T_Delete: {
-            const auto scan = convert_plan_executor(dml->subplan_, context);
-            auto root = std::make_unique<DeleteExecutor>(sm_manager_, dml->tab_name_, dml->conds_,
-                                                         collect_rids(scan.get()), context);
-            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
-                                                std::move(plan));
-        }
-        case T_Insert: {
-            auto root = std::make_unique<InsertExecutor>(sm_manager_, dml->tab_name_, dml->values_, context);
-            return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root),
-                                                std::move(plan));
-        }
-        default:
-            throw InternalError("unexpected DML plan type");
+    if (auto* update = dynamic_cast<UpdatePlan*>(plan.get())) {
+        auto scan = convert_plan_executor(*update->scan_, context);
+        auto root = std::make_unique<UpdateExecutor>(sm_manager_, update->table_, update->set_clauses_, update->conds_,
+                                                     collect_rids(scan.get()), context);
+        return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root), std::move(plan));
     }
+    if (auto* delete_plan = dynamic_cast<DeletePlan*>(plan.get())) {
+        auto scan = convert_plan_executor(*delete_plan->scan_, context);
+        auto root = std::make_unique<DeleteExecutor>(sm_manager_, delete_plan->table_, delete_plan->conds_,
+                                                     collect_rids(scan.get()), context);
+        return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root), std::move(plan));
+    }
+    if (auto* insert = dynamic_cast<InsertPlan*>(plan.get())) {
+        auto root = std::make_unique<InsertExecutor>(sm_manager_, insert->table_, insert->values_, context);
+        return std::make_unique<PortalStmt>(PortalType::Dml, std::vector<TabCol>{}, std::move(root), std::move(plan));
+    }
+    throw InternalError("unexpected plan type");
 }
 
 void Portal::run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* txn_id, Context* context) {
@@ -96,34 +85,34 @@ void Portal::run(std::unique_ptr<PortalStmt> portal, QlManager* ql, txn_id_t* tx
             ql->run_dml(std::move(portal->root));
             return;
         case PortalType::Ddl:
-            ql->run_mutli_query(portal->plan, context);
+            ql->run_mutli_query(*portal->plan, context);
             return;
         case PortalType::Utility:
-            ql->run_cmd_utility(portal->plan, txn_id, context);
+            ql->run_cmd_utility(*portal->plan, txn_id, context);
             return;
     }
     throw InternalError("unexpected portal type");
 }
 
-std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(const std::shared_ptr<Plan>& plan, Context* context) {
-    if (const auto projection = std::dynamic_pointer_cast<ProjectionPlan>(plan)) {
-        return std::make_unique<ProjectionExecutor>(convert_plan_executor(projection->subplan_, context),
+std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(Plan& plan, Context* context) {
+    if (auto* projection = dynamic_cast<ProjectionPlan*>(&plan)) {
+        return std::make_unique<ProjectionExecutor>(convert_plan_executor(*projection->subplan_, context),
                                                     projection->sel_cols_);
     }
-    if (const auto scan = std::dynamic_pointer_cast<ScanPlan>(plan)) {
+    if (auto* scan = dynamic_cast<ScanPlan*>(&plan)) {
         if (scan->tag == T_SeqScan) {
             return std::make_unique<SeqScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, context);
         }
         return std::make_unique<IndexScanExecutor>(sm_manager_, scan->tab_name_, scan->conds_, scan->index_col_names_,
                                                    context);
     }
-    if (const auto join = std::dynamic_pointer_cast<JoinPlan>(plan)) {
-        return std::make_unique<NestedLoopJoinExecutor>(convert_plan_executor(join->left_, context),
-                                                        convert_plan_executor(join->right_, context),
+    if (auto* join = dynamic_cast<JoinPlan*>(&plan)) {
+        return std::make_unique<NestedLoopJoinExecutor>(convert_plan_executor(*join->left_, context),
+                                                        convert_plan_executor(*join->right_, context),
                                                         std::move(join->conds_));
     }
-    if (const auto sort = std::dynamic_pointer_cast<SortPlan>(plan)) {
-        return std::make_unique<SortExecutor>(convert_plan_executor(sort->subplan_, context), sort->sel_col_,
+    if (auto* sort = dynamic_cast<SortPlan*>(&plan)) {
+        return std::make_unique<SortExecutor>(convert_plan_executor(*sort->subplan_, context), sort->sel_col_,
                                               sort->is_desc_);
     }
     throw NotImplementedError("executor conversion for this query plan");
