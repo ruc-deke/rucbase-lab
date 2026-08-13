@@ -1,9 +1,10 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
 #include <algorithm>
+#include <cstring>
 #include <iosfwd>
 #include <map>
 #include <string>
@@ -22,12 +23,49 @@ struct ColMeta {
     bool index{false};  ///< 是否参与任一索引，由 indexes 推导。
 };
 
-/** @brief 索引的目录元数据；cols 的顺序就是复合索引键顺序。 */
+/**
+ * @brief 一条索引的定义。
+ *
+ * 索引按 (key, Rid) 存放。unique 为 false 时同一 key 可以对应多条记录；
+ * 为 true 时每个 key 至多一条。cols 的顺序就是复合键顺序。
+ */
 struct IndexMeta {
     std::string tab_name;
     int col_tot_len{};          ///< 由 cols 推导。
     int col_num{};              ///< 由 cols.size() 推导。
+    bool unique{false};         ///< 是否施加唯一约束。
     std::vector<ColMeta> cols;  ///< 索引包含的字段。
+
+    static IndexMeta make(std::string table_name, std::vector<ColMeta> columns, bool unique = false) {
+        IndexMeta index;
+        index.tab_name = std::move(table_name);
+        index.cols = std::move(columns);
+        index.unique = unique;
+        index.rebuild_derived();
+        return index;
+    }
+
+    void rebuild_derived() {
+        col_num = static_cast<int>(cols.size());
+        col_tot_len = 0;
+        for (const auto& column : cols) {
+            col_tot_len += column.len;
+        }
+    }
+
+    void encode_key(const char* record, char* key_out) const {
+        int offset = 0;
+        for (const auto& column : cols) {
+            std::memcpy(key_out + offset, record + column.offset, static_cast<size_t>(column.len));
+            offset += column.len;
+        }
+    }
+
+    [[nodiscard]] std::vector<char> make_key(const char* record) const {
+        std::vector<char> key(static_cast<size_t>(col_tot_len));
+        encode_key(record, key.data());
+        return key;
+    }
 };
 
 /** @brief 表的目录元数据；字段和索引均保留声明顺序。 */

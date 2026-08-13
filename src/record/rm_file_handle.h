@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -19,17 +19,18 @@ class Context;
 class RmManager;
 
 /**
- * @brief 将一张已固定在缓冲池中的页面解释为记录页布局。
+ * @brief 框架内部的记录页视图。Lab1 作业实现 fetch_page_handle / unpin，不要实现本类型。
  *
- * 本类型只是页面视图，不拥有 Page，也不负责解除 pin。持有它的作用域必须保证页面保持固定；
- * 获取页面的一方仍负责恰好解除一次 pin。
+ * 不拥有 Page，也不负责解除 pin。持有它的作用域必须保证页面保持固定。
  */
 struct RmPageHandle {
-    const RmFileHdr* file_hdr;  // 当前页面所在文件的文件头指针
-    Page* page;                 // 页面的实际数据，包括页面存储的数据、元信息等
-    RmPageHdr* page_hdr;        // page->data的第一部分，存储页面元信息，指针指向首地址，长度为sizeof(RmPageHdr)
-    char* bitmap;               // page->data的第二部分，存储页面的bitmap，指针指向首地址，长度为file_hdr->bitmap_size
-    char* slots;  // page->data的第三部分，存储表的记录，指针指向首地址，每个slot的长度为file_hdr->record_size
+    const RmFileHdr* file_hdr = nullptr;
+    Page* page = nullptr;
+    RmPageHdr* page_hdr = nullptr;
+    char* bitmap = nullptr;
+    char* slots = nullptr;
+
+    RmPageHandle() = default;
 
     /** @throws InternalError 文件头或页面为空。 */
     RmPageHandle(const RmFileHdr* fhdr_, Page* page_) : file_hdr(fhdr_), page(page_) {
@@ -48,6 +49,28 @@ struct RmPageHandle {
 
     /** @return slot_no 对应记录槽的首地址。 */
     char* get_slot(int slot_no) const { return slots + static_cast<std::ptrdiff_t>(slot_no) * file_hdr->record_size; }
+};
+
+/** @brief 框架内部。Lab1 作业实现 fetch_page_handle / unpin，不要实现本类。 */
+class RmPageGuard {
+public:
+    RmPageGuard() noexcept = default;
+
+    RmPageGuard(const RmFileHdr* file_hdr, PageGuard guard) : guard_(std::move(guard)) {
+        if (guard_) {
+            view_ = RmPageHandle(file_hdr, guard_.get());
+        }
+    }
+
+    [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(guard_); }
+    RmPageHandle* operator->() noexcept { return &view_; }
+    const RmPageHandle* operator->() const noexcept { return &view_; }
+    RmPageHandle& handle() noexcept { return view_; }
+    void mark_dirty() noexcept { guard_.mark_dirty(); }
+
+private:
+    PageGuard guard_;
+    RmPageHandle view_{};
 };
 
 /* 每个RmFileHandle对应一个表的数据文件，里面有多个page，每个page的数据封装在RmPageHandle中 */
@@ -75,16 +98,20 @@ public:
     }
 
     RmFileHdr get_file_hdr() const { return file_hdr_; }
-    int GetFd() const noexcept { return fd_; }
+    int fd() const noexcept { return fd_; }
+
+    [[nodiscard]] RmPageGuard fetch_page_guard(int page_no) const {
+        PageGuard guard = buffer_pool_manager_->fetch_page_guard(PageId{.fd = fd_, .page_no = page_no});
+        return {&file_hdr_, std::move(guard)};
+    }
 
     /** @brief 通过 bitmap 判断指定位置是否已经存在记录。 */
     bool is_record(const Rid& rid) const {
-        RmPageHandle page_handle = fetch_page_handle(rid.page_no);
-        bool exists = Bitmap::is_set(page_handle.bitmap, rid.slot_no);
-        bool unpinned = buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), false);
-        assert(unpinned);
-        (void)unpinned;
-        return exists;
+        RmPageGuard page = fetch_page_guard(rid.page_no);
+        if (!page.valid()) {
+            throw InternalError("failed to fetch record page");
+        }
+        return Bitmap::is_set(page->bitmap, rid.slot_no);
     }
 
     std::unique_ptr<RmRecord> get_record(const Rid& rid, Context* context) const;

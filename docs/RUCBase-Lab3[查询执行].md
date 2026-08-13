@@ -28,7 +28,7 @@ RUCBase 查询执行模块采用火山模型（Volcano Model）。可以通过[�
 
 - `create_index(...)`：创建索引
 
-系统调用该函数在指定表的指定属性上创建索引（该函数在lab2中应该已经实现了）
+系统调用该函数在指定表的指定属性上创建索引。`unique` 属于这条索引的定义：`CREATE INDEX` 为 false，`CREATE UNIQUE INDEX` 为 true。用 `IndexMeta::make(表, 列, unique)` 构造后交给 `IndexManager::create_index`，并把同一份定义写进表的元数据。删除或更新记录时，按 `(key, Rid)` 维护索引。
 
 - `drop_index(...)`：删除索引
 
@@ -43,7 +43,7 @@ cd src/test/query
 python3 query_unit_test.py basic_query_test1.sql # 25分
 ```
 
-上述兼容命令内部使用pytest运行测试，不再删除已有构建目录。也可以在仓库根目录执行`ctest --preset lab3-query`。
+也可以在仓库根目录执行 `ctest --preset lab3-query`。
 
 
 ## 实验二：DML语句实现（75分）
@@ -54,11 +54,11 @@ python3 query_unit_test.py basic_query_test1.sql # 25分
 
 在本实验中，你需要仿照insert算子实现如下算子：
 
-- `SeqScan`算子：你需要实现该算子的`Next()`、`beginTuple()`和`nextTuple()`接口，用于表的扫描，你需要调用`RmScan`中的相关函数辅助实现（这些接口在lab1中已经实现）；
-- `Projection`算子：你需要实现该算子的`Next()`、`beginTuple()`和`nextTuple()`接口，该算子用于投影操作的实现；
-- `NestedLoopJoin`算子：你需要实现该算子的`Next()`、`beginTuple()`和`nextTuple()`接口，该算子用于连接操作，在本实验中，你只需要支持两表连接；
-- `Delete`算子：你需要实现该算子的`Next()`接口，该算子用于删除操作；
-- `Update`算子：你需要实现该算子的`Next()`接口，该算子用于更新操作。
+- `SeqScan`算子：你需要实现该算子的`next()`、`begin_tuple()`和`next_tuple()`接口，用于表的扫描，你需要调用`RmScan`中的相关函数辅助实现（这些接口在lab1中已经实现）；
+- `Projection`算子：你需要实现该算子的`next()`、`begin_tuple()`和`next_tuple()`接口，该算子用于投影操作的实现；
+- `NestedLoopJoin`算子：你需要实现该算子的`next()`、`begin_tuple()`和`next_tuple()`接口，该算子用于连接操作，在本实验中，你只需要支持两表连接；
+- `Delete`算子：你需要实现该算子的`next()`接口，该算子用于删除操作；
+- `Update`算子：你需要实现该算子的`next()`接口，该算子用于更新操作。
 
 所有算子都继承自抽象算子类 `AbstractExecutor`，基类声明了各执行器需要实现的统一接口。
 
@@ -99,11 +99,11 @@ std::unique_ptr<AbstractExecutor> right_;
 你需要补充完成`LoopJoin`算子中的以下3个方法：
 
 ```cpp
-void beginTuple() override {}
+void begin_tuple() override {}
 
-void nextTuple() override {}
+void next_tuple() override {}
 
-std::unique_ptr<RmRecord> Next() override{}
+std::unique_ptr<RmRecord> next() override{}
 
 ```
 
@@ -131,6 +131,6 @@ python3 query_test_basic.py  # 100分
 | `basic_query_test4` | 单表删除与条件查询    | 15 |
 | `basic_query_test5` | 多表连接与条件查询    | 30 |
 
-**注意⚠️：**
+**注意：**
 
-当前版本通过 Wire 客户端接收 `SELECT` 的类型化结果。黑盒客户端关闭 CLI 文本格式化，把列名、`INT32` / `FLOAT32` / `CHAR`、NULL 和未经展示格式化的单元格编码为 JSONL 测试事件，再与独立的 `*.typed.jsonl` golden 比较；测试用 `CHAR` 数据约定为合法 UTF-8 文本。因此长字符串不会被 16 字符定宽表格截断，浮点也不会先格式化成 6 位小数再判分。同目录旧 `.txt` 结果仅作为人类可读参考，不参与运行时判分。服务端不生成或维护 `output.txt`；Wire `ERROR` 和 `TRANSACTION_ABORT` 会作为不同的类型化状态比较。
+测试会比较查询结果的列名、类型和单元格取值。客户端表格如何显示（列宽、小数位数等）不影响判分。测试失败时可在 `build/debug/test-logs` 查看服务端和客户端日志。

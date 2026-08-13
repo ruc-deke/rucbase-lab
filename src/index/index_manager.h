@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /**
@@ -12,9 +12,10 @@
 #include <string>
 #include <vector>
 
+#include "system/sm_meta.h"
+
 class BPlusTree;
 class BufferPoolManager;
-struct ColMeta;
 class DiskManager;
 
 /**
@@ -33,7 +34,7 @@ public:
     bool exists(const std::string& table_name, const std::vector<ColMeta>& index_columns) const;
     bool exists(const std::string& table_name, const std::vector<std::string>& index_columns) const;
 
-    void create_index(const std::string& table_name, const std::vector<ColMeta>& index_columns);
+    void create_index(const IndexMeta& index);
 
     void destroy_index(const std::string& table_name, const std::vector<ColMeta>& index_columns);
     void destroy_index(const std::string& table_name, const std::vector<std::string>& index_columns);

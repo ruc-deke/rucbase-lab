@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -25,8 +25,8 @@ std::istream& operator>>(std::istream& is, T& enum_val) {
 }
 
 struct Rid {
-    int page_no;
-    int slot_no;
+    int page_no = -1;
+    int slot_no = -1;
 
     friend bool operator==(const Rid& x, const Rid& y) { return x.page_no == y.page_no && x.slot_no == y.slot_no; }
 

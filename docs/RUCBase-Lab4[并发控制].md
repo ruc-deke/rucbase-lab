@@ -19,8 +19,10 @@ prepare_transaction(session, &execution_context);
 
 - `RUCBASE_LAB4_AUTO_COMMIT`：
 ```
-if (execution_context.txn_->get_txn_mode() == false) {
-    transaction_manager_.commit(execution_context.txn_, execution_context.log_mgr_);
+if (execution_context.transaction() != nullptr &&
+    execution_context.transaction()->get_txn_mode() == false) {
+    transaction_manager_.commit(execution_context.transaction(), execution_context.log_manager());
+    finish_session_transaction(session, &execution_context);
 }
 ```
 
@@ -38,38 +40,28 @@ Lab4 后再按照实验要求取消注释。
 `TransactionManager`类的接口和重要成员变量如下：
 
 ```cpp
-class TransactionManager{
+class TransactionManager {
 public:
-    static std::unordered_map<txn_id_t, Transaction *> txn_map;
-    Transaction *get_transaction(txn_id_t txn_id);
-
-    Transaction * begin(Transaction * txn, LogManager *log_manager);
-    void commit(Transaction * txn, LogManager *log_manager);
-    void abort(Transaction * txn, LogManager *log_manager);
+    Transaction* get_transaction(txn_id_t txn_id);
+    Transaction* begin(LogManager* log_manager);
+    void commit(Transaction* txn, LogManager* log_manager);
+    void abort(Transaction* txn, LogManager* log_manager);
 };
 ```
 
-其中，本实验提供以下辅助接口/成员变量：
-
-- 静态成员变量`txn_map`：维护全局事务映射表
-
-- `Transaction *get_transaction(txn_id_t txn_id);`
-
-  根据事务ID获取事务指针
-
 你需要完成`src/transaction/transaction_manager.cpp`文件中的以下接口：
 
-- `begin(Transaction*, LogManager*)`：该接口提供事务的开始方法。
+- `begin(LogManager*)`：开始一个新事务。
 
-  **提示**：如果是新事务，需要创建一个`Transaction`对象，并把该对象的指针加入到全局事务表中。
+  **提示**：创建一个 `Transaction` 对象，加入事务表，并返回该事务。
 
-- `commit(Transaction*, LogManager*)`：该接口提供事务的提交方法。
+- `commit(Transaction*, LogManager*)`：提交事务。
 
-  **提示**：如果并发控制算法需要申请和释放锁，那么你需要在提交阶段完成锁的释放。
+  **提示**：如果并发控制算法需要申请和释放锁，那么你需要在提交阶段完成锁的释放。提交结束后把事务从事务表中移除。
 
-- `abort(Transaction*, LogManager*)`：该接口提供事务的终止方法。
+- `abort(Transaction*, LogManager*)`：终止事务。
 
-  在事务的终止方法中，你需要对需要对事务的所有写操作进行撤销，事务的写操作都存储在Transaction类的write_set_中，因此，你可以通过修改存储层或执行层的相关代码来维护write_set_，并在终止阶段遍历write_set_，撤销所有的写操作。
+  事务的写操作记录在 `txn->write_set()` 中。回滚时从后往前撤销这些写操作，再释放锁，并从事务表中移除该事务。同一条记录上如果连续更新了多次，只有按相反顺序撤销，才能恢复到事务开始前的值。
 
   **提示**：需要对事务的所有写操作进行撤销，如果并发控制算法需要申请和释放锁，那么你需要在终止阶段完成锁的释放。
 
@@ -82,7 +74,7 @@ cd src/test/transaction
 python3 transaction_test.py
 ```
 
-该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset lab4-transaction`。
+也可以在仓库根目录执行 `ctest --preset lab4-transaction`。
 
 本测试包含两个测试点，分别对事务的提交和回滚进行测试，测试点分数设置如下：
 
@@ -189,7 +181,7 @@ private:
 - `create_index(const std::string, const std::string, Context *)`
 - `drop_index(const std::string, const std::string, Context *)`
 
-**提示**：除了事务锁的申请，还需要考虑`txn_map`等共享数据结构。
+**提示**：除了事务锁的申请，还需要考虑事务表等共享数据结构。
 
 ### 测试点及分数
 
@@ -198,7 +190,7 @@ cd src/test/concurrency
 python3 concurrency_test.py
 ```
 
-该兼容命令内部使用pytest；也可以在仓库根目录执行`ctest --preset lab4-concurrency`。测试失败日志位于`build/debug/test-logs`。
+也可以在仓库根目录执行 `ctest --preset lab4-concurrency`。测试失败日志位于 `build/debug/test-logs`。
 
 本测试包含六个测试点考虑，对应不同的数据异常：
 

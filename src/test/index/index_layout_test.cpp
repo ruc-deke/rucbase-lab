@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <array>
@@ -67,6 +67,13 @@ TEST(IndexLayoutTest, FileHeaderRoundTripsAndRejectsInvalidBounds) {
     EXPECT_EQ(restored.column_count_, 1);
     EXPECT_EQ(restored.key_length_, 3);
     EXPECT_EQ(restored.keys_region_size_, header.keys_region_size_);
+    EXPECT_FALSE(restored.unique_);
+
+    header.unique_ = true;
+    header.serialize(page.data());
+    restored = IndexFileHeader{};
+    restored.deserialize(page.data(), page.size());
+    EXPECT_TRUE(restored.unique_);
 
     IndexFileHeader truncated;
     EXPECT_THROW(truncated.deserialize(page.data(), header.serialized_size_ - 1), InternalError);

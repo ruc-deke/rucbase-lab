@@ -6,7 +6,7 @@
  * UTF-8 字节列号，用于生成解析诊断。字面量转换失败时，先把准确原因记录到
  * 本次调用的 ParseContext，再向 Bison 返回 INVALID。
  *
- * Copyright (c) 2023-2026 Renmin University of China
+ * Copyright (c) 2023-2027 Renmin University of China
  * SPDX-License-Identifier: MulanPSL-2.0
  */
 
@@ -103,6 +103,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "CHAR" { return CHAR; }
 "FLOAT" { return FLOAT; }
 "INDEX" { return INDEX; }
+"UNIQUE" { return UNIQUE; }
 "AND" { return AND; }
 "JOIN" { return JOIN; }
 "HELP" { return HELP; }

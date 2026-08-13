@@ -6,7 +6,7 @@
  * 完成。解析成功要求输入中恰好有一条以分号结束的语句，并且随后到达真正的
  * 输入末尾。
  *
- * Copyright (c) 2023-2026 Renmin University of China
+ * Copyright (c) 2023-2027 Renmin University of China
  * SPDX-License-Identifier: MulanPSL-2.0
  */
 
@@ -42,7 +42,7 @@ using namespace ast;
 
 // SQL 关键字。
 %token SHOW DATABASE TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY
-WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK
+WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX UNIQUE AND JOIN HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK
 // 运算符和错误 token。
 %token LEQ NEQ GEQ INVALID
 
@@ -136,7 +136,11 @@ ddl_stmt:
     }
     |   CREATE INDEX table_name '(' column_name_list ')'
     {
-        $$ = std::make_shared<CreateIndexStmt>(std::move($3), std::move($5));
+        $$ = std::make_shared<CreateIndexStmt>(std::move($3), std::move($5), false);
+    }
+    |   CREATE UNIQUE INDEX table_name '(' column_name_list ')'
+    {
+        $$ = std::make_shared<CreateIndexStmt>(std::move($4), std::move($6), true);
     }
     |   DROP INDEX table_name '(' column_name_list ')'
     {

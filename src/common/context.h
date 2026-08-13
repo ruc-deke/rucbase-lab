@@ -1,73 +1,45 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
-#include <cstddef>
-#include <string>
-#include <vector>
-
-#include "common/defs.h"
+#include <memory>
 
 class LockManager;
 class LogManager;
+class QueryResultBuilder;
 class Transaction;
 
-// class TransactionManager;
-
-// used for data_send
-static int const_offset = -1;
-
-// Structured tabular result for META/ROW/RESULT_END wire responses.
-struct WireResultColumn {
-    std::string name;
-    ColType type = TYPE_STRING;
-};
-
-struct WireResultCell {
-    ColType type = TYPE_STRING;
-    int int_val = 0;
-    float float_val = 0.0f;
-    std::string str_val;
-};
-
-struct WireResultSet {
-    // Conservative budget for retained result objects and string contents. It
-    // bounds teaching-server memory even when a result has many tiny cells.
-    static constexpr size_t kMaxBufferedBytes = size_t{16} * 1024 * 1024;
-
-    bool has_query_result = false;
-    size_t buffered_bytes = 0;
-    std::vector<WireResultColumn> columns;
-    std::vector<std::vector<WireResultCell>> rows;
-
-    bool try_account(size_t bytes) noexcept {
-        if (buffered_bytes > kMaxBufferedBytes || bytes > kMaxBufferedBytes - buffered_bytes) {
-            return false;
-        }
-        buffered_bytes += bytes;
-        return true;
-    }
-};
-
+/**
+ * @brief 一条 SQL 的执行上下文。
+ *
+ * Lab3 / Lab4 作业通常只用：
+ *   - transaction() / set_transaction()
+ *   - 需要加锁或写日志时再用 lock_manager() / log_manager()
+ * result() 是框架发给客户端的缓冲，作业不必调用，也不必打开 wire_result.h。
+ */
 class Context {
 public:
-    Context(LockManager* lock_mgr,
-            LogManager* log_mgr,
-            Transaction* txn,
-            char* data_send = nullptr,
-            int* offset = &const_offset)
-        : lock_mgr_(lock_mgr),
-          log_mgr_(log_mgr),
-          txn_(txn),
-          data_send_(data_send),
-          offset_(offset) {}
+    Context(LockManager* lock_manager, LogManager* log_manager, Transaction* txn);
+    ~Context();
 
-    // TransactionManager *txn_mgr_;
-    LockManager* lock_mgr_;
-    LogManager* log_mgr_;
-    Transaction* txn_;
-    char* data_send_;
-    int* offset_;
-    WireResultSet wire_result_;
+    Context(const Context&) = delete;
+    Context& operator=(const Context&) = delete;
+    Context(Context&&) noexcept;
+    Context& operator=(Context&&) noexcept;
+
+    [[nodiscard]] LockManager* lock_manager() const noexcept { return lock_manager_; }
+    [[nodiscard]] LogManager* log_manager() const noexcept { return log_manager_; }
+
+    [[nodiscard]] Transaction* transaction() const noexcept { return txn_; }
+    void set_transaction(Transaction* txn) noexcept { txn_ = txn; }
+
+    QueryResultBuilder& result() noexcept;
+    [[nodiscard]] const QueryResultBuilder& result() const noexcept;
+
+private:
+    LockManager* lock_manager_ = nullptr;  ///< 借用，可空。
+    LogManager* log_manager_ = nullptr;    ///< 借用，可空。
+    Transaction* txn_ = nullptr;           ///< 借用，可空。
+    std::unique_ptr<QueryResultBuilder> result_;
 };

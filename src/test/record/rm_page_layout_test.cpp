@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <gtest/gtest.h>
@@ -10,7 +10,8 @@
 /** @return 按照教学文档中的页面布局计算一组槽位需要的总字节数。 */
 int required_page_bytes(int record_size, int slot_count) {
     int bitmap_size = (slot_count + BITMAP_WIDTH - 1) / BITMAP_WIDTH;
-    return Page::OFFSET_PAGE_HDR + static_cast<int>(sizeof(RmPageHdr)) + bitmap_size + record_size * slot_count;
+    const int record_bytes = record_size * slot_count;
+    return static_cast<int>(Page::OFFSET_PAGE_HDR) + static_cast<int>(sizeof(RmPageHdr)) + bitmap_size + record_bytes;
 }
 
 TEST(RecordPageLayoutTest, CapacityFillsThePageWithoutOverflow) {

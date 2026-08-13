@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /**
@@ -27,8 +27,10 @@
 #include "common/config.h"
 #include "common/context.h"
 #include "common/errors.h"
+#include "common/wire_result.h"
 #include "net/wire.h"
 #include "parser/parser.h"
+#include "transaction/transaction.h"
 
 namespace rucbase {
 namespace {
@@ -84,19 +86,10 @@ bool parse_options(const int argc, char** argv, std::string* database, std::stri
 }  // namespace
 
 struct Server::ClientSession {
-    explicit ClientSession(const int client_fd) : socket_fd(client_fd) { reset_statement_output(); }
-
-    void reset_statement_output() noexcept {
-        text_result_buffer.fill('\0');
-        text_result_length = 0;
-    }
+    explicit ClientSession(const int client_fd) : socket_fd(client_fd) {}
 
     int socket_fd;
-    // 事务标识属于会话，需要在多条语句之间保留。
     txn_id_t transaction_id = INVALID_TXN_ID;
-    // 兼容仍通过 Context::data_send_ 返回文本的旧执行路径。
-    std::array<char, BUFFER_LENGTH> text_result_buffer{};
-    int text_result_length = 0;
 };
 
 Server::Server(std::string database_name, std::string bind_address, const int port)
@@ -260,6 +253,7 @@ void Server::handle_client(const int fd) {
         }
     }
 
+    abort_session_transaction(&session);
     close_client(fd);
     std::cout << "Client disconnected (fd=" << fd << ")\n";
 }
@@ -277,10 +271,7 @@ bool Server::handle_request(ClientSession* session, const wire::Frame& request) 
 }
 
 bool Server::execute_sql(ClientSession* session, const std::string& sql_text) {
-    session->reset_statement_output();
-    // Context 为本条语句集中传递事务、日志、锁与执行结果。
-    Context execution_context(&lock_manager_, &log_manager_, nullptr, session->text_result_buffer.data(),
-                              &session->text_result_length);
+    Context execution_context(&lock_manager_, &log_manager_, nullptr);
 
     try {
         // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一行。
@@ -293,6 +284,7 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql_text) {
             if (!parse_result.error.has_value()) {
                 throw InternalError("parser returned neither a statement nor an error");
             }
+            cleanup_failed_request(session, &execution_context);
             return send_error(session->socket_fd, parser::FormatError(sql_text, parse_result.error.value()));
         }
 
@@ -308,52 +300,75 @@ bool Server::execute_sql(ClientSession* session, const std::string& sql_text) {
 
         // Lab 3 保持关闭；Lab 4 按实验文档启用下面这一段。
         // RUCBASE_LAB4_AUTO_COMMIT
-        // if (execution_context.txn_->get_txn_mode() == false) {
-        //     transaction_manager_.commit(execution_context.txn_, execution_context.log_mgr_);
+        // if (execution_context.transaction() != nullptr &&
+        //     execution_context.transaction()->get_txn_mode() == false) {
+        //     transaction_manager_.commit(execution_context.transaction(), execution_context.log_manager());
+        //     finish_session_transaction(session, &execution_context);
         // }
 
-        // 阶段五：响应编码。根据执行结果选择结果集、文本或成功响应。
-        return send_statement_result(session, execution_context.wire_result_);
+        return send_statement_result(session, execution_context.result().view());
     } catch (const TransactionAbortException& exception) {
-        // 事务异常需要先回滚，再发送专用终止帧以保持客户端协议同步。
-        if (execution_context.txn_ != nullptr) {
-            transaction_manager_.abort(execution_context.txn_, &log_manager_);
+        if (execution_context.transaction() != nullptr) {
+            transaction_manager_.abort(execution_context.transaction(), &log_manager_);
+            finish_session_transaction(session, &execution_context);
         }
-        std::cout << exception.GetInfo() << '\n';
+        std::cout << exception.info() << '\n';
         return wire::WriteFrame(session->socket_fd, wire::kTagTransactionAbort, 0, "abort");
     } catch (const RMDBError& exception) {
+        cleanup_failed_request(session, &execution_context);
         std::cerr << exception.what() << '\n';
         return send_error(session->socket_fd, exception.what());
     } catch (const std::exception& exception) {
+        cleanup_failed_request(session, &execution_context);
         std::cerr << exception.what() << '\n';
         return send_error(session->socket_fd, std::string("internal server error: ") + exception.what());
     }
 }
 
 void Server::prepare_transaction(ClientSession* session, Context* context) {
-    context->txn_ = transaction_manager_.get_transaction(session->transaction_id);
-    if (context->txn_ == nullptr || context->txn_->get_state() == TransactionState::COMMITTED ||
-        context->txn_->get_state() == TransactionState::ABORTED) {
-        context->txn_ = transaction_manager_.begin(nullptr, context->log_mgr_);
-        session->transaction_id = context->txn_->get_transaction_id();
-        context->txn_->set_txn_mode(false);
+    context->set_transaction(transaction_manager_.get_transaction(session->transaction_id));
+    if (context->transaction() == nullptr || context->transaction()->get_state() == TransactionState::COMMITTED ||
+        context->transaction()->get_state() == TransactionState::ABORTED) {
+        context->set_transaction(transaction_manager_.begin(context->log_manager()));
+        session->transaction_id = context->transaction()->get_transaction_id();
+        context->transaction()->set_txn_mode(false);
     }
 }
 
+void Server::finish_session_transaction(ClientSession* session, Context* context) {
+    context->set_transaction(nullptr);
+    session->transaction_id = INVALID_TXN_ID;
+}
+
+void Server::cleanup_failed_request(ClientSession* session, Context* context) {
+    Transaction* txn = context->transaction();
+    if (txn == nullptr) {
+        txn = transaction_manager_.get_transaction(session->transaction_id);
+    }
+    if (txn == nullptr || txn->get_txn_mode()) {
+        return;
+    }
+    transaction_manager_.abort(txn, &log_manager_);
+    finish_session_transaction(session, context);
+}
+
+void Server::abort_session_transaction(ClientSession* session) {
+    Transaction* txn = transaction_manager_.get_transaction(session->transaction_id);
+    if (txn == nullptr) {
+        session->transaction_id = INVALID_TXN_ID;
+        return;
+    }
+    transaction_manager_.abort(txn, &log_manager_);
+    session->transaction_id = INVALID_TXN_ID;
+}
+
 bool Server::send_statement_result(ClientSession* session, const WireResultSet& structured_result) {
+    if (structured_result.has_query_result && structured_result.raw_text) {
+        return send_raw_text_result(session->socket_fd, structured_result);
+    }
     if (structured_result.has_query_result) {
         return send_query_result(session->socket_fd, structured_result);
     }
-
-    const int text_length = session->text_result_length;
-    if (text_length < 0 || text_length > static_cast<int>(session->text_result_buffer.size())) {
-        throw InternalError("result buffer offset is out of range");
-    }
-    if (text_length > 0) {
-        const std::string text_result(session->text_result_buffer.data(), text_length);
-        return send_text_result(session->socket_fd, "output", text_result);
-    }
-
     return wire::WriteFrame(session->socket_fd, wire::kTagCommandOk, 0, "");
 }
 
@@ -405,10 +420,22 @@ bool Server::send_query_result(int fd, const WireResultSet& result) {
     return wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(result.rows.size()));
 }
 
-bool Server::send_text_result(int fd, const std::string& column_name, const std::string& text) {
-    // 原始文本仍封装为单列、单行结果，复用统一的结果集状态机。
-    return wire::WriteFrame(fd, wire::kTagMeta, wire::kFlagRawText, wire::EncodeMetaSingleCharColumn(column_name)) &&
-           wire::WriteFrame(fd, wire::kTagRow, 0, wire::EncodeRowSingleChar(text)) &&
+bool Server::send_raw_text_result(int fd, const WireResultSet& result) {
+    if (result.columns.size() != 1 || result.rows.size() != 1 || result.rows.front().size() != 1) {
+        return send_error(fd, "raw text result must contain one CHAR cell");
+    }
+    const std::string& column_name = result.columns.front().name;
+    const std::string& text = result.rows.front().front().str_val;
+    std::string meta;
+    std::string row;
+    std::string diagnostic;
+    const wire::ColumnDef column{.name = column_name, .sql_type = wire::kTypeChar};
+    const wire::Cell cell{.sql_type = wire::kTypeChar, .str_val = text};
+    if (!wire::TryEncodeMeta({column}, &meta, &diagnostic) || !wire::TryEncodeRow({cell}, &row, &diagnostic)) {
+        return send_error(fd, diagnostic.empty() ? "failed to encode raw text result" : diagnostic);
+    }
+    return wire::WriteFrame(fd, wire::kTagMeta, wire::kFlagRawText, meta) &&
+           wire::WriteFrame(fd, wire::kTagRow, 0, row) &&
            wire::WriteFrame(fd, wire::kTagResultEnd, 0, wire::EncodeResultEnd(1));
 }
 

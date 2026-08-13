@@ -1,12 +1,11 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
 #include <atomic>
-#include <cassert>
+#include <memory>
 #include <mutex>
-#include <thread>
 #include <unordered_map>
 
 #include "common/config.h"
@@ -16,58 +15,55 @@ class LockManager;
 class LogManager;
 class SmManager;
 
-/* 系统采用的并发控制算法，当前题目中要求两阶段封锁并发控制算法 */
 enum class ConcurrencyMode { TWO_PHASE_LOCKING = 0, BASIC_TO };
 
-class TransactionManager{
+class TransactionManager {
 public:
-    explicit TransactionManager(LockManager *lock_manager, SmManager *sm_manager,
-                             ConcurrencyMode concurrency_mode = ConcurrencyMode::TWO_PHASE_LOCKING) {
-        sm_manager_ = sm_manager;
-        lock_manager_ = lock_manager;
-        concurrency_mode_ = concurrency_mode;
-    }
-    
-    ~TransactionManager() = default;
+    explicit TransactionManager(LockManager* lock_manager,
+                                SmManager* sm_manager,
+                                ConcurrencyMode concurrency_mode = ConcurrencyMode::TWO_PHASE_LOCKING)
+        : concurrency_mode_(concurrency_mode),
+          sm_manager_(sm_manager),
+          lock_manager_(lock_manager) {}
 
-    Transaction* begin(Transaction* txn, LogManager* log_manager);
+    /**
+     * @brief 创建新事务并由 *this 独占。
+     * @return 表中的借用指针，有效期直到 commit/abort 从表中移除。
+     */
+    Transaction* begin(LogManager* log_manager);
 
     void commit(Transaction* txn, LogManager* log_manager);
 
     void abort(Transaction* txn, LogManager* log_manager);
 
-    ConcurrencyMode get_concurrency_mode() const noexcept { return concurrency_mode_; }
+    [[nodiscard]] ConcurrencyMode get_concurrency_mode() const noexcept { return concurrency_mode_; }
 
     void set_concurrency_mode(ConcurrencyMode concurrency_mode) { concurrency_mode_ = concurrency_mode; }
 
-    LockManager* get_lock_manager() const noexcept { return lock_manager_; }
+    [[nodiscard]] LockManager* get_lock_manager() const noexcept { return lock_manager_; }
 
     /**
-     * @description: 获取事务ID为txn_id的事务对象
-     * @return {Transaction*} 事务对象的指针
-     * @param {txn_id_t} txn_id 事务ID
-     */    
-    Transaction* get_transaction(txn_id_t txn_id) {
-        if(txn_id == INVALID_TXN_ID) return nullptr;
-        
+     * @brief 按事务 ID 查找事务。
+     * @return 表中的借用指针；找不到或 id 无效时返回 nullptr。有效期直到该事务从 txn_map_ 移除。
+     */
+    [[nodiscard]] Transaction* get_transaction(txn_id_t txn_id) {
+        if (txn_id == INVALID_TXN_ID) {
+            return nullptr;
+        }
         std::unique_lock<std::mutex> lock(latch_);
-        // C++20：unordered_map::contains，等价于 find(txn_id) != end()。
-        assert(TransactionManager::txn_map.contains(txn_id));
-        auto *res = TransactionManager::txn_map[txn_id];
-        lock.unlock();
-        assert(res != nullptr);
-        assert(res->get_thread_id() == std::this_thread::get_id());
-
-        return res;
+        const auto it = txn_map_.find(txn_id);
+        if (it == txn_map_.end()) {
+            return nullptr;
+        }
+        return it->second.get();
     }
 
-    static std::unordered_map<txn_id_t, Transaction *> txn_map;     // 全局事务表，存放事务ID与事务对象的映射关系
-
 private:
-    ConcurrencyMode concurrency_mode_;      // 事务使用的并发控制算法，目前只需要考虑2PL
-    std::atomic<txn_id_t> next_txn_id_{0};  // 用于分发事务ID
-    std::atomic<timestamp_t> next_timestamp_{0};    // 用于分发事务时间戳
-    std::mutex latch_;  // 用于txn_map的并发
-    SmManager *sm_manager_;
-    LockManager *lock_manager_;
+    ConcurrencyMode concurrency_mode_;
+    std::atomic<txn_id_t> next_txn_id_{0};
+    std::atomic<timestamp_t> next_timestamp_{0};
+    std::mutex latch_;
+    std::unordered_map<txn_id_t, std::unique_ptr<Transaction>> txn_map_;
+    SmManager* sm_manager_;
+    LockManager* lock_manager_;
 };

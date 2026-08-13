@@ -1,7 +1,6 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
-#include <array>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -20,12 +19,10 @@
 #include "record/rm.h"
 #undef private  // for use private variables in "rm.h"
 
-constexpr std::size_t TEST_RESULT_BUFFER_SIZE = 8192;
-
 int record_page_bytes(const RmFileHdr& file_hdr, int slot_count) {
     int bitmap_size = (slot_count + BITMAP_WIDTH - 1) / BITMAP_WIDTH;
-    return Page::OFFSET_PAGE_HDR + static_cast<int>(sizeof(RmPageHdr)) + bitmap_size +
-           slot_count * file_hdr.record_size;
+    const int record_bytes = slot_count * file_hdr.record_size;
+    return static_cast<int>(Page::OFFSET_PAGE_HDR) + static_cast<int>(sizeof(RmPageHdr)) + bitmap_size + record_bytes;
 }
 
 void rand_buf(int size, char* out_buf) {
@@ -49,9 +46,7 @@ struct rid_equal_t {
 
 void check_equal(const RmFileHandle* file_handle,
                  const std::unordered_map<Rid, std::string, rid_hash_t, rid_equal_t>& mock) {
-    std::array<char, TEST_RESULT_BUFFER_SIZE> result{};
-    int offset = 0;
-    Context context(nullptr, nullptr, nullptr, result.data(), &offset);
+    Context context(nullptr, nullptr, nullptr);
     // Test all records
     for (auto& [rid, value] : mock) {
         const char* mock_buf = value.data();
@@ -92,9 +87,7 @@ std::ostream& operator<<(std::ostream& os, const Rid& rid) {
 TEST(RecordManagerTest, SimpleTest) {
     srand(20260812U);  // 固定种子，失败可以稳定复现
 
-    std::array<char, TEST_RESULT_BUFFER_SIZE> result{};
-    int offset = 0;
-    Context context(nullptr, nullptr, nullptr, result.data(), &offset);
+    Context context(nullptr, nullptr, nullptr);
 
     // 创建RmManager类的对象rm_manager
     auto disk_manager = std::make_unique<DiskManager>();

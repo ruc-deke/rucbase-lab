@@ -1,11 +1,11 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "lru_replacer.h"
 
 LRUReplacer::LRUReplacer(size_t num_pages) { max_size_ = num_pages; }
 
-LRUReplacer::~LRUReplacer() = default;  
+LRUReplacer::~LRUReplacer() = default;
 
 /**
  * @description: 使用LRU策略删除一个victim frame，并返回该frame的id

@@ -39,12 +39,12 @@ RUCBase labs are intentionally implementation-heavy. Students must fill in `Todo
 
 ## Lab Map (for orientation only)
 
-| Lab | Focus | Typical code areas | Typical tests |
-| --- | --- | --- | --- |
-| Lab1 | Storage | `src/storage/`, `src/replacer/`, `src/record/` | `lab1_disk_manager_test`, `lab1_lru_replacer_test`, `lab1_buffer_pool_manager_test`, `lab1_record_manager_test` |
-| Lab2 | Index | `src/index/` | `lab2_b_plus_tree_insert_test`, `lab2_b_plus_tree_delete_test`, `lab2_b_plus_tree_concurrent_test` |
-| Lab3 | Query execution | `src/execution/`, related planner/analyze paths | query / regress black-box (`lab3_query_blackbox_test`, handout scripts under `src/test/query/`) |
-| Lab4 | Concurrency | `src/transaction/` | transaction / concurrency black-box (`lab4_transaction_blackbox_test`, `lab4_concurrency_blackbox_test`, bonus variants) |
+| Lab  | Focus           | Typical code areas                              | Typical tests                                                                                                            |
+|------|-----------------|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| Lab1 | Storage         | `src/storage/`, `src/replacer/`, `src/record/`  | `lab1_disk_manager_test`, `lab1_lru_replacer_test`, `lab1_buffer_pool_manager_test`, `lab1_record_manager_test`          |
+| Lab2 | Index           | `src/index/`                                    | `lab2_b_plus_tree_insert_test`, `lab2_b_plus_tree_delete_test`, `lab2_b_plus_tree_concurrent_test`                       |
+| Lab3 | Query execution | `src/execution/`, related planner/analyze paths | query / regress black-box (`lab3_query_blackbox_test`, handout scripts under `src/test/query/`)                          |
+| Lab4 | Concurrency     | `src/transaction/`                              | transaction / concurrency black-box (`lab4_transaction_blackbox_test`, `lab4_concurrency_blackbox_test`, bonus variants) |
 
 When helping, prefer the handout for the lab the student is currently working on. Do not jump ahead and implement later labs for them.
 

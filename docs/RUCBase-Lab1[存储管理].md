@@ -136,7 +136,7 @@ class Replacer {
 class BufferPoolManager {
    public:
     BufferPoolManager(size_t pool_size, DiskManager *disk_manager);
-    ~BufferPoolManager();
+    ~BufferPoolManager() = default;
     Page *new_page(PageId *page_id);
     Page *fetch_page(PageId page_id);
     bool unpin_page(PageId page_id, bool is_dirty);
@@ -150,13 +150,9 @@ class BufferPoolManager {
 }
 ```
 
-框架另外提供了 move-only `PageGuard`，用于在作用域结束时自动调用 `unpin_page()`。`fetch_page_guard()` 和 `new_page_guard()` 只是对上述原始接口的 RAII 包装，不代替本实验对 `fetch_page()`、`new_page()` 和 `unpin_page()` 的实现要求。修改 guard 持有的页后应调用 `mark_dirty()`。
-
-`BufferPoolManager::get_pin_snapshot()` 可以记录当前每个页面的 pin_count，测试可直接比较操作前后的快照来发现未释放的 pin。该检测是显式的：缓冲池析构时不会全局断言，因为部分 Lab1 用例会故意保持页面 pinned 以测试池耗尽场景。
-
 注意要对缓冲池进行并发控制，可以像`Replacer`类那样直接用`std::mutex`对每个函数上锁。但这种方法实际上是顺序执行若干个原子性操作。学生可以考虑这些函数之间的并发执行逻辑，加以改进。
 
-**学生可以自主添加私有辅助函数，将某些重复使用的逻辑模块化，例如寻找淘汰页、更新页表和页面等。不允许修改上述实验要求的原始公有函数声明；框架预先提供的 guard 和诊断接口不属于学生 TODO。**
+**学生可以自主添加私有辅助函数，将某些重复使用的逻辑模块化，例如寻找淘汰页、更新页表和页面等。不允许修改上述实验要求的原始公有函数声明。**
 
 首先，可以实现辅助函数：
 
@@ -232,11 +228,11 @@ class BufferPoolManager {
 
 在本实验中，学生需要实现存储系统中的记录管理器，它主要由 `RmManager`、`RmFileHandle`、`RmPageHandle` 和 `RmScan` 组成。此外，还有底层数据结构 `Rid` 和 `RmRecord`。
 
-其中，学生只需要实现 `RmFileHandle` 和 `RmScan` 中标有 `Todo` 的 Lab1 接口，其他类型已提供完整源码。指定 RID 的 `insert_record` 是后续恢复/回滚实验的扩展接口，不属于 Lab1 评分任务。
+其中，学生只需要实现 `RmFileHandle` 和 `RmScan` 中标有 `Todo` 的接口，其他类型已提供完整源码。
 
-`RMManager`类提供了创建/打开/关闭/删除记录文件的接口，其内部实现调用了任务一实现的`DiskManager`和`BufferPoolManager`类的接口。
+`RmManager`类提供了创建/打开/关闭/删除记录文件的接口，其内部实现调用了任务一实现的`DiskManager`和`BufferPoolManager`类的接口。
 
-`RmPageHandle` 将一个已固定在缓冲池中的页面解释为记录页面，并提供页头、bitmap 和记录槽位的访问。它只是页面视图，不负责解除 pin；获取页面的调用路径必须最终恰好 unpin 一次。其构造函数直接展示页头、bitmap 和记录槽在页面中的排列方式。
+`RmPageHandle` 将缓冲池中的一页解释为记录页面，并提供页头、bitmap 和记录槽位的访问。其构造函数直接展示这些内容在页面中的排列方式。通过 `fetch_page` 取出页面后，用完需要调用 `unpin_page`。
 
 ### 任务2.1 记录操作
 

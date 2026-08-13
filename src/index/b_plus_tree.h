@@ -1,10 +1,11 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
 #include <cstddef>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <utility>
 #include <vector>
@@ -12,12 +13,20 @@
 #include "common/config.h"
 #include "common/defs.h"
 #include "index_types.h"
+#include "storage/page_guard.h"
 
 class BufferPoolManager;
 class DiskManager;
 class Page;
 struct PageId;
 class Transaction;
+
+/**
+ * Lab2 作业记住两件事：
+ *   1. `IndexNode node = fetch_node(p);` 然后 `node->...`，离开作用域即 unpin。
+ *   2. `BPlusTreeNode` 是页内视图，通过 `node->` 使用，不要自己 new。
+ * `PageGuard` 是框架内部类型，作业不用写。蟹行 / `release()` 只在任务 4 选做。
+ */
 
 /** @brief 查找叶节点时的操作类型；写操作后续需要配合并发控制。 */
 enum class IndexOperation { Find, Insert, Delete };
@@ -32,8 +41,8 @@ int compare_index_key(const char* left,
                       const std::vector<int>& column_lengths);
 
 /**
- * @brief 将一个已固定的缓冲池页解释为 B+ 树节点。
- * @note 该对象不拥有 Page，使用完后必须由 BPlusTree 解固定对应页。
+ * @brief 页内视图：键、Rid、孩子页号。不拥有 Page，也不负责 pin。
+ * @note 作业通过 `IndexNode::operator->` 使用。不要单独构造，也不要手动 unpin。
  */
 class BPlusTreeNode {
     friend class BPlusTree;
@@ -118,7 +127,7 @@ public:
 
     void erase_pair(int pos);
 
-    int remove(const char* key);
+    int remove(const char* key, const Rid& rid);
 
     /**
      * @brief used in internal node to remove the last key in root node, and return the last child
@@ -136,6 +145,53 @@ public:
 };
 
 /**
+ * @brief Lab2 进页句柄：离开作用域即 unpin。
+ * @note `operator->` 得到页内视图 `BPlusTreeNode`。`release()` 只给任务 4 选做蟹行用。
+ */
+class IndexNode {
+public:
+    IndexNode() noexcept = default;
+    IndexNode(const IndexFileHeader* file_header, PageGuard guard) : guard_(std::move(guard)) {
+        if (guard_) {
+            view_ = BPlusTreeNode(file_header, guard_.get());
+        }
+    }
+
+    IndexNode(IndexNode&& other) noexcept : guard_(std::move(other.guard_)), view_(other.view_) {
+        other.view_ = BPlusTreeNode();
+    }
+
+    IndexNode& operator=(IndexNode&& other) noexcept {
+        if (this != &other) {
+            guard_ = std::move(other.guard_);
+            view_ = other.view_;
+            other.view_ = BPlusTreeNode();
+        }
+        return *this;
+    }
+
+    IndexNode(const IndexNode&) = delete;
+    IndexNode& operator=(const IndexNode&) = delete;
+
+    [[nodiscard]] bool valid() const noexcept { return static_cast<bool>(guard_); }
+    BPlusTreeNode* operator->() noexcept { return &view_; }
+    const BPlusTreeNode* operator->() const noexcept { return &view_; }
+    BPlusTreeNode& node() noexcept { return view_; }
+    const BPlusTreeNode& node() const noexcept { return view_; }
+    void mark_dirty() noexcept { guard_.mark_dirty(); }
+
+    /** @brief 交出 pin。仅任务 4 选做蟹行需要。 */
+    [[nodiscard]] PageGuard release() noexcept {
+        view_ = BPlusTreeNode();
+        return std::move(guard_);
+    }
+
+private:
+    PageGuard guard_;
+    BPlusTreeNode view_{};
+};
+
+/**
  * @brief 管理一个索引文件中的 B+ 树。
  * @note 拥有 IndexFileHeader，但不拥有磁盘管理器和缓冲池管理器。
  */
@@ -145,48 +201,43 @@ class BPlusTree {
     friend class BPlusTreeInvariantChecker;
 
 private:
-    DiskManager* disk_manager_;               ///< 非拥有指针。
-    BufferPoolManager* buffer_pool_manager_;  ///< 非拥有指针。
-    int file_descriptor_;                     ///< 索引文件描述符。
-    IndexFileHeader* file_header_;            ///< 拥有的内存文件头副本。
+    DiskManager* disk_manager_;                     ///< 非拥有指针。
+    BufferPoolManager* buffer_pool_manager_;        ///< 非拥有指针。
+    int file_descriptor_;                           ///< 索引文件描述符。
+    std::unique_ptr<IndexFileHeader> file_header_;  ///< 独占的内存文件头副本。
     std::mutex root_latch_;
 
 public:
     BPlusTree(DiskManager* disk_manager, BufferPoolManager* buffer_pool_manager, int file_descriptor);
 
-    ~BPlusTree();
+    ~BPlusTree() = default;
 
     // for search
     bool get_value(const char* key, std::vector<Rid>* result, Transaction* transaction);
 
-    std::pair<BPlusTreeNode*, bool> find_leaf_page(const char* key,
-                                                   IndexOperation operation,
-                                                   Transaction* transaction,
-                                                   bool find_first = false);
+    std::pair<IndexNode, bool> find_leaf_page(const char* key,
+                                              IndexOperation operation,
+                                              Transaction* transaction,
+                                              bool find_first = false);
 
     // for insert
     page_id_t insert_entry(const char* key, const Rid& value, Transaction* transaction);
 
-    BPlusTreeNode* split(BPlusTreeNode* node);
+    IndexNode split(IndexNode& node);
 
-    void insert_into_parent(BPlusTreeNode* old_node,
-                            const char* key,
-                            BPlusTreeNode* new_node,
-                            Transaction* transaction);
+    void insert_into_parent(IndexNode& old_node, const char* key, IndexNode& new_node, Transaction* transaction);
 
     // for delete
-    bool delete_entry(const char* key, Transaction* transaction);
+    bool delete_entry(const char* key, const Rid& rid, Transaction* transaction);
 
-    bool coalesce_or_redistribute(BPlusTreeNode* node,
-                                  Transaction* transaction = nullptr,
-                                  bool* root_is_latched = nullptr);
-    bool adjust_root(BPlusTreeNode* old_root_node);
+    bool coalesce_or_redistribute(IndexNode& node, Transaction* transaction = nullptr, bool* root_is_latched = nullptr);
+    bool adjust_root(IndexNode& old_root_node);
 
-    void redistribute(BPlusTreeNode* neighbor_node, BPlusTreeNode* node, BPlusTreeNode* parent, int index);
+    void redistribute(IndexNode& neighbor_node, IndexNode& node, IndexNode& parent, int index);
 
-    bool coalesce(BPlusTreeNode** neighbor_node,
-                  BPlusTreeNode** node,
-                  BPlusTreeNode** parent,
+    bool coalesce(IndexNode& neighbor_node,
+                  IndexNode& node,
+                  IndexNode& parent,
                   int index,
                   Transaction* transaction,
                   bool* root_is_latched);
@@ -199,27 +250,23 @@ public:
 
     IndexPosition leaf_begin() const;
 
-private:
-    // 辅助函数
-    void set_root_page(page_id_t root) { file_header_->root_page_ = root; }
+    [[nodiscard]] IndexNode fetch_node(page_id_t page_no) const;
+    [[nodiscard]] IndexNode create_node();
 
-    bool is_empty() const { return file_header_->root_page_ == INDEX_NO_PAGE; }
+    void update_ancestor_keys(IndexNode& node);
 
-    // for get/create node
-    BPlusTreeNode* fetch_node(int page_no) const;
-    void unpin_node(BPlusTreeNode* node, bool dirty) const;
-
-    BPlusTreeNode* create_node();
-
-    // for maintain data structure
-    void update_ancestor_keys(BPlusTreeNode* node);
-
-    void unlink_leaf(BPlusTreeNode* leaf);
+    void unlink_leaf(IndexNode& leaf);
 
     void record_page_deletion();
 
-    void update_child_parent(BPlusTreeNode* node, int child_idx);
+    void update_child_parent(IndexNode& node, int child_idx);
 
-    // for index test
     Rid get_rid(const IndexPosition& position) const;
+
+    /** @brief 该索引是否施加唯一约束。 */
+    [[nodiscard]] bool is_unique() const { return file_header_ != nullptr && file_header_->unique_; }
+
+private:
+    void set_root_page(page_id_t root) { file_header_->root_page_ = root; }
+    [[nodiscard]] bool is_empty() const { return file_header_->root_page_ == INDEX_NO_PAGE; }
 };

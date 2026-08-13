@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /**
@@ -235,11 +235,13 @@ struct DescTableStmt : public Statement {
 struct CreateIndexStmt : public Statement {
     std::string tab_name;
     std::vector<std::string> col_names;
+    bool unique;
 
-    CreateIndexStmt(std::string tab_name_, std::vector<std::string> col_names_)
+    CreateIndexStmt(std::string tab_name_, std::vector<std::string> col_names_, bool unique_ = false)
         : Statement(StatementKind::CreateIndex),
           tab_name(std::move(tab_name_)),
-          col_names(std::move(col_names_)) {}
+          col_names(std::move(col_names_)),
+          unique(unique_) {}
 };
 
 struct DropIndexStmt : public Statement {

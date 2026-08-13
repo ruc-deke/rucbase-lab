@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -18,18 +18,22 @@
 #include "system/sm_meta.h"
 
 class UpdateExecutor : public AbstractExecutor {
-   private:
+private:
     TabMeta tab_;
     std::vector<Condition> conds_;
-    RmFileHandle *fh_;
+    RmFileHandle* fh_;
     std::vector<Rid> rids_;
     std::string tab_name_;
     std::vector<SetClause> set_clauses_;
-    SmManager *sm_manager_;
+    SmManager* sm_manager_;
 
-   public:
-    UpdateExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<SetClause> set_clauses,
-                   std::vector<Condition> conds, std::vector<Rid> rids, Context *context) {
+public:
+    UpdateExecutor(SmManager* sm_manager,
+                   const std::string& tab_name,
+                   std::vector<SetClause> set_clauses,
+                   std::vector<Condition> conds,
+                   std::vector<Rid> rids,
+                   Context* context) {
         sm_manager_ = sm_manager;
         tab_name_ = tab_name;
         set_clauses_ = std::move(set_clauses);
@@ -39,9 +43,7 @@ class UpdateExecutor : public AbstractExecutor {
         rids_ = std::move(rids);
         context_ = context;
     }
-    std::unique_ptr<RmRecord> Next() override {
-        throw NotImplementedError("UpdateExecutor::Next");
-    }
+    std::unique_ptr<RmRecord> next() override { throw NotImplementedError("UpdateExecutor::next"); }
 
-    Rid &rid() override { return _abstract_rid; }
+    Rid& rid() override { return abstract_rid_; }
 };

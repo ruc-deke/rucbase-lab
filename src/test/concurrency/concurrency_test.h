@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -13,7 +13,7 @@
 
 class Operation {
 public:
-    std::string name;   // 比如t1a, t1b, t2a
+    std::string name;  // 比如t1a, t1b, t2a
     std::string sql;
     int txn_id = -1;
 };

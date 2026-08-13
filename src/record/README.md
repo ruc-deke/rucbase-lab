@@ -8,7 +8,7 @@
 |----------------|-------------------------------------------|-----------------------|
 | `RmManager`    | 创建、打开、关闭和删除记录文件            | 否                    |
 | `RmFileHandle` | 按 RID 读取以及插入、删除、更新记录       | 是                    |
-| `RmPageHandle` | 把已固定的 `Page` 解释为记录页视图        | 否                    |
+| `RmPageHandle` | 把已固定的 `Page` 解释为记录页             | 否                    |
 | `RmScan`       | 按页号、槽号顺序遍历已占用槽位            | 是                    |
 | `RmRecord`     | 拥有一份从页面复制出的记录数据            | 否                    |
 
@@ -38,4 +38,4 @@
 
 ## 页面生命周期
 
-`RmPageHandle` 只是视图，不拥有缓冲池 pin。通过 `fetch_page_handle()` 或 `create_page_handle()` 得到页面后，调用路径必须最终恰好 unpin 一次；修改页面时还要把本次 pin 标记为 dirty。实现每个函数后，可以逐条检查 fetch/new 与 unpin 是否成对出现。
+`RmPageHandle` 用来访问已经取到缓冲池中的记录页。通过 `fetch_page_handle()` 或 `create_page_handle()` 得到页面后，用完需要 `unpin_page`；如果修改了页面，unpin 时要把脏页标记带上。实现每个函数后，可以检查取出页面和解除固定是否成对出现。

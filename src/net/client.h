@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -50,7 +50,7 @@ struct ClientStatus {
 // handshake, serializes concurrent Execute calls, and closes a poisoned
 // connection after transport/protocol failures.
 class Client {
-   public:
+public:
     Client();
     ~Client();
 
@@ -68,7 +68,7 @@ class Client {
     void Close() noexcept;
     bool is_open() const noexcept;
 
-   private:
+private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

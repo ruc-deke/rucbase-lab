@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "index_types.h"
@@ -39,7 +39,8 @@ IndexFileHeader::IndexFileHeader(page_id_t first_free_page,
                                  int tree_order,
                                  int keys_region_size,
                                  page_id_t first_leaf,
-                                 page_id_t last_leaf)
+                                 page_id_t last_leaf,
+                                 bool unique)
     : first_free_page_(first_free_page),
       page_count_(page_count),
       root_page_(root_page),
@@ -48,7 +49,8 @@ IndexFileHeader::IndexFileHeader(page_id_t first_free_page,
       tree_order_(tree_order),
       keys_region_size_(keys_region_size),
       first_leaf_(first_leaf),
-      last_leaf_(last_leaf) {
+      last_leaf_(last_leaf),
+      unique_(unique) {
     serialized_size_ = 0;
 }
 
@@ -95,6 +97,9 @@ void IndexFileHeader::serialize(char* dest) const {
     offset += sizeof(page_id_t);
     memcpy(dest + offset, &last_leaf_, sizeof(page_id_t));
     offset += sizeof(page_id_t);
+    const int unique_flag = unique_ ? 1 : 0;
+    memcpy(dest + offset, &unique_flag, sizeof(int));
+    offset += sizeof(int);
     if (offset != serialized_size_) {
         throw InternalError("Invalid index file header");
     }
@@ -140,6 +145,12 @@ void IndexFileHeader::deserialize(const char* src, size_t src_len) {
     read_value(keys_region_size_);
     read_value(first_leaf_);
     read_value(last_leaf_);
+    int unique_flag = 0;
+    read_value(unique_flag);
+    if (unique_flag != 0 && unique_flag != 1) {
+        throw InternalError("Invalid index file header");
+    }
+    unique_ = unique_flag == 1;
 
     if (col_len_sum != key_length_ || key_length_ <= 0 || key_length_ > INDEX_MAX_KEY_LENGTH || tree_order_ <= 2 ||
         keys_region_size_ != calculate_keys_region_size(tree_order_, key_length_) ||

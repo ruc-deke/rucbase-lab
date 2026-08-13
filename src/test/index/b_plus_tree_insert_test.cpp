@@ -1,11 +1,12 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
-#include <random>  // for std::default_random_engine
+#include <random>
+#include <utility>
 
 #include "gtest/gtest.h"
 
@@ -14,6 +15,7 @@
 #undef private  // 测试需要检查 B+ 树的内部不变式。
 
 #include "b_plus_tree_invariant_checker.h"
+#include "common/errors.h"
 #include "index/index_manager.h"
 #include "index/index_scan.h"
 #include "record/rm.h"
@@ -78,7 +80,7 @@ public:
         coldef.push_back({.name = "col1", .type = TYPE_INT, .len = 4});
         coldef.push_back({.name = "col2", .type = TYPE_INT, .len = 4});
         sm_->create_table(TEST_FILE_NAME, coldef, nullptr);
-        index_manager_->create_index(TEST_FILE_NAME, TEST_COL_META);
+        index_manager_->create_index(IndexMeta::make(TEST_FILE_NAME, TEST_COL_META));
         assert(index_manager_->exists(TEST_FILE_NAME, TEST_COL));
         // 打开测试文件
         tree_ = index_manager_->open_index(TEST_FILE_NAME, TEST_COL);
@@ -99,17 +101,26 @@ public:
         assert(disk_manager_->is_dir(TEST_DB_NAME));
     };
 
+    void RecreateIndex(bool unique) {
+        index_manager_->close_index(tree_.get());
+        tree_.reset();
+        index_manager_->destroy_index(TEST_FILE_NAME, TEST_COL);
+        index_manager_->create_index(IndexMeta::make(TEST_FILE_NAME, TEST_COL_META, unique));
+        tree_ = index_manager_->open_index(TEST_FILE_NAME, TEST_COL);
+        pin_baseline_ = buffer_pool_manager_->get_pin_snapshot();
+    }
+
     ::testing::AssertionResult tree_invariants_hold() const {
         const auto report = BPlusTreeInvariantChecker::check(*tree_);
         if (report.ok()) return ::testing::AssertionSuccess();
         return ::testing::AssertionFailure() << report.describe();
     }
 
-    void ToGraph(const BPlusTree* tree, BPlusTreeNode* node, BufferPoolManager* bpm, std::ofstream& out) const {
+    void ToGraph(const BPlusTree* tree, IndexNode node, BufferPoolManager* bpm, std::ofstream& out) const {
         std::string leaf_prefix("LEAF_");
         std::string internal_prefix("INT_");
         if (node->is_leaf_page()) {
-            BPlusTreeNode* leaf = node;
+            BPlusTreeNode* leaf = &node.node();
             // Print node name
             out << leaf_prefix << leaf->get_page_no();
             // Print node properties
@@ -141,7 +152,7 @@ public:
                     << leaf_prefix << leaf->get_page_no() << ";\n";
             }
         } else {
-            BPlusTreeNode* inner = node;
+            BPlusTreeNode* inner = &node.node();
             // Print node name
             out << internal_prefix << inner->get_page_no();
             // Print node properties
@@ -173,21 +184,19 @@ public:
             }
             // Print leaves
             for (int i = 0; i < inner->get_size(); i++) {
-                BPlusTreeNode* child_node = tree->fetch_node(inner->value_at(i));
+                IndexNode child_node = tree->fetch_node(inner->value_at(i));
                 const bool child_is_leaf = child_node->is_leaf_page();
                 const page_id_t child_page_no = child_node->get_page_no();
-                ToGraph(tree, child_node, bpm, out);  // 继续递归
+                ToGraph(tree, std::move(child_node), bpm, out);
                 if (i > 0) {
-                    BPlusTreeNode* sibling_node = tree->fetch_node(inner->value_at(i - 1));
+                    IndexNode sibling_node = tree->fetch_node(inner->value_at(i - 1));
                     if (!sibling_node->is_leaf_page() && !child_is_leaf) {
                         out << "{rank=same " << internal_prefix << sibling_node->get_page_no() << " " << internal_prefix
                             << child_page_no << "};\n";
                     }
-                    tree->unpin_node(sibling_node, false);
                 }
             }
         }
-        tree->unpin_node(node, false);
     }
 
     /**
@@ -200,8 +209,7 @@ public:
         std::ofstream out(outf);
         out << "digraph G {\n";
 
-        BPlusTreeNode* node = tree_->fetch_node(tree_->file_header_->root_page_);
-        ToGraph(tree_.get(), node, bpm, out);
+        ToGraph(tree_.get(), tree_->fetch_node(tree_->file_header_->root_page_), bpm, out);
         out << "}\n";
         out.close();
 
@@ -375,4 +383,37 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
         scan.next();
     }
     EXPECT_EQ(current_key, keys.size() + 1);
+}
+
+TEST_F(BPlusTreeTests, NonUniqueIndexAllowsDuplicateKeys) {
+    ASSERT_FALSE(tree_->is_unique());
+
+    int64_t key = 7;
+    const char* index_key = reinterpret_cast<const char*>(&key);
+    const Rid first{.page_no = 1, .slot_no = 0};
+    const Rid second{.page_no = 1, .slot_no = 1};
+    ASSERT_NE(tree_->insert_entry(index_key, first, txn_.get()), static_cast<page_id_t>(-1));
+    ASSERT_NE(tree_->insert_entry(index_key, second, txn_.get()), static_cast<page_id_t>(-1));
+    ASSERT_TRUE(tree_invariants_hold());
+
+    std::vector<Rid> rids;
+    ASSERT_TRUE(tree_->get_value(index_key, &rids, txn_.get()));
+    ASSERT_EQ(rids.size(), 2U);
+}
+
+TEST_F(BPlusTreeTests, UniqueIndexRejectsDuplicateKeys) {
+    RecreateIndex(true);
+    ASSERT_TRUE(tree_->is_unique());
+
+    int64_t key = 7;
+    const char* index_key = reinterpret_cast<const char*>(&key);
+    const Rid first{.page_no = 1, .slot_no = 0};
+    const Rid second{.page_no = 1, .slot_no = 1};
+    ASSERT_NE(tree_->insert_entry(index_key, first, txn_.get()), static_cast<page_id_t>(-1));
+    EXPECT_THROW(tree_->insert_entry(index_key, second, txn_.get()), DuplicateKeyError);
+
+    std::vector<Rid> rids;
+    ASSERT_TRUE(tree_->get_value(index_key, &rids, txn_.get()));
+    ASSERT_EQ(rids.size(), 1U);
+    EXPECT_EQ(rids[0].slot_no, 0);
 }

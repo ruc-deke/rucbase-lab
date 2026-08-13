@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -45,9 +45,10 @@ public:
     int keys_region_size_{};                    ///< 对齐后的键数组区域字节数。
     page_id_t first_leaf_{INDEX_NO_PAGE};       ///< 第一个叶节点页号。
     page_id_t last_leaf_{INDEX_NO_PAGE};        ///< 最后一个叶节点页号。
+    bool unique_{false};                        ///< 是否为唯一索引；默认允许重复键。
     int serialized_size_{};                     ///< 文件头序列化后的字节数。
 
-    static constexpr size_t fixed_serialized_size() { return sizeof(page_id_t) * 4 + sizeof(int) * 6; }
+    static constexpr size_t fixed_serialized_size() { return sizeof(page_id_t) * 4 + sizeof(int) * 7; }
 
     static constexpr size_t max_serialized_columns() {
         return (PAGE_SIZE - fixed_serialized_size()) / (sizeof(ColType) + sizeof(int));
@@ -71,7 +72,8 @@ public:
                     int tree_order,
                     int keys_region_size,
                     page_id_t first_leaf,
-                    page_id_t last_leaf);
+                    page_id_t last_leaf,
+                    bool unique = false);
 
     void update_serialized_size();
 

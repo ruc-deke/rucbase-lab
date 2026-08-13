@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "system/sm_meta.h"
@@ -9,6 +9,7 @@
 #include <string>
 
 #include "common/context.h"
+#include "common/wire_result.h"
 #include "system/sm_manager.h"
 
 TEST(CatalogMetadataTest, WritesReadableEmptyDatabaseJson) {
@@ -29,13 +30,14 @@ TEST(CatalogMetadataTest, ShowDatabaseReturnsStructuredCurrentName) {
     Context context(nullptr, nullptr, nullptr);
     sm_manager.show_database(&context);
 
-    ASSERT_TRUE(context.wire_result_.has_query_result);
-    ASSERT_EQ(context.wire_result_.columns.size(), 1U);
-    EXPECT_EQ(context.wire_result_.columns[0].name, "Database");
-    EXPECT_EQ(context.wire_result_.columns[0].type, TYPE_STRING);
-    ASSERT_EQ(context.wire_result_.rows.size(), 1U);
-    ASSERT_EQ(context.wire_result_.rows[0].size(), 1U);
-    EXPECT_EQ(context.wire_result_.rows[0][0].str_val, "demo");
+    const auto& result = context.result().view();
+    ASSERT_TRUE(result.has_query_result);
+    ASSERT_EQ(result.columns.size(), 1U);
+    EXPECT_EQ(result.columns[0].name, "Database");
+    EXPECT_EQ(result.columns[0].type, TYPE_STRING);
+    ASSERT_EQ(result.rows.size(), 1U);
+    ASSERT_EQ(result.rows[0].size(), 1U);
+    EXPECT_EQ(result.rows[0][0].str_val, "demo");
 }
 
 TEST(CatalogMetadataTest, DefaultMetadataIsInitialized) {
@@ -81,6 +83,7 @@ TEST(CatalogMetadataTest, RebuildsDerivedMetadataOnRoundTrip) {
     ASSERT_EQ(table.indexes.size(), 1U);
     EXPECT_EQ(table.indexes[0].col_num, 2);
     EXPECT_EQ(table.indexes[0].col_tot_len, 12);
+    EXPECT_FALSE(table.indexes[0].unique);
     EXPECT_EQ(table.indexes[0].cols[0].name, "name");
     EXPECT_EQ(table.indexes[0].cols[1].name, "id");
 
@@ -96,9 +99,30 @@ TEST(CatalogMetadataTest, RebuildsDerivedMetadataOnRoundTrip) {
     round_trip >> restored;
     EXPECT_TRUE(restored.is_table("student"));
 
+    EXPECT_NE(output.str().find("\"unique\": false"), std::string::npos);
+
     std::istringstream replacement(R"({"database":"empty","tables":[]})");
     replacement >> restored;
     EXPECT_FALSE(restored.is_table("student"));
+}
+
+TEST(CatalogMetadataTest, ReadsUniqueIndexFlag) {
+    const std::string json = R"({
+        "database": "demo",
+        "tables": [{
+          "name": "t",
+          "columns": [{"name": "id", "type": "INT", "length": 4}],
+          "indexes": [{"columns": ["id"], "unique": true}]
+        }]
+      })";
+    DbMeta db;
+    std::istringstream input(json);
+    input >> db;
+    ASSERT_TRUE(db.get_table("t").indexes[0].unique);
+
+    std::ostringstream output;
+    output << db;
+    EXPECT_NE(output.str().find("\"unique\": true"), std::string::npos);
 }
 
 TEST(CatalogMetadataTest, RejectsLegacyAndInvalidMetadata) {

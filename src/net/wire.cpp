@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "net/wire.h"
@@ -726,8 +726,7 @@ ExecuteResult ExecStreamResult(int fd, const std::string& sql, const ExecuteOpti
 
                 state = ResponseState::Rows;
                 raw_text_result = (frame.flags & kFlagRawText) != 0;
-                if (raw_text_result &&
-                    (result.columns.size() != 1 || result.columns[0].sql_type != kTypeChar)) {
+                if (raw_text_result && (result.columns.size() != 1 || result.columns[0].sql_type != kTypeChar)) {
                     result.status = ExecuteStatus::ProtocolError;
                     result.diagnostic = "raw text META must contain one CHAR column";
                     return result;

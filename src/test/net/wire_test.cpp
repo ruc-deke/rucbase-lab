@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <arpa/inet.h>
@@ -20,7 +20,7 @@
 namespace {
 
 class SocketPair {
-   public:
+public:
     SocketPair() { EXPECT_EQ(socketpair(AF_UNIX, SOCK_STREAM, 0, fds_.data()), 0); }
 
     ~SocketPair() {
@@ -39,13 +39,15 @@ class SocketPair {
         fds_[0] = -1;
     }
 
-   private:
+private:
     std::array<int, 2> fds_{{-1, -1}};
 };
 
 struct ResponseFrame {
     ResponseFrame(const uint8_t tag_value, std::string payload_value, const uint8_t flag_value = 0)
-        : tag(tag_value), payload(std::move(payload_value)), flags(flag_value) {}
+        : tag(tag_value),
+          payload(std::move(payload_value)),
+          flags(flag_value) {}
 
     uint8_t tag;
     std::string payload;
@@ -252,16 +254,15 @@ TEST(WireExecStreamTest, RawTextRequiresExplicitMetaFlag) {
     cell.sql_type = rucbase::wire::kTypeChar;
     cell.str_val = "hello";
 
-    const auto ordinary = RunExecStreamResult(
-        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output")},
-         {rucbase::wire::kTagRow, rucbase::wire::EncodeRow({cell})},
-         {rucbase::wire::kTagResultEnd, rucbase::wire::EncodeResultEnd(1)}});
+    const auto ordinary =
+        RunExecStreamResult({{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output")},
+                             {rucbase::wire::kTagRow, rucbase::wire::EncodeRow({cell})},
+                             {rucbase::wire::kTagResultEnd, rucbase::wire::EncodeResultEnd(1)}});
     EXPECT_TRUE(ordinary.ok());
     EXPECT_NE(ordinary.text.find("Total record(s): 1"), std::string::npos);
 
     const auto raw = RunExecStreamResult(
-        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"),
-          rucbase::wire::kFlagRawText},
+        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"), rucbase::wire::kFlagRawText},
          {rucbase::wire::kTagRow, rucbase::wire::EncodeRow({cell})},
          {rucbase::wire::kTagResultEnd, rucbase::wire::EncodeResultEnd(1)}});
     EXPECT_TRUE(raw.ok());
@@ -269,14 +270,12 @@ TEST(WireExecStreamTest, RawTextRequiresExplicitMetaFlag) {
 }
 
 TEST(WireExecStreamTest, RejectsInvalidRawTextFlags) {
-    const auto unknown_flag = RunExecStreamResult(
-        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"), 0x80}});
+    const auto unknown_flag =
+        RunExecStreamResult({{rucbase::wire::kTagMeta, rucbase::wire::EncodeMetaSingleCharColumn("output"), 0x80}});
     EXPECT_EQ(unknown_flag.status, rucbase::wire::ExecuteStatus::ProtocolError);
 
     const auto non_char_schema = RunExecStreamResult(
-        {{rucbase::wire::kTagMeta,
-          rucbase::wire::EncodeMeta(
-              {{.name = "id", .sql_type = rucbase::wire::kTypeInt32}}),
+        {{rucbase::wire::kTagMeta, rucbase::wire::EncodeMeta({{.name = "id", .sql_type = rucbase::wire::kTypeInt32}}),
           rucbase::wire::kFlagRawText}});
     EXPECT_EQ(non_char_schema.status, rucbase::wire::ExecuteStatus::ProtocolError);
 }

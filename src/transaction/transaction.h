@@ -1,72 +1,63 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
 
 #include <deque>
-#include <memory>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 
 #include "common/config.h"
 #include "txn_defs.h"
 
-class Page;
-
+/**
+ * @brief 一条事务。
+ *
+ * Lab4 作业主要用 write_set() / lock_set() / get_state()。
+ * Lab2 串行 B+ 树可以把传入的 Transaction* 当作可空参数忽略。
+ */
 class Transaction {
-   public:
+public:
     explicit Transaction(txn_id_t txn_id, IsolationLevel isolation_level = IsolationLevel::SERIALIZABLE)
-        : state_(TransactionState::DEFAULT), isolation_level_(isolation_level), txn_id_(txn_id) {
-        write_set_ = std::make_shared<std::deque<WriteRecord *>>();
-        lock_set_ = std::make_shared<std::unordered_set<LockDataId>>();
-        index_latch_page_set_ = std::make_shared<std::deque<Page *>>();
-        index_deleted_page_set_ = std::make_shared<std::deque<Page*>>();
-        prev_lsn_ = INVALID_LSN;
-        thread_id_ = std::this_thread::get_id();
-    }
+        : isolation_level_(isolation_level),
+          thread_id_(std::this_thread::get_id()),
+          prev_lsn_(INVALID_LSN),
+          txn_id_(txn_id) {}
 
-    ~Transaction() = default;
+    [[nodiscard]] txn_id_t get_transaction_id() const noexcept { return txn_id_; }
+    [[nodiscard]] std::thread::id get_thread_id() const noexcept { return thread_id_; }
 
-    inline txn_id_t get_transaction_id() const noexcept { return txn_id_; }
+    void set_txn_mode(bool txn_mode) { txn_mode_ = txn_mode; }
+    [[nodiscard]] bool get_txn_mode() const noexcept { return txn_mode_; }
 
-    inline std::thread::id get_thread_id() const noexcept { return thread_id_; }
+    void set_start_ts(timestamp_t start_ts) { start_ts_ = start_ts; }
+    [[nodiscard]] timestamp_t get_start_ts() const noexcept { return start_ts_; }
 
-    inline void set_txn_mode(bool txn_mode) { txn_mode_ = txn_mode; }
-    inline bool get_txn_mode() const noexcept { return txn_mode_; }
+    [[nodiscard]] IsolationLevel get_isolation_level() const noexcept { return isolation_level_; }
 
-    inline void set_start_ts(timestamp_t start_ts) { start_ts_ = start_ts; }
-    inline timestamp_t get_start_ts() const noexcept { return start_ts_; }
+    [[nodiscard]] TransactionState get_state() const noexcept { return state_; }
+    void set_state(TransactionState state) { state_ = state; }
 
-    inline IsolationLevel get_isolation_level() const noexcept { return isolation_level_; }
+    [[nodiscard]] lsn_t get_prev_lsn() const noexcept { return prev_lsn_; }
+    void set_prev_lsn(lsn_t prev_lsn) { prev_lsn_ = prev_lsn; }
 
-    inline TransactionState get_state() const noexcept { return state_; }
-    inline void set_state(TransactionState state) { state_ = state; }
+    void append_write_record(WriteRecord record) { write_set_.push_back(std::move(record)); }
+    [[nodiscard]] std::deque<WriteRecord>& write_set() noexcept { return write_set_; }
+    [[nodiscard]] const std::deque<WriteRecord>& write_set() const noexcept { return write_set_; }
 
-    inline lsn_t get_prev_lsn() const noexcept { return prev_lsn_; }
-    inline void set_prev_lsn(lsn_t prev_lsn) { prev_lsn_ = prev_lsn; }
+    [[nodiscard]] std::unordered_set<LockDataId>& lock_set() noexcept { return lock_set_; }
+    [[nodiscard]] const std::unordered_set<LockDataId>& lock_set() const noexcept { return lock_set_; }
 
-    inline std::shared_ptr<std::deque<WriteRecord *>> get_write_set() const { return write_set_; }
-    inline void append_write_record(WriteRecord* write_record) { write_set_->push_back(write_record); }
+private:
+    bool txn_mode_ = false;
+    TransactionState state_ = TransactionState::DEFAULT;
+    IsolationLevel isolation_level_;
+    std::thread::id thread_id_;
+    lsn_t prev_lsn_;
+    txn_id_t txn_id_;
+    timestamp_t start_ts_ = 0;
 
-    inline std::shared_ptr<std::deque<Page*>> get_index_deleted_page_set() const { return index_deleted_page_set_; }
-    inline void append_index_deleted_page(Page* page) { index_deleted_page_set_->push_back(page); }
-
-    inline std::shared_ptr<std::deque<Page*>> get_index_latch_page_set() const { return index_latch_page_set_; }
-    inline void append_index_latch_page_set(Page* page) { index_latch_page_set_->push_back(page); }
-
-    inline std::shared_ptr<std::unordered_set<LockDataId>> get_lock_set() const { return lock_set_; }
-
-   private:
-    bool txn_mode_ = false;           // 用于标识当前事务为显式事务还是单条SQL语句的隐式事务
-    TransactionState state_;          // 事务状态
-    IsolationLevel isolation_level_;  // 事务的隔离级别，默认隔离级别为可串行化
-    std::thread::id thread_id_;       // 当前事务对应的线程id
-    lsn_t prev_lsn_;                  // 当前事务执行的最后一条操作对应的lsn，用于系统故障恢复
-    txn_id_t txn_id_;                 // 事务的ID，唯一标识符
-    timestamp_t start_ts_ = 0;        // 事务的开始时间戳
-
-    std::shared_ptr<std::deque<WriteRecord *>> write_set_;  // 事务包含的所有写操作
-    std::shared_ptr<std::unordered_set<LockDataId>> lock_set_;  // 事务申请的所有锁
-    std::shared_ptr<std::deque<Page*>> index_latch_page_set_;          // 维护事务执行过程中加锁的索引页面
-    std::shared_ptr<std::deque<Page*>> index_deleted_page_set_;    // 维护事务执行过程中删除的索引页面
+    std::deque<WriteRecord> write_set_;
+    std::unordered_set<LockDataId> lock_set_;
 };

@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include <chrono>  // NOLINT
@@ -8,6 +8,7 @@
 #include <functional>
 #include <random>  // for std::default_random_engine
 #include <thread>  // NOLINT
+#include <utility>
 
 #include "gtest/gtest.h"
 
@@ -79,7 +80,7 @@ public:
         coldef.push_back({.name = "col1", .type = TYPE_INT, .len = 4});
         coldef.push_back({.name = "col2", .type = TYPE_INT, .len = 4});
         sm_->create_table(TEST_FILE_NAME, coldef, nullptr);
-        index_manager_->create_index(TEST_FILE_NAME, TEST_COL_META);
+        index_manager_->create_index(IndexMeta::make(TEST_FILE_NAME, TEST_COL_META));
         assert(index_manager_->exists(TEST_FILE_NAME, TEST_COL));
         // 打开测试文件
         tree_ = index_manager_->open_index(TEST_FILE_NAME, TEST_COL);
@@ -106,11 +107,11 @@ public:
         return ::testing::AssertionFailure() << report.describe();
     }
 
-    void ToGraph(const BPlusTree* tree, BPlusTreeNode* node, BufferPoolManager* bpm, std::ofstream& out) const {
+    void ToGraph(const BPlusTree* tree, IndexNode node, BufferPoolManager* bpm, std::ofstream& out) const {
         std::string leaf_prefix("LEAF_");
         std::string internal_prefix("INT_");
         if (node->is_leaf_page()) {
-            BPlusTreeNode* leaf = node;
+            BPlusTreeNode* leaf = &node.node();
             // Print node name
             out << leaf_prefix << leaf->get_page_no();
             // Print node properties
@@ -142,7 +143,7 @@ public:
                     << leaf_prefix << leaf->get_page_no() << ";\n";
             }
         } else {
-            BPlusTreeNode* inner = node;
+            BPlusTreeNode* inner = &node.node();
             // Print node name
             out << internal_prefix << inner->get_page_no();
             // Print node properties
@@ -174,21 +175,19 @@ public:
             }
             // Print leaves
             for (int i = 0; i < inner->get_size(); i++) {
-                BPlusTreeNode* child_node = tree->fetch_node(inner->value_at(i));
+                IndexNode child_node = tree->fetch_node(inner->value_at(i));
                 const bool child_is_leaf = child_node->is_leaf_page();
                 const page_id_t child_page_no = child_node->get_page_no();
-                ToGraph(tree, child_node, bpm, out);  // 继续递归
+                ToGraph(tree, std::move(child_node), bpm, out);
                 if (i > 0) {
-                    BPlusTreeNode* sibling_node = tree->fetch_node(inner->value_at(i - 1));
+                    IndexNode sibling_node = tree->fetch_node(inner->value_at(i - 1));
                     if (!sibling_node->is_leaf_page() && !child_is_leaf) {
                         out << "{rank=same " << internal_prefix << sibling_node->get_page_no() << " " << internal_prefix
                             << child_page_no << "};\n";
                     }
-                    tree->unpin_node(sibling_node, false);
                 }
             }
         }
-        tree->unpin_node(node, false);
     }
 
     /**
@@ -201,8 +200,7 @@ public:
         std::ofstream out(outf);
         out << "digraph G {\n";
 
-        BPlusTreeNode* node = tree_->fetch_node(tree_->file_header_->root_page_);
-        ToGraph(tree_.get(), node, bpm, out);
+        ToGraph(tree_.get(), tree_->fetch_node(tree_->file_header_->root_page_), bpm, out);
         out << "}\n";
         out.close();
 
@@ -328,7 +326,9 @@ void DeleteHelper(BPlusTree* tree, const std::vector<int64_t>& keys, __attribute
     const char* index_key;
     for (auto key : keys) {
         index_key = (const char*)&key;
-        tree->delete_entry(index_key, transaction);
+        Rid rid = {.page_no = static_cast<int32_t>(static_cast<uint64_t>(key) >> 32U),
+                   .slot_no = static_cast<int32_t>(static_cast<uint32_t>(key))};
+        tree->delete_entry(index_key, rid, transaction);
     }
 
     delete transaction;

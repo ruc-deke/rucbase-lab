@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -16,19 +16,19 @@ class SmManager;
 class TransactionManager;
 
 class QlManager {
-   private:
-    SmManager *sm_manager_;
-    TransactionManager *txn_mgr_;
+private:
+    SmManager* sm_manager_;
+    TransactionManager* txn_mgr_;
 
-   public:
-    QlManager(SmManager *sm_manager, TransactionManager *txn_mgr) 
-        : sm_manager_(sm_manager),  txn_mgr_(txn_mgr) {}
+public:
+    QlManager(SmManager* sm_manager, TransactionManager* txn_mgr) : sm_manager_(sm_manager), txn_mgr_(txn_mgr) {}
 
     // PortalStmt 保留计划所有权；执行管理器只在调用期间借用计划。
     void run_mutli_query(const Plan& plan, Context* context) const;
     void run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* context);
-    static void select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, const std::vector<TabCol> &sel_cols,
-                        Context *context);
+    static void select_from(std::unique_ptr<AbstractExecutor> executor_tree_root,
+                            const std::vector<TabCol>& sel_cols,
+                            Context* context);
 
     // unique_ptr 按值传入：调用方 std::move 后所有权转移到本函数。
     static void run_dml(std::unique_ptr<AbstractExecutor> exec);

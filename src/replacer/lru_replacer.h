@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -15,7 +15,7 @@
 LRUReplacer实现了LRU替换策略
 */
 class LRUReplacer : public Replacer {
-   public:
+public:
     /**
      * @description: 创建一个新的LRUReplacer
      * @param {size_t} num_pages LRUReplacer最多需要存储的page数量
@@ -24,7 +24,7 @@ class LRUReplacer : public Replacer {
 
     ~LRUReplacer() override;
 
-    bool victim(frame_id_t *frame_id) override;
+    bool victim(frame_id_t* frame_id) override;
 
     void pin(frame_id_t frame_id) override;
 
@@ -32,9 +32,10 @@ class LRUReplacer : public Replacer {
 
     size_t Size() override;
 
-   private:
-    std::mutex latch_;                  // 互斥锁
-    std::list<frame_id_t> LRUlist_;     // 按加入的时间顺序存放unpinned pages的frame id，首部表示最近被访问
-    std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> LRUhash_;   // frame_id_t -> unpinned pages的frame id
-    size_t max_size_;   // 最大容量（与缓冲池的容量相同）
+private:
+    std::mutex latch_;               // 互斥锁
+    std::list<frame_id_t> LRUlist_;  // 按加入的时间顺序存放unpinned pages的frame id，首部表示最近被访问
+    std::unordered_map<frame_id_t, std::list<frame_id_t>::iterator> LRUhash_;  // frame_id_t -> unpinned pages的frame id
+    // 最大容量（与缓冲池的容量相同）
+    size_t max_size_;
 };

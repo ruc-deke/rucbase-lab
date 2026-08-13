@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -17,7 +17,7 @@ struct TabCol {
     std::string tab_name;
     std::string col_name;
 
-    friend bool operator<(const TabCol &x, const TabCol &y) {
+    friend bool operator<(const TabCol& x, const TabCol& y) {
         return std::make_pair(x.tab_name, x.col_name) < std::make_pair(y.tab_name, y.col_name);
     }
 };
@@ -52,10 +52,10 @@ struct Value {
         raw = std::make_shared<RmRecord>(len);
         if (type == TYPE_INT) {
             assert(len == sizeof(int));
-            *(int *)(raw->data) = int_val;
+            *(int*)(raw->data) = int_val;
         } else if (type == TYPE_FLOAT) {
             assert(len == sizeof(float));
-            *(float *)(raw->data) = float_val;
+            *(float*)(raw->data) = float_val;
         } else if (type == TYPE_STRING) {
             if (len < (int)str_val.size()) {
                 throw StringOverflowError();

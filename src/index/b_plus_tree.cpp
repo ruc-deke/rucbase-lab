@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "b_plus_tree.h"
@@ -184,9 +184,8 @@ void BPlusTreeNode::insert_pairs(int pos, const char* key, const Rid* rid, int n
 int BPlusTreeNode::insert(const char* key, const Rid& value) {
     // Todo:
     // 1. 查找要插入的键值对应该插入到当前节点的哪个位置
-    // 2. 如果key重复则不插入
-    // 3. 如果key不重复则插入键值对
-    // 4. 返回完成插入操作之后的键值对数量
+    // 2. 插入键值对并保持有序；相同 key 可以并存（插在已有相同 key 的后面）
+    // 3. 返回完成插入操作之后的键值对数量
 
     return -1;
 }
@@ -209,10 +208,10 @@ void BPlusTreeNode::erase_pair(int pos) {
  * @param key 要删除的键值对key值
  * @return 完成删除操作后的键值对数量
  */
-int BPlusTreeNode::remove(const char* key) {
+int BPlusTreeNode::remove(const char* key, const Rid& rid) {
     // Todo:
-    // 1. 查找要删除键值对的位置
-    // 2. 如果要删除的键值对存在，删除键值对
+    // 1. 查找 (key, rid) 所在的位置；同一 key 可能有多条，要同时匹配 rid
+    // 2. 如果存在则删除该键值对
     // 3. 返回完成删除操作后的键值对数量
 
     return -1;
@@ -222,7 +221,7 @@ BPlusTree::BPlusTree(DiskManager* disk_manager, BufferPoolManager* buffer_pool_m
     : disk_manager_(disk_manager),
       buffer_pool_manager_(buffer_pool_manager),
       file_descriptor_(file_descriptor),
-      file_header_(nullptr) {
+      file_header_() {
     alignas(int) char buf[PAGE_SIZE]{};
     disk_manager_->read_page(file_descriptor_, INDEX_FILE_HEADER_PAGE, buf, PAGE_SIZE);
     auto file_header = std::make_unique<IndexFileHeader>();
@@ -240,10 +239,8 @@ BPlusTree::BPlusTree(DiskManager* disk_manager, BufferPoolManager* buffer_pool_m
     }
     auto physical_pages = static_cast<page_id_t>(physical_pages_64);
     disk_manager_->set_fd2pageno(file_descriptor_, std::max(file_header->page_count_, physical_pages));
-    file_header_ = file_header.release();
+    file_header_ = std::move(file_header);
 }
-
-BPlusTree::~BPlusTree() { delete file_header_; }
 
 /**
  * @brief 用于查找指定键所在的叶子结点
@@ -251,20 +248,18 @@ BPlusTree::~BPlusTree() { delete file_header_; }
  * @param operation 查找到目标键值对后要进行的操作类型
  * @param transaction 事务参数，如果不需要则默认传入nullptr
  * @param find_first 是否从叶子链表的最左端开始查找
- * @return [leaf node] and [root_is_latched] 返回目标叶子结点以及根结点是否加锁
- * @note need to Unlatch and unpin the leaf node outside!
- * 注意：用了FindLeafPage之后一定要unlatch叶结点，否则下次latch该结点会堵塞！
+ * @return 目标叶子结点（IndexNode 离开作用域即 unpin）以及根结点是否加锁
  */
-std::pair<BPlusTreeNode*, bool> BPlusTree::find_leaf_page(const char* key,
-                                                          IndexOperation operation,
-                                                          Transaction* transaction,
-                                                          bool find_first) {
+std::pair<IndexNode, bool> BPlusTree::find_leaf_page(const char* key,
+                                                     IndexOperation operation,
+                                                     Transaction* transaction,
+                                                     bool find_first) {
     // Todo:
     // 1. 获取根节点
     // 2. 从根节点开始不断向下查找目标key
     // 3. 找到包含该key值的叶子结点停止查找，并返回叶子节点
 
-    return std::make_pair(nullptr, false);
+    return {IndexNode{}, false};
 }
 
 /**
@@ -277,10 +272,9 @@ std::pair<BPlusTreeNode*, bool> BPlusTree::find_leaf_page(const char* key,
  */
 bool BPlusTree::get_value(const char* key, std::vector<Rid>* result, Transaction* transaction) {
     // Todo:
-    // 1. 获取目标key值所在的叶子结点
-    // 2. 在叶子节点中查找目标key值的位置，并读取key对应的rid
-    // 3. 把rid存入result参数中
-    // 提示：使用完buffer_pool提供的page之后，记得unpin page；记得处理并发的上锁
+    // 1. 获取目标 key 所在的叶子结点
+    // 2. 在叶子中找到该 key 的全部记录（非唯一索引可能有多条），把 rid 放入 result
+    // 提示：IndexNode 离开作用域即 unpin。
 
     return false;
 }
@@ -289,10 +283,9 @@ bool BPlusTree::get_value(const char* key, std::vector<Rid>* result, Transaction
  * @brief  将传入的一个node拆分(Split)成两个结点，在node的右边生成一个新结点new node
  * @param node 需要拆分的结点
  * @return 拆分得到的new_node
- * @note need to unpin the new node outside
- * 注意：本函数执行完毕后，原node和new node都需要在函数外面进行unpin
+ * @note 返回的 IndexNode 拥有新页的 pin；原 node 仍由调用方持有。
  */
-BPlusTreeNode* BPlusTree::split(BPlusTreeNode* node) {
+IndexNode BPlusTree::split(IndexNode& node) {
     // Todo:
     // 1. 将原结点的键值对平均分配，右半部分分裂为新的右兄弟结点
     //    需要初始化新节点的page_hdr内容
@@ -300,7 +293,7 @@ BPlusTreeNode* BPlusTree::split(BPlusTreeNode* node) {
     //    为新节点分配键值对，更新旧节点的键值对数记录
     // 3. 如果新的右兄弟结点不是叶子结点，更新该结点的所有孩子结点的父节点信息(使用BPlusTree::update_child_parent())
 
-    return nullptr;
+    return {};
 }
 
 /**
@@ -316,18 +309,18 @@ BPlusTreeNode* BPlusTree::split(BPlusTreeNode* node) {
  * @param transaction 当前事务；不需要并发控制时可为 nullptr。
  * @note 一个结点插入了键值对之后需要分裂，分裂后左半部分的键值对保留在原结点，在参数中称为old_node，
  * 右半部分的键值对分裂为新的右兄弟节点，在参数中称为new_node（参考Split函数来理解old_node和new_node）
- * @note 本函数执行完毕后，new node和old node都需要在函数外面进行unpin
+ * @note old_node / new_node 的 pin 仍由调用方的 IndexNode 持有。
  */
-void BPlusTree::insert_into_parent(BPlusTreeNode* old_node,
+void BPlusTree::insert_into_parent(IndexNode& old_node,
                                    const char* key,
-                                   BPlusTreeNode* new_node,
+                                   IndexNode& new_node,
                                    Transaction* transaction) {
     // Todo:
     // 1. 分裂前的结点（原结点, old_node）是否为根结点，如果为根结点需要分配新的root
     // 2. 获取原结点（old_node）的父亲结点
     // 3. 获取key对应的rid，并将(key, rid)插入到父亲结点
     // 4. 如果父亲结点仍需要继续分裂，则进行递归插入
-    // 提示：记得unpin page
+    // 提示：不要手动 unpin；IndexNode 析构会释放 pin。
 }
 
 /**
@@ -339,10 +332,11 @@ void BPlusTree::insert_into_parent(BPlusTreeNode* old_node,
  */
 page_id_t BPlusTree::insert_entry(const char* key, const Rid& value, Transaction* transaction) {
     // Todo:
-    // 1. 查找key值应该插入到哪个叶子节点
-    // 2. 在该叶子节点中插入键值对
-    // 3. 如果结点已满，分裂结点，并把新结点的相关信息插入父节点
-    // 提示：记得unpin page；若当前叶子节点是最右叶子节点，则需要更新file_header_.last_leaf；记得处理并发的上锁
+    // 1. 若 is_unique() 且 key 已存在，抛出 DuplicateKeyError
+    // 2. 查找 (key, value) 应该插入到哪个叶子节点
+    // 3. 在该叶子节点中插入键值对
+    // 4. 如果结点已满，分裂结点，并把新结点的相关信息插入父节点
+    // 提示：IndexNode 离开作用域即 unpin；若当前叶子是最右叶子，更新 file_header_->last_leaf_。
 
     return -1;
 }
@@ -352,12 +346,11 @@ page_id_t BPlusTree::insert_entry(const char* key, const Rid& value, Transaction
  * @param key 要删除的key值
  * @param transaction 事务指针
  */
-bool BPlusTree::delete_entry(const char* key, Transaction* transaction) {
+bool BPlusTree::delete_entry(const char* key, const Rid& rid, Transaction* transaction) {
     // Todo:
-    // 1. 获取该键值对所在的叶子结点
-    // 2. 在该叶子结点中删除键值对
-    // 3. 如果删除成功需要调用CoalesceOrRedistribute来进行合并或重分配操作，并根据函数返回结果判断是否有结点需要删除
-    // 4. 如果需要并发，并且需要删除叶子结点，则需要在事务的delete_page_set中添加删除结点的对应页面；记得处理并发的上锁
+    // 1. 获取 (key, rid) 所在的叶子结点
+    // 2. 只删除这一条键值对（同一 key 的其他记录保留）
+    // 3. 如果删除成功需要调用 coalesce_or_redistribute 处理合并或重分配
 
     return false;
 }
@@ -373,7 +366,7 @@ bool BPlusTree::delete_entry(const char* key, Transaction* transaction) {
  * If sibling's size + input page's size >= 2 * page's minsize, then redistribute.
  * Otherwise, merge(Coalesce).
  */
-bool BPlusTree::coalesce_or_redistribute(BPlusTreeNode* node, Transaction* transaction, bool* root_is_latched) {
+bool BPlusTree::coalesce_or_redistribute(IndexNode& node, Transaction* transaction, bool* root_is_latched) {
     // Todo:
     // 1. 判断node结点是否为根节点
     //    1.1 如果是根节点，需要调用AdjustRoot() 函数来进行处理，返回根节点是否需要被删除
@@ -393,7 +386,7 @@ bool BPlusTree::coalesce_or_redistribute(BPlusTreeNode* node, Transaction* trans
  * @return bool 根结点是否需要被删除
  * @note size of root page can be less than min size and this method is only called within coalesce_or_redistribute()
  */
-bool BPlusTree::adjust_root(BPlusTreeNode* old_root_node) {
+bool BPlusTree::adjust_root(IndexNode& old_root_node) {
     // Todo:
     // 1. 如果old_root_node是内部结点，并且大小为1，则直接把它的孩子更新成新的根结点
     // 2. 如果old_root_node是叶结点，且大小为0，则直接更新root page
@@ -416,7 +409,7 @@ bool BPlusTree::adjust_root(BPlusTreeNode* old_root_node) {
  * index>0，则neighbor是node前驱结点，表示：neighbor(left)  node(right)
  * 注意更新parent结点的相关kv对
  */
-void BPlusTree::redistribute(BPlusTreeNode* neighbor_node, BPlusTreeNode* node, BPlusTreeNode* parent, int index) {
+void BPlusTree::redistribute(IndexNode& neighbor_node, IndexNode& node, IndexNode& parent, int index) {
     // Todo:
     // 1. 通过index判断neighbor_node是否为node的前驱结点
     // 2. 从neighbor_node中移动一个键值对到node结点中
@@ -440,9 +433,9 @@ void BPlusTree::redistribute(BPlusTreeNode* neighbor_node, BPlusTreeNode* node, 
  * @return true means parent node should be deleted, false means no deletion happend
  * @note Assume that *neighbor_node is the left sibling of *node (neighbor -> node)
  */
-bool BPlusTree::coalesce(BPlusTreeNode** neighbor_node,
-                         BPlusTreeNode** node,
-                         BPlusTreeNode** parent,
+bool BPlusTree::coalesce(IndexNode& neighbor_node,
+                         IndexNode& node,
+                         IndexNode& parent,
                          int index,
                          Transaction* transaction,
                          bool* root_is_latched) {
@@ -463,14 +456,11 @@ bool BPlusTree::coalesce(BPlusTreeNode** neighbor_node,
  * @note IndexPosition 描述索引内部位置，Rid 描述表记录位置，二者含义不同。
  */
 Rid BPlusTree::get_rid(const IndexPosition& position) const {
-    BPlusTreeNode* node = fetch_node(position.page_no);
-    if (position.slot_no < 0 || position.slot_no >= node->get_size()) {
-        unpin_node(node, false);
+    IndexNode node = fetch_node(position.page_no);
+    if (!node.valid() || position.slot_no < 0 || position.slot_no >= node->get_size()) {
         throw IndexEntryNotFoundError();
     }
-    Rid rid = *node->get_rid(position.slot_no);
-    unpin_node(node, false);
-    return rid;
+    return *node->get_rid(position.slot_no);
 }
 
 /**
@@ -498,10 +488,11 @@ IndexPosition BPlusTree::upper_bound(const char* key) { return IndexPosition{.pa
  * @return IndexPosition
  */
 IndexPosition BPlusTree::leaf_end() const {
-    BPlusTreeNode* node = fetch_node(file_header_->last_leaf_);
-    IndexPosition position = {.page_no = file_header_->last_leaf_, .slot_no = node->get_size()};
-    unpin_node(node, false);
-    return position;
+    IndexNode node = fetch_node(file_header_->last_leaf_);
+    if (!node.valid()) {
+        throw InternalError("failed to fetch last leaf for index scan");
+    }
+    return {.page_no = file_header_->last_leaf_, .slot_no = node->get_size()};
 }
 
 /**
@@ -512,112 +503,85 @@ IndexPosition BPlusTree::leaf_end() const {
  */
 IndexPosition BPlusTree::leaf_begin() const { return {.page_no = file_header_->first_leaf_, .slot_no = 0}; }
 
-/**
- * @brief 获取一个指定结点
- *
- * @param page_no
- * @return BPlusTreeNode*
- * @note pin the page, remember to unpin it outside!
- */
-BPlusTreeNode* BPlusTree::fetch_node(int page_no) const {
-    Page* page = buffer_pool_manager_->fetch_page(PageId{.fd = file_descriptor_, .page_no = page_no});
-    auto* node = new BPlusTreeNode(file_header_, page);
-
-    return node;
+IndexNode BPlusTree::fetch_node(page_id_t page_no) const {
+    PageGuard guard = buffer_pool_manager_->fetch_page_guard(PageId{.fd = file_descriptor_, .page_no = page_no});
+    return {file_header_.get(), std::move(guard)};
 }
 
-void BPlusTree::unpin_node(BPlusTreeNode* node, bool dirty) const {
-    PageId page_id = node->get_page_id();
-    delete node;
-    bool unpinned = buffer_pool_manager_->unpin_page(page_id, dirty);
-    assert(unpinned);
-    (void)unpinned;
-}
-
-/**
- * @brief 创建一个新结点
- *
- * @return BPlusTreeNode*
- * @note pin the page, remember to unpin it outside!
- * 注意：对于Index的处理是，删除某个页面后，认为该被删除的页面是free_page
- * 而first_free_page实际上就是最新被删除的页面，初始为INDEX_NO_PAGE
- * 在最开始插入时，一直是create node，那么first_page_no一直没变，一直是INDEX_NO_PAGE
- * 与Record的处理不同，Record将未插入满的记录页认为是free_page
- */
-BPlusTreeNode* BPlusTree::create_node() {
-    BPlusTreeNode* node;
-    file_header_->page_count_++;
-
+IndexNode BPlusTree::create_node() {
     PageId new_page_id = {.fd = file_descriptor_, .page_no = INVALID_PAGE_ID};
-    // 0~2 号页已用于文件头、叶链哨兵和初始根，因此新页从 3 号开始分配。
-    Page* page = buffer_pool_manager_->new_page(&new_page_id);
-    node = new BPlusTreeNode(file_header_, page);
-    return node;
+    PageGuard guard = buffer_pool_manager_->new_page_guard(&new_page_id);
+    if (!guard) {
+        return {};
+    }
+    file_header_->page_count_++;
+    return {file_header_.get(), std::move(guard)};
 }
 
-/**
- * @brief 从node开始更新其父节点的第一个key，一直向上更新直到根节点
- *
- * @param node
- */
-void BPlusTree::update_ancestor_keys(BPlusTreeNode* node) {
-    BPlusTreeNode* curr = node;
-    bool owns_curr = false;
-    while (curr->get_parent_page_no() != INDEX_NO_PAGE) {
-        // Load its parent
-        BPlusTreeNode* parent = fetch_node(curr->get_parent_page_no());
-        int rank = parent->find_child(curr);
-        char* parent_key = parent->get_key(rank);
-        char* child_first_key = curr->get_key(0);
-        if (memcmp(parent_key, child_first_key, file_header_->key_length_) == 0) {
-            unpin_node(parent, false);
+void BPlusTree::update_ancestor_keys(IndexNode& node) {
+    page_id_t current_page = node->get_page_no();
+    while (true) {
+        IndexNode current = fetch_node(current_page);
+        if (!current.valid() || current->get_parent_page_no() == INDEX_NO_PAGE) {
             break;
         }
-        memcpy(parent_key, child_first_key, file_header_->key_length_);  // 修改了parent node
-
-        if (owns_curr) {
-            unpin_node(curr, true);
+        IndexNode parent = fetch_node(current->get_parent_page_no());
+        if (!parent.valid()) {
+            break;
         }
-        curr = parent;
-        owns_curr = true;
-    }
-
-    if (owns_curr) {
-        unpin_node(curr, true);
+        const int rank = parent->find_child(&current.node());
+        if (memcmp(parent->get_key(rank), current->get_key(0), file_header_->key_length_) == 0) {
+            break;
+        }
+        parent->set_key(rank, current->get_key(0));
+        parent.mark_dirty();
+        current_page = parent->get_page_no();
     }
 }
 
-/**
- * @brief 要删除leaf之前调用此函数，更新leaf前驱结点的next指针和后继结点的prev指针
- *
- * @param leaf 要删除的leaf
- */
-void BPlusTree::unlink_leaf(BPlusTreeNode* leaf) {
-    assert(leaf->is_leaf_page());
+// 框架辅助：调用即可。这段失败回滚是框架内部实现，作业不要模仿。
+void BPlusTree::unlink_leaf(IndexNode& leaf) {
+    if (!leaf.valid() || !leaf->is_leaf_page()) {
+        throw InternalError("unlink_leaf requires a valid leaf node");
+    }
 
-    BPlusTreeNode* prev = fetch_node(leaf->get_prev_leaf());
-    prev->set_next_leaf(leaf->get_next_leaf());
-    unpin_node(prev, true);
+    const page_id_t leaf_page = leaf->get_page_no();
+    const page_id_t prev_page = leaf->get_prev_leaf();
+    const page_id_t next_page = leaf->get_next_leaf();
 
-    BPlusTreeNode* next = fetch_node(leaf->get_next_leaf());
-    next->set_prev_leaf(leaf->get_prev_leaf());  // 注意此处是SetPrevLeaf()
-    unpin_node(next, true);
+    {
+        IndexNode prev = fetch_node(prev_page);
+        if (!prev.valid()) {
+            throw InternalError("unlink_leaf failed to fetch previous leaf");
+        }
+        prev->set_next_leaf(next_page);
+        prev.mark_dirty();
+    }
+    {
+        IndexNode next = fetch_node(next_page);
+        if (!next.valid()) {
+            IndexNode prev = fetch_node(prev_page);
+            if (prev.valid()) {
+                prev->set_next_leaf(leaf_page);
+                prev.mark_dirty();
+            }
+            throw InternalError("unlink_leaf failed to fetch next leaf; previous link rolled back");
+        }
+        next->set_prev_leaf(prev_page);
+        next.mark_dirty();
+    }
 }
 
-/**
- * @brief 记录一个索引页被删除。
- */
 void BPlusTree::record_page_deletion() { file_header_->page_count_--; }
 
-/**
- * @brief 将node的第child_idx个孩子结点的父节点置为node
- */
-void BPlusTree::update_child_parent(BPlusTreeNode* node, int child_idx) {
-    if (!node->is_leaf_page()) {
-        //  Current node is inner node, load its child and set its parent to current node
-        int child_page_no = node->value_at(child_idx);
-        BPlusTreeNode* child = fetch_node(child_page_no);
-        child->set_parent_page_no(node->get_page_no());
-        unpin_node(child, true);
+void BPlusTree::update_child_parent(IndexNode& node, int child_idx) {
+    if (!node.valid() || node->is_leaf_page()) {
+        return;
     }
+    IndexNode child = fetch_node(node->value_at(child_idx));
+    if (!child.valid()) {
+        return;
+    }
+    child->set_parent_page_no(node->get_page_no());
+    child.mark_dirty();
 }

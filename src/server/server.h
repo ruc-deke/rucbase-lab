@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 /**
@@ -57,7 +57,7 @@ public:
     Server& operator=(const Server&) = delete;
 
 private:
-    /** @brief 保存一个客户端连接的文件描述符、事务 ID 和文本结果缓冲区。 */
+    /** @brief 保存一个客户端连接的文件描述符和事务 ID。 */
     struct ClientSession;
 
     /**
@@ -111,14 +111,25 @@ private:
     /** @brief 为当前语句取得已有事务，或创建一个新的隐式事务。 */
     void prepare_transaction(ClientSession* session, Context* context);
 
-    /** @brief 按“结构化结果、文本结果、成功状态”的优先级发送语句响应。 */
+    /** @brief 事务结束后清空 Context 借用指针和会话中的旧事务 ID。 */
+    static void finish_session_transaction(ClientSession* session, Context* context);
+
+    /**
+     * @brief 隐式事务在语句失败时回滚并从表中移除；显式事务保留到 COMMIT/ABORT/断连。
+     */
+    void cleanup_failed_request(ClientSession* session, Context* context);
+
+    /** @brief 连接结束时中止仍挂在会话上的事务，释放锁和 pin。 */
+    void abort_session_transaction(ClientSession* session);
+
+    /** @brief 按“结构化结果、原始文本、成功状态”的优先级发送语句响应。 */
     static bool send_statement_result(ClientSession* session, const WireResultSet& structured_result);
 
     /** @brief 将结构化查询结果编码为 META、ROW 和 RESULT_END 帧。 */
     static bool send_query_result(int fd, const WireResultSet& result);
 
-    /** @brief 将一段文本编码为单列、单行的结果集。 */
-    static bool send_text_result(int fd, const std::string& column_name, const std::string& text);
+    /** @brief 将单列文本按 raw-text 标志发给客户端，避免被定宽表格截断。 */
+    static bool send_raw_text_result(int fd, const WireResultSet& result);
 
     /** @brief 截断过长诊断信息，并发送 ERROR 帧。 */
     static bool send_error(int fd, std::string diagnostic);

@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -14,7 +14,8 @@ constexpr int RM_MAX_RECORD_SIZE = 512;  ///< 教学版本支持的单条定长�
 
 /* 文件头，记录表数据文件的元信息，写入磁盘中文件的第0号页面 */
 struct RmFileHdr {
-    int record_size;           // 表中每条记录的大小，由于不包含变长字段，因此当前字段初始化后保持不变
+    // 表中每条记录的大小，由于不包含变长字段，因此当前字段初始化后保持不变
+    int record_size;
     int num_pages;             // 文件中分配的页面个数，包含第0号文件头页
     int num_records_per_page;  // 每个数据页最多能存储的记录数
     int first_free_page_no;    // 空闲页链表头；RM_NO_PAGE 表示链表为空

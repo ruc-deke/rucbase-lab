@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -36,7 +36,7 @@ private:
     DiskManager* disk_manager_;               ///< 非拥有指针。
     BufferPoolManager* buffer_pool_manager_;  ///< 非拥有指针。
     RmManager* rm_manager_;                   ///< 非拥有指针。
-    IndexManager* index_manager_;                   ///< 非拥有指针。
+    IndexManager* index_manager_;             ///< 非拥有指针。
 
 public:
     /**
@@ -119,7 +119,10 @@ public:
      * @brief 为指定字段创建索引。
      * @todo Lab 3：由学生实现索引创建流程。
      */
-    void create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context);
+    void create_index(const std::string& tab_name,
+                      const std::vector<std::string>& col_names,
+                      bool unique,
+                      Context* context);
 
     /**
      * @brief 按字段名删除索引。

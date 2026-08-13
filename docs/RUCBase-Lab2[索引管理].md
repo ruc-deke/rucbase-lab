@@ -21,7 +21,7 @@ B+树的结构如图：
 
 注意：
 
-（1）本系统设计的B+树索引不支持重复键，即唯一索引（索引列不包含重复的值）。
+（1）索引按 `(key, Rid)` 存放。默认同一 key 可以对应多条记录；创建时加上唯一约束后，每个 key 至多一条。单元测试用 `IndexMeta::make(表, 列, true)` 再交给 `IndexManager::create_index`；SQL 为 `CREATE UNIQUE INDEX 表名 (列名)`。唯一约束在 `insert_entry` 中检查，重复时抛出 `DuplicateKeyError`。
 
 （2）结点能容纳的键值对数量小于最大值，大于等于最小值。这相当于留出了一个多余的空位，方便B+树进行插入和删除操作。
 
@@ -54,32 +54,38 @@ class BPlusTreeNode {
 ```cpp
 class BPlusTree {
     // 辅助函数（本实验提供，无需实现）
-    BPlusTreeNode *fetch_node(int page_no) const;
-    BPlusTreeNode *create_node();
-    void update_ancestor_keys(BPlusTreeNode *node);
-    void update_child_parent(BPlusTreeNode *node, int child_idx);
-    void unlink_leaf(BPlusTreeNode *leaf);
+    IndexNode fetch_node(page_id_t page_no) const;
+    IndexNode create_node();
+    void update_ancestor_keys(IndexNode &node);
+    void update_child_parent(IndexNode &node, int child_idx);
+    void unlink_leaf(IndexNode &leaf);
     void record_page_deletion();
-}
+};
 ```
 
-- `BPlusTreeNode *fetch_node(int page_no) const;`
+- `IndexNode fetch_node(page_id_t page_no) const;`
 
-​		用于获取指定页面对应的`BPlusTreeNode`。
+  用于获取指定页面对应的结点。通过 `node->` 访问键和值，修改后调用 `node.mark_dirty()`。结点离开作用域后，对应页面会自动解除固定。
 
-- `BPlusTreeNode *create_node();`
+- `IndexNode create_node();`
 
-​		用于创建一个`BPlusTreeNode`。
+  用于创建一个新结点。
 
-- `void update_ancestor_keys(BPlusTreeNode *node);`
+```cpp
+IndexNode node = fetch_node(page_no);
+node->insert(...);
+node.mark_dirty();
+```
+
+- `void update_ancestor_keys(IndexNode &node);`
 
   用于从`node`开始更新其父节点的第一个key，一直向上更新直到根节点。
 
-- `void update_child_parent(BPlusTreeNode *node, int child_idx);`
+- `void update_child_parent(IndexNode &node, int child_idx);`
 
   用于将`node`的第`child_idx`个孩子结点的父结点指针置为`node`。
 
-- `void unlink_leaf(BPlusTreeNode *leaf);`
+- `void unlink_leaf(IndexNode &leaf);`
 
   用于删除 `leaf` 之前，更新其前驱和后继叶子页指针。
 
@@ -137,15 +143,15 @@ class BPlusTreeNode {
 
 ```cpp
 class BPlusTree {
-    // B+树的查找
-    std::pair<BPlusTreeNode *, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction,bool find_first = false);
+    std::pair<IndexNode, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction,
+                                              bool find_first = false);
     bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);
-}
+};
 ```
 
 学生需要实现以下函数：
 
-- `std::pair<BPlusTreeNode *, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction, bool find_first = false);`
+- `std::pair<IndexNode, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction, bool find_first = false);`
 
 ​		用于查找指定键所在的叶子结点。
 
@@ -157,9 +163,9 @@ class BPlusTree {
 
 - `bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);`
 
-  用于查找指定键在叶子结点中的对应的值`result`。
+  用于查找指定键在叶子结点中的对应的值`result`。非唯一索引时，同一 key 可能有多条记录，需要全部放入 `result`。
 
-  提示：可以调用`find_leaf_page()`和`leaf_lookup()`函数。
+  提示：可以调用`find_leaf_page()`、`lower_bound()` / `upper_bound()` 或 `leaf_lookup()`。
 
 ### 任务2 B+树的插入
 
@@ -189,19 +195,18 @@ class BPlusTreeNode {
 
 ​		用于在结点中插入单个键值对。函数返回插入后的键值对数量。
 
-​		注意：重复的key不插入；插入后需要保持键数组仍然有序。
+​		插入后需要保持键数组仍然有序。相同 key 可以并存，新记录插在已有相同 key 的后面。
 
-​		提示：可以调用`lower_bound()`和`insert_pairs()`函数。
+​		提示：可以调用`lower_bound()` / `upper_bound()`和`insert_pairs()`函数。结点只负责有序存放键值对，唯一约束在 `insert_entry` 里处理。
 
 #### （2）B+树的插入
 
 ```cpp
 class BPlusTree {
-    // B+树的插入
     page_id_t insert_entry(const char *key, const Rid &value, Transaction *transaction);
-    BPlusTreeNode *split(BPlusTreeNode *node);
-    void insert_into_parent(BPlusTreeNode *old_node, const char *key, BPlusTreeNode *new_node, Transaction *transaction);
-}
+    IndexNode split(IndexNode &node);
+    void insert_into_parent(IndexNode &old_node, const char *key, IndexNode &new_node, Transaction *transaction);
+};
 ```
 学生需要实现以下函数：
 
@@ -211,9 +216,11 @@ class BPlusTree {
 
 ​		首先找到要插入的叶结点，然后将键值对插入到该叶结点。如果该结点插入后已满，即size==max_size，就需要分裂成两个结点，分裂后还需要将新结点相关信息插入到父结点，不断向上递归插入直到当前结点在插入后未满或到达根结点。
 
+​		若 `is_unique()` 为真且树中已有相同 key，抛出 `DuplicateKeyError`，不要插入。
+
 ​		提示：需要调用`find_leaf_page()`、`insert()`、`split()`、`insert_into_parent()`。
 
-- `BPlusTreeNode *split(BPlusTreeNode *node);`
+- `IndexNode split(IndexNode &node);`
 
 ​		用于分裂结点。函数返回分裂产生的新结点。
 
@@ -221,7 +228,7 @@ class BPlusTree {
 
 ​		注意：如果分裂的结点是叶结点，要更新叶结点的后继指针。如果分裂的结点是内部结点，要更新其孩子结点的父指针。
 
-- `void insert_into_parent(BPlusTreeNode *old_node, const char *key, BPlusTreeNode *new_node, Transaction *transaction);`
+- `void insert_into_parent(IndexNode &old_node, const char *key, IndexNode &new_node, Transaction *transaction);`
 
 ​		用于结点分裂后，更新父结点中的键值对。
 
@@ -244,7 +251,7 @@ B+树插入的整体流程如下图：
 class BPlusTreeNode {
     // 结点内的删除
     void erase_pair(int pos);
-    int remove(const char *key);
+    int remove(const char *key, const Rid &rid);
 }
 ```
 
@@ -256,9 +263,9 @@ class BPlusTreeNode {
 
   提示：可以调用`memmove()`函数。
 
-- `int remove(const char *key);`
+- `int remove(const char *key, const Rid &rid);`
 
-​		用于在结点中删除指定key的键值对。函数返回删除后的键值对数量。
+​		用于在结点中删除指定的 `(key, rid)`。同一 key 可能有多条，必须同时匹配 rid。函数返回删除后的键值对数量。
 
 ​		提示：可以调用`lower_bound()`和`erase_pair()`函数。
 
@@ -266,26 +273,26 @@ class BPlusTreeNode {
 
 ```cpp
 class BPlusTree {
-    // B+树的删除
-    bool delete_entry(const char *key, Transaction *transaction);
-    bool coalesce_or_redistribute(BPlusTreeNode *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);
-    bool coalesce(BPlusTreeNode **neighbor_node, BPlusTreeNode **node, BPlusTreeNode **parent, int index,Transaction *transaction, bool *root_is_latched);
-    void redistribute(BPlusTreeNode *neighbor_node, BPlusTreeNode *node, BPlusTreeNode *parent, int index);
-    bool adjust_root(BPlusTreeNode *old_root_node);
-}
+    bool delete_entry(const char *key, const Rid &rid, Transaction *transaction);
+    bool coalesce_or_redistribute(IndexNode &node, Transaction *transaction = nullptr, bool *root_is_latched = nullptr);
+    bool coalesce(IndexNode &neighbor_node, IndexNode &node, IndexNode &parent, int index, Transaction *transaction,
+                  bool *root_is_latched);
+    void redistribute(IndexNode &neighbor_node, IndexNode &node, IndexNode &parent, int index);
+    bool adjust_root(IndexNode &old_root_node);
+};
 ```
 
 学生需要实现以下函数：
 
-- `bool delete_entry(const char *key, Transaction *transaction);`
+- `bool delete_entry(const char *key, const Rid &rid, Transaction *transaction);`
 
-​		用于删除B+树中含有指定`key`的键值对。
+​		用于删除B+树中的一条 `(key, rid)`。
 
-​		首先找到要删除的叶结点，直接删除对应键值对。如果删除后该结点小于半满，则需要合并（Coalesce）或重分配（Redistribute）。
+​		首先找到该键值对所在的叶结点，只删除这一条。如果删除后该结点小于半满，则需要合并（Coalesce）或重分配（Redistribute）。
 
 ​		提示：需要调用`find_leaf_page()`、`remove()`、`coalesce_or_redistribute()`。
 
-- `bool coalesce_or_redistribute(BPlusTreeNode *node, Transaction *transaction = nullptr,bool *root_is_latched = nullptr);`
+- `bool coalesce_or_redistribute(IndexNode &node, Transaction *transaction = nullptr, bool *root_is_latched = nullptr);`
 
   用于处理合并和重分配的逻辑。函数返回是否有结点被删除（无论是`node`还是它的兄弟结点被删除）。传出参数`root_is_latched`记录根结点是否被上锁，该参数将在任务3使用，在本任务2中不使用。
 
@@ -293,7 +300,7 @@ class BPlusTree {
 
 ​		提示：需要调用`coalesce()`、`redistribute()`、`adjust_root()`。
 
-- `bool coalesce(BPlusTreeNode **neighbor_node, BPlusTreeNode **node, BPlusTreeNode **parent, int index,Transaction *transaction, bool *root_is_latched);`
+- `bool coalesce(IndexNode &neighbor_node, IndexNode &node, IndexNode &parent, int index, Transaction *transaction, bool *root_is_latched);`
 
 ​		将`node`向前合并到其前驱`neighbor_node`。函数返回`node`的父结点`parent`否需要被删除。
 
@@ -303,7 +310,7 @@ class BPlusTree {
 
 ​		提示：需要调用`insert_pairs()`、`erase_pair()`、`update_child_parent()`、`record_page_deletion()`。以及`coalesce_or_redistribute()`进行继续递归。
 
-- `void redistribute(BPlusTreeNode *neighbor_node, BPlusTreeNode *node, BPlusTreeNode *parent, int index);`
+- `void redistribute(IndexNode &neighbor_node, IndexNode &node, IndexNode &parent, int index);`
 
 ​		重新分配`node`和兄弟结点`neighbor_node`的键值对。参数`index`表示`node`在parent中的rid_idx，其决定`neighbor_node`是否为`node`的前驱结点。
 
@@ -311,7 +318,7 @@ class BPlusTree {
 
 ​		提示：需要调用`insert_pairs()`、`erase_pair()`、`update_child_parent()`。
 
-- `bool adjust_root(BPlusTreeNode *old_root_node);`
+- `bool adjust_root(IndexNode &old_root_node);`
 
 ​		用于根结点被删除了一个键值对之后的处理。函数返回根结点是否需要被删除。
 
@@ -333,41 +340,20 @@ B+树删除的整体流程如下图：
 
 学生可以选择实现并发的粒度，选择下面两种并发粒度的任意一种进行实现即可。
 
-##### 方法一、粗粒度并发（Tree级）
+##### 方法一、粗粒度并发（推荐）
 
-比较简单的粗粒度实现方法是对整个树加锁，即让查找、插入、删除三者操作互斥。
+对整棵树加一把锁，让查找、插入、删除互斥。实现方式类似于实验一缓冲池管理器的并发控制，足以通过本任务测试。
 
-提醒：这种方法的实现类似于 实验一任务1.3 缓冲池管理器的并发实现。
+##### 方法二、细粒度并发（选做）
 
-##### 方法二、细粒度并发（Page级）【选做】
+请自行学习 B+ 树索引并发算法：**蟹行协议（crabbing protocol）**。建议先用方法一通过测试，再尝试本方法。
 
-请自行学习B+树索引并发算法：**蟹行协议（crabbing protocol）**。
+蟹行协议用读写锁控制对树结点的访问：向下遍历时，先锁住孩子结点，再决定是否释放父结点的锁。
 
-主要需要修改`BPlusTree`类中以下函数的实现逻辑：
+- 查找：进入每一层时先加读锁，再释放父结点的读锁。
+- 插入 / 删除：进入每一层时先加写锁；如果当前结点是“安全”的，再释放所有祖先结点的写锁。安全是指：再插入一个键后仍然未满，或再删除一个键后仍然不低于半满。
 
-（1）`find_leaf_page()`
-
-​		此函数十分重要，在B+树的查找/插入/删除操作中均被调用。其基本功能在于根据指定`key`从根结点向下查找到含有该`key`的叶结点。
-
-​		引入并发控制算法，以 **蟹行协议（crabbing protocol）** 为例，其使用读写锁来控制对树结点（索引页面）的访问和修改，并规定向下遍历树时 获取/释放 锁的机制：每个线程都是以自上而下的方式获取锁，从根结点开始获取锁，然后向下进入孩子结点并获取锁，再选择是否释放父结点的锁。
-
-​		参数`operation`表示操作类型。对于查找操作，进入树的每一层结点都是先在当前结点获取读锁，然后释放父结点读锁；对于插入和删除操作，进入树的每一层结点都是先在当前结点获取写锁，如果当前结点“安全”才释放所有祖先节点的写锁。“安全”结点的定义是：结点插入一个键值对后仍然未满(size+1<max_size)；或者结点删除一个键值对后仍然超过或等于半满(size-1>=min_size)；注意，根结点的min_size=2，其余结点的min_size=max_size/2。
-
-​		参数`transaction`表示事务，其中有一个数据结构`page_set_`用于存储从根结点到当前结点经过的所有祖先结点（索引页面）。实际上，只有插入或删除操作需要记录当前结点的所有祖先结点，然后判断如果当前结点是“安全”的，就遍历`transaction`的`page_set_`中存放的所有页面，依次释放这些页面的写锁。
-
-​		函数返回值修改为`std::pair<BPlusTreeNode*, bool>`，其两部分分别表示找到的叶结点以及根结点是否被锁住。在`BPlusTree`类中设计了一个mutex锁（互斥锁）`root_latch_`用于对根结点进行上锁。对于读操作（查找），不需要对根结点上锁，因为蟹行协议允许多个线程同时读B+树；但对于写操作（插入/删除），则需要上锁，直到确定根结点不会被修改或者已经将根结点修改完毕，才能释放锁，从而防止本线程写操作未完成而其他线程又进行读的错误。最后用一个bool类型的变量表示根结点是否被上锁。
-
-（2）查找函数`get_value()`
-
-​		与之前实现不同的是，此处经过`find_leaf_page()`找到的叶结点被加上了读锁，且其祖先结点无任何读锁。最后释放叶结点的读锁即可。
-
-（3）插入函数`insert_entry()`、`split()`、`insert_into_parent()`
-
-删除函数`delete_entry()`、`coalesce_or_redistribute()`、`coalesce()`、`redistribute()`、`adjust_root()`
-
-​		当要插入或删除某个键值对时，首先获取根结点的写锁， 在其孩子结点上获取写锁。然后判断孩子结点是否“安全”，只有孩子结点安全才能释放它的所有祖先结点的写锁。不断重复这一过程，直到找到叶结点，最后叶结点获取的是写锁。
-
-​		注意释放结点写锁的时机：对于每一层结点，都是确定其安全之后，才能释放其上层的写锁。
+可以自行保存从根到当前结点经过的祖先。`find_leaf_page` 的返回值是 `std::pair<IndexNode, bool>`，分别表示找到的叶结点和当前是否仍持有根锁。
 
 ### 实验计分
 
@@ -387,8 +373,6 @@ cmake --build --preset debug -j 4
 ctest --preset lab2
 ```
 
-三个 B+ 树测试共用一个只读 invariant checker。它会在小规模操作后或大批量操作的分批边界检查节点占用率、键顺序、父子指针、子树范围、叶子深度、叶链，以及非空树的 `page_count` 与可达节点数是否一致。checker 仅能在没有线程正在修改树时运行；并发用例会在所有 worker `join` 后检查。测试还会直接比较操作前后的 pin 快照，以发现未释放的页面引用。
-
 注意：
-1. 在本实验中的所有测试只调用`get_value()`、`insert_entry()`、`delete_entry()`这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
+1. 本实验的测试只调用 `get_value()`、`insert_entry()`、`delete_entry(key, rid, txn)` 这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
 2. 索引单元测试直接使用 `IndexManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。

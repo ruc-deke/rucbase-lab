@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -7,19 +7,19 @@
 #include <cstring>
 #include <exception>
 #include <string>
+#include <utility>
 #include <vector>
 
 class RMDBError : public std::exception {
 public:
-    RMDBError() : _msg("Error: ") {}
+    RMDBError() : RMDBError(std::string{}) {}
 
-    explicit RMDBError(const std::string& msg) : _msg("Error: " + msg) {}
+    explicit RMDBError(std::string message) : message_("Error: " + std::move(message)) {}
 
-    const char* what() const noexcept override { return _msg.c_str(); }
+    const char* what() const noexcept override { return message_.c_str(); }
 
-    std::size_t get_msg_len() const noexcept { return _msg.length(); }
-
-    std::string _msg;
+private:
+    std::string message_;
 };
 
 class InternalError : public RMDBError {
@@ -67,7 +67,8 @@ public:
 
 class InvalidRecordSizeError : public RMDBError {
 public:
-    explicit InvalidRecordSizeError(int record_size) : RMDBError("Invalid record size: " + std::to_string(record_size)) {}
+    explicit InvalidRecordSizeError(int record_size)
+        : RMDBError("Invalid record size: " + std::to_string(record_size)) {}
 };
 
 // IX errors
@@ -79,6 +80,11 @@ public:
 class IndexEntryNotFoundError : public RMDBError {
 public:
     IndexEntryNotFoundError() : RMDBError("Index entry not found") {}
+};
+
+class DuplicateKeyError : public RMDBError {
+public:
+    DuplicateKeyError() : RMDBError("Duplicate key on unique index") {}
 };
 
 // SM errors
@@ -112,28 +118,32 @@ public:
     explicit ColumnExistsError(const std::string& col_name) : RMDBError("Column already exists: " + col_name) {}
 };
 
+namespace rucbase::error_detail {
+
+inline std::string format_index_name(const std::string& tab_name, const std::vector<std::string>& col_names) {
+    std::string name = tab_name + ".(";
+    for (size_t i = 0; i < col_names.size(); ++i) {
+        if (i > 0) {
+            name += ", ";
+        }
+        name += col_names[i];
+    }
+    name += ')';
+    return name;
+}
+
+}  // namespace rucbase::error_detail
+
 class IndexNotFoundError : public RMDBError {
 public:
-    IndexNotFoundError(const std::string& tab_name, const std::vector<std::string>& col_names) {
-        _msg += "Index not found: " + tab_name + ".(";
-        for (size_t i = 0; i < col_names.size(); ++i) {
-            if (i > 0) _msg += ", ";
-            _msg += col_names[i];
-        }
-        _msg += ')';
-    }
+    IndexNotFoundError(const std::string& tab_name, const std::vector<std::string>& col_names)
+        : RMDBError("Index not found: " + rucbase::error_detail::format_index_name(tab_name, col_names)) {}
 };
 
 class IndexExistsError : public RMDBError {
 public:
-    IndexExistsError(const std::string& tab_name, const std::vector<std::string>& col_names) {
-        _msg += "Index already exists: " + tab_name + ".(";
-        for (size_t i = 0; i < col_names.size(); ++i) {
-            if (i > 0) _msg += ", ";
-            _msg += col_names[i];
-        }
-        _msg += ')';
-    }
+    IndexExistsError(const std::string& tab_name, const std::vector<std::string>& col_names)
+        : RMDBError("Index already exists: " + rucbase::error_detail::format_index_name(tab_name, col_names)) {}
 };
 
 // QL errors

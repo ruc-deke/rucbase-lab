@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "portal/portal.h"
@@ -24,7 +24,7 @@ namespace {
 
 std::vector<Rid> collect_rids(AbstractExecutor* scan) {
     std::vector<Rid> rids;
-    for (scan->beginTuple(); !scan->is_end(); scan->nextTuple()) {
+    for (scan->begin_tuple(); !scan->is_end(); scan->next_tuple()) {
         rids.push_back(scan->rid());
     }
     return rids;

@@ -1,51 +1,33 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "transaction_manager.h"
 
-std::unordered_map<txn_id_t, Transaction *> TransactionManager::txn_map = {};
-
 /**
- * @description: 事务的开始方法
- * @return {Transaction*} 开始事务的指针
- * @param {Transaction*} txn 事务指针，空指针代表需要创建新事务，否则开始已有事务
- * @param {LogManager*} log_manager 日志管理器指针
+ * @brief 创建新事务并由 *this 独占。
+ * @note 不要从外部传入 Transaction*。所有事务都必须由本函数 make_unique 后放入 txn_map_。
  */
-Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manager) {
+Transaction* TransactionManager::begin(LogManager* log_manager) {
     // Todo:
-    // 1. 判断传入事务参数是否为空指针
-    // 2. 如果为空指针，创建新事务
-    // 3. 把开始事务加入到全局事务表中
-    // 4. 返回当前事务指针
-    
+    // 1. 分配新的 txn_id，make_unique<Transaction>。
+    // 2. 把 unique_ptr 移入 txn_map_。
+    // 3. 返回表中的借用指针。
+
     return nullptr;
 }
 
 /**
- * @description: 事务的提交方法
- * @param {Transaction*} txn 需要提交的事务
- * @param {LogManager*} log_manager 日志管理器指针
+ * @brief 事务的提交方法。
  */
 void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // Todo:
-    // 1. 如果存在未提交的写操作，提交所有的写操作
-    // 2. 释放所有锁
-    // 3. 释放事务相关资源，eg.锁集
-    // 4. 把事务日志刷入磁盘中
-    // 5. 更新事务状态
-
+    // 释放锁，清理写集，将事务从 txn_map_ 移除（unique_ptr 析构即释放对象）。
 }
 
 /**
- * @description: 事务的终止（回滚）方法
- * @param {Transaction *} txn 需要回滚的事务
- * @param {LogManager} *log_manager 日志管理器指针
+ * @brief 事务的终止（回滚）方法。
  */
-void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
+void TransactionManager::abort(Transaction* txn, LogManager* log_manager) {
     // Todo:
-    // 1. 回滚所有写操作
-    // 2. 释放所有锁
-    // 3. 清空事务相关资源，eg.锁集
-    // 4. 把事务日志刷入磁盘中
-    // 5. 更新事务状态
+    // 按 write_set() 中的值记录撤销写操作，释放锁，再从 txn_map_ 移除事务。
 }

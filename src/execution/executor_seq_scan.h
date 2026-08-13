@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -20,25 +20,25 @@
 #include "system/sm_meta.h"
 
 class SeqScanExecutor : public AbstractExecutor {
-   private:
+private:
     std::string tab_name_;              // 表的名称
     std::vector<Condition> conds_;      // scan的条件
-    RmFileHandle *fh_;                  // 表的数据文件句柄
+    RmFileHandle* fh_;                  // 表的数据文件句柄
     std::vector<ColMeta> cols_;         // scan后生成的记录的字段
     size_t len_;                        // scan后生成的每条记录的长度
     std::vector<Condition> fed_conds_;  // 同conds_，两个字段相同
 
     Rid rid_{.page_no = INVALID_PAGE_ID, .slot_no = -1};
-    std::unique_ptr<RecScan> scan_;     // table_iterator
+    std::unique_ptr<RecScan> scan_;  // table_iterator
 
-    SmManager *sm_manager_;
+    SmManager* sm_manager_;
 
-   public:
-    SeqScanExecutor(SmManager *sm_manager, std::string tab_name, std::vector<Condition> conds, Context *context) {
+public:
+    SeqScanExecutor(SmManager* sm_manager, std::string tab_name, std::vector<Condition> conds, Context* context) {
         sm_manager_ = sm_manager;
         tab_name_ = std::move(tab_name);
         conds_ = std::move(conds);
-        TabMeta &tab = sm_manager_->db_.get_table(tab_name_);
+        TabMeta& tab = sm_manager_->db_.get_table(tab_name_);
         fh_ = sm_manager_->fhs_.at(tab_name_).get();
         cols_ = tab.cols;
         len_ = cols_.back().offset + cols_.back().len;
@@ -52,36 +52,28 @@ class SeqScanExecutor : public AbstractExecutor {
      * @brief 构建表迭代器scan_,并开始迭代扫描,直到扫描到第一个满足谓词条件的元组停止,并赋值给rid_
      *
      */
-    void beginTuple() override {
-        throw NotImplementedError("SeqScanExecutor::beginTuple");
-    }
+    void begin_tuple() override { throw NotImplementedError("SeqScanExecutor::begin_tuple"); }
 
     /**
      * @brief 从当前scan_指向的记录开始迭代扫描,直到扫描到第一个满足谓词条件的元组停止,并赋值给rid_
      *
      */
-    void nextTuple() override {
-        throw NotImplementedError("SeqScanExecutor::nextTuple");
-    }
+    void next_tuple() override { throw NotImplementedError("SeqScanExecutor::next_tuple"); }
 
     /**
      * @brief 返回下一个满足扫描条件的记录
      *
      * @return std::unique_ptr<RmRecord>
      */
-    std::unique_ptr<RmRecord> Next() override {
-        throw NotImplementedError("SeqScanExecutor::Next");
-    }
+    std::unique_ptr<RmRecord> next() override { throw NotImplementedError("SeqScanExecutor::next"); }
 
-    size_t tupleLen() const override { throw NotImplementedError("Lab 3 sequential scan executor"); }
+    size_t tuple_len() const override { throw NotImplementedError("Lab 3 sequential scan executor"); }
 
-    const std::vector<ColMeta> &cols() const override {
+    const std::vector<ColMeta>& cols() const override { throw NotImplementedError("Lab 3 sequential scan executor"); }
+
+    ColMeta get_col_offset(const TabCol& target) override {
         throw NotImplementedError("Lab 3 sequential scan executor");
     }
 
-    ColMeta get_col_offset(const TabCol &target) override {
-        throw NotImplementedError("Lab 3 sequential scan executor");
-    }
-
-    Rid &rid() override { return rid_; }
+    Rid& rid() override { return rid_; }
 };

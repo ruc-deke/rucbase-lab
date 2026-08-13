@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -15,7 +15,7 @@
 #include "system/sm_manager.h"
 #include "system/sm_meta.h"
 
-typedef enum PlanTag{
+typedef enum PlanTag {
     T_Invalid = 1,
     T_Help,
     T_ShowDatabase,
@@ -166,15 +166,21 @@ public:
 
 class DDLPlan : public Plan {
 public:
-    DDLPlan(PlanTag tag, std::string tab_name, std::vector<std::string> col_names, std::vector<ColDef> cols)
+    DDLPlan(PlanTag tag,
+            std::string tab_name,
+            std::vector<std::string> col_names,
+            std::vector<ColDef> cols,
+            bool unique = false)
         : Plan(tag),
           tab_name_(std::move(tab_name)),
           tab_col_names_(std::move(col_names)),
-          cols_(std::move(cols)) {}
+          cols_(std::move(cols)),
+          unique_(unique) {}
 
     std::string tab_name_;
     std::vector<std::string> tab_col_names_;
     std::vector<ColDef> cols_;
+    bool unique_{false};
 };
 
 class OtherPlan : public Plan {

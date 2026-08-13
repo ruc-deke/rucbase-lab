@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "execution_manager.h"
@@ -6,7 +6,9 @@
 #include <algorithm>
 #include <span>
 
+#include "common/config.h"
 #include "common/context.h"
+#include "common/wire_result.h"
 #include "executor_delete.h"
 #include "executor_index_scan.h"
 #include "executor_insert.h"
@@ -28,7 +30,7 @@ constexpr char help_info[] =
     "  DESC table_name\n"
     "  CREATE TABLE table_name (column_name type [, column_name type ...])\n"
     "  DROP TABLE table_name\n"
-    "  CREATE INDEX table_name (column_name)\n"
+    "  CREATE [UNIQUE] INDEX table_name (column_name)\n"
     "  DROP INDEX table_name (column_name)\n"
     "  INSERT INTO table_name VALUES (value [, value ...])\n"
     "  DELETE FROM table_name [WHERE where_clause]\n"
@@ -47,8 +49,6 @@ constexpr char help_info[] =
     "selector:\n"
     "  {* | column [, column ...]}\n";
 
-constexpr int help_info_size = static_cast<int>(sizeof(help_info) - 1);
-
 // 主要负责执行DDL语句
 void QlManager::run_mutli_query(const Plan& plan, Context* context) const {
     if (const auto* ddl_plan = dynamic_cast<const DDLPlan*>(&plan)) {
@@ -62,7 +62,7 @@ void QlManager::run_mutli_query(const Plan& plan, Context* context) const {
                 break;
             }
             case T_CreateIndex: {
-                sm_manager_->create_index(ddl_plan->tab_name_, ddl_plan->tab_col_names_, context);
+                sm_manager_->create_index(ddl_plan->tab_name_, ddl_plan->tab_col_names_, ddl_plan->unique_, context);
                 break;
             }
             case T_DropIndex: {
@@ -81,8 +81,7 @@ void QlManager::run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* con
     if (const auto* utility_plan = dynamic_cast<const OtherPlan*>(&plan)) {
         switch (utility_plan->tag) {
             case T_Help: {
-                memcpy(context->data_send_ + *(context->offset_), help_info, help_info_size);
-                *(context->offset_) = help_info_size;
+                context->result().set_raw_text("Help", help_info);
                 break;
             }
             case T_ShowDatabase: {
@@ -98,28 +97,31 @@ void QlManager::run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* con
                 break;
             }
             case T_Transaction_begin: {
-                if (context->txn_ == nullptr) {
+                if (context->transaction() == nullptr) {
                     throw NotImplementedError("Lab 4 transaction control");
                 }
-                // 显示开启一个事务
-                context->txn_->set_txn_mode(true);
+                context->transaction()->set_txn_mode(true);
                 break;
             }
             case T_Transaction_commit: {
-                if (context->txn_ == nullptr) {
+                if (context->transaction() == nullptr) {
                     throw NotImplementedError("Lab 4 transaction control");
                 }
-                context->txn_ = txn_mgr_->get_transaction(*txn_id);
-                txn_mgr_->commit(context->txn_, context->log_mgr_);
+                context->set_transaction(txn_mgr_->get_transaction(*txn_id));
+                txn_mgr_->commit(context->transaction(), context->log_manager());
+                context->set_transaction(nullptr);
+                *txn_id = INVALID_TXN_ID;
                 break;
             }
             case T_Transaction_rollback:
             case T_Transaction_abort: {
-                if (context->txn_ == nullptr) {
+                if (context->transaction() == nullptr) {
                     throw NotImplementedError("Lab 4 transaction control");
                 }
-                context->txn_ = txn_mgr_->get_transaction(*txn_id);
-                txn_mgr_->abort(context->txn_, context->log_mgr_);
+                context->set_transaction(txn_mgr_->get_transaction(*txn_id));
+                txn_mgr_->abort(context->transaction(), context->log_manager());
+                context->set_transaction(nullptr);
+                *txn_id = INVALID_TXN_ID;
                 break;
             }
             default:
@@ -130,7 +132,7 @@ void QlManager::run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* con
 }
 
 // 执行 select 语句，结构化结果通过当前请求的 Wire 响应返回。
-void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot,
+void QlManager::select_from(std::unique_ptr<AbstractExecutor> executor_tree_root,
                             const std::vector<TabCol>& sel_cols,
                             Context* context) {
     std::vector<std::string> captions;
@@ -139,44 +141,20 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot,
         captions.push_back(sel_col.col_name);
     }
 
-    // Build typed wire result (META/ROW) from executor schema + tuples.
-    // Wire clients format the typed result; data_send is not used for SELECT.
-    context->wire_result_ = WireResultSet{};
-    context->wire_result_.has_query_result = true;
-    const auto& proj_cols = executorTreeRoot->cols();
-    context->wire_result_.columns.reserve(proj_cols.size());
+    const auto& proj_cols = executor_tree_root->cols();
+    std::vector<WireResultColumn> columns;
+    columns.reserve(proj_cols.size());
     for (size_t i = 0; i < proj_cols.size(); ++i) {
-        WireResultColumn column{.name = i < captions.size() ? captions[i] : proj_cols[i].name,
-                                .type = proj_cols[i].type};
-        context->wire_result_.columns.push_back(std::move(column));
+        columns.push_back({.name = i < captions.size() ? captions[i] : proj_cols[i].name, .type = proj_cols[i].type});
     }
-    size_t schema_bytes = context->wire_result_.columns.size() * sizeof(WireResultColumn);
-    if (schema_bytes > WireResultSet::kMaxBufferedBytes) {
-        throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
-    }
-    for (const auto& column : context->wire_result_.columns) {
-        if (column.name.size() > WireResultSet::kMaxBufferedBytes - schema_bytes) {
-            throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
-        }
-        schema_bytes += column.name.size();
-    }
-    if (!context->wire_result_.try_account(schema_bytes)) {
-        throw InternalError("query result schema exceeds the 16 MiB teaching wire buffer");
-    }
+    context->result().set_columns(std::move(columns));
 
-    // Execute the query plan and collect the bounded typed result.
-    for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
-        auto Tuple = executorTreeRoot->Next();
+    for (executor_tree_root->begin_tuple(); !executor_tree_root->is_end(); executor_tree_root->next_tuple()) {
+        auto tuple = executor_tree_root->next();
         std::vector<WireResultCell> wire_row;
-        // Account for the retained row vector, its cells, and conservative
-        // growth slack in the outer rows vector.
-        size_t wire_row_bytes = 2 * sizeof(std::vector<WireResultCell>) + proj_cols.size() * sizeof(WireResultCell);
-        if (wire_row_bytes > WireResultSet::kMaxBufferedBytes) {
-            throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
-        }
         wire_row.reserve(proj_cols.size());
         for (auto& col : proj_cols) {
-            char* rec_buf = Tuple->data + col.offset;
+            char* rec_buf = tuple->data + col.offset;
             WireResultCell cell{};
             cell.type = col.type;
             if (col.type == TYPE_INT) {
@@ -184,24 +162,15 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot,
             } else if (col.type == TYPE_FLOAT) {
                 std::memcpy(&cell.float_val, rec_buf, sizeof(cell.float_val));
             } else if (col.type == TYPE_STRING) {
-                // C++20：std::span 是「不拥有内存」的连续视图，这里表示定长 CHAR 字段字节。
-                // ranges::find 在视图内找 '\0'；等价于 std::find(rec_buf, rec_buf+len, '\0')。
                 const auto field = std::span(rec_buf, static_cast<size_t>(col.len));
                 const auto string_end = std::ranges::find(field, '\0');
                 cell.str_val.assign(field.begin(), string_end);
-                if (cell.str_val.size() > WireResultSet::kMaxBufferedBytes - wire_row_bytes) {
-                    throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
-                }
-                wire_row_bytes += cell.str_val.size();
             }
             wire_row.push_back(std::move(cell));
         }
-        if (!context->wire_result_.try_account(wire_row_bytes)) {
-            throw InternalError("query result exceeds the 16 MiB teaching wire buffer");
-        }
-        context->wire_result_.rows.push_back(std::move(wire_row));
+        context->result().add_row(std::move(wire_row));
     }
 }
 
 // 执行DML语句
-void QlManager::run_dml(std::unique_ptr<AbstractExecutor> exec) { exec->Next(); }
+void QlManager::run_dml(std::unique_ptr<AbstractExecutor> exec) { exec->next(); }

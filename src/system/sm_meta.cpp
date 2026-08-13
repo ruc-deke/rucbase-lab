@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "system/sm_meta.h"
@@ -129,13 +129,19 @@ IndexMeta read_index(const Json& value, TabMeta& table) {
 
     IndexMeta index;
     index.tab_name = table.name;
+    if (value.contains("unique")) {
+        const Json& unique_value = value.at("unique");
+        if (!unique_value.is_boolean()) {
+            invalid_meta();
+        }
+        index.unique = unique_value.get<bool>();
+    }
     for (const auto& name : names) {
         auto column = table.get_col(name);
         column->index = true;
-        index.col_tot_len += column->len;
         index.cols.push_back(*column);
     }
-    index.col_num = static_cast<int>(index.cols.size());
+    index.rebuild_derived();
     return index;
 }
 
@@ -199,6 +205,7 @@ Json write_table(const TabMeta& table) {
         }
         Json value = Json::object();
         value["columns"] = std::move(names);
+        value["unique"] = index.unique;
         indexes.push_back(std::move(value));
     }
 

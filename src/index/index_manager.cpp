@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "index_manager.h"
@@ -48,7 +48,8 @@ bool IndexManager::exists(const std::string& table_name, const std::vector<std::
     return disk_manager_->is_file(make_index_name(table_name, index_columns));
 }
 
-void IndexManager::create_index(const std::string& table_name, const std::vector<ColMeta>& index_columns) {
+void IndexManager::create_index(const IndexMeta& index) {
+    const std::vector<ColMeta>& index_columns = index.cols;
     // 为插入和删除临时多保留一个槽位：header + (key + Rid) * (order + 1) <= PAGE_SIZE。
     if (index_columns.empty() || index_columns.size() > IndexFileHeader::max_serialized_columns()) {
         throw InternalError("Invalid number of index columns");
@@ -91,7 +92,7 @@ void IndexManager::create_index(const std::string& table_name, const std::vector
     const int keys_region_size = IndexFileHeader::calculate_keys_region_size(tree_order, key_length);
     IndexFileHeader file_header(INDEX_NO_PAGE, INDEX_INITIAL_PAGE_COUNT, INDEX_INITIAL_ROOT_PAGE, column_count,
                                 key_length, tree_order, keys_region_size, INDEX_INITIAL_ROOT_PAGE,
-                                INDEX_INITIAL_ROOT_PAGE);
+                                INDEX_INITIAL_ROOT_PAGE, index.unique);
     for (const auto& column : index_columns) {
         file_header.column_types_.push_back(column.type);
         file_header.column_lengths_.push_back(column.len);
@@ -101,7 +102,7 @@ void IndexManager::create_index(const std::string& table_name, const std::vector
     std::vector<char> header_data(file_header.serialized_size_);
     file_header.serialize(header_data.data());
 
-    const std::string index_name = make_index_name(table_name, index_columns);
+    const std::string index_name = make_index_name(index.tab_name, index_columns);
     disk_manager_->create_file(index_name);
     const int file_descriptor = disk_manager_->open_file(index_name);
     disk_manager_->write_page(file_descriptor, INDEX_FILE_HEADER_PAGE, header_data.data(),

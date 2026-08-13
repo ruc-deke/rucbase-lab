@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -103,7 +103,8 @@ public:
         table_name_ = nullptr;
         table_name_size_ = 0;
     }
-    InsertLogRecord(txn_id_t txn_id, RmRecord& insert_value, Rid& rid, const std::string& table_name) : InsertLogRecord() {
+    InsertLogRecord(txn_id_t txn_id, RmRecord& insert_value, Rid& rid, const std::string& table_name)
+        : InsertLogRecord() {
         log_tid_ = txn_id;
         insert_value_ = insert_value;
         rid_ = rid;

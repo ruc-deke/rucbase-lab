@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -49,8 +49,9 @@ public:
         while (true) {
             // 一个 bit 对应一个 slot，除以 8 并向上取整得到 bitmap 的字节数。
             int bitmap_size = (num_records + BITMAP_WIDTH - 1) / BITMAP_WIDTH;
-            int required_bytes =
-                Page::OFFSET_PAGE_HDR + static_cast<int>(sizeof(RmPageHdr)) + bitmap_size + num_records * record_size;
+            const int record_bytes = num_records * record_size;
+            int required_bytes = static_cast<int>(Page::OFFSET_PAGE_HDR) + static_cast<int>(sizeof(RmPageHdr)) +
+                                 bitmap_size + record_bytes;
             if (required_bytes <= PAGE_SIZE) {
                 file_hdr.num_records_per_page = num_records;
                 file_hdr.bitmap_size = bitmap_size;

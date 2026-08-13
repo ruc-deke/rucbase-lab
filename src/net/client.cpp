@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "net/client.h"
@@ -23,7 +23,7 @@ namespace rucbase::wire {
 namespace {
 
 class UniqueFd {
-   public:
+public:
     UniqueFd() = default;
     explicit UniqueFd(int fd) : fd_(fd) {}
     ~UniqueFd() {
@@ -58,7 +58,7 @@ class UniqueFd {
         fd_ = fd;
     }
 
-   private:
+private:
     int fd_ = -1;
 };
 
@@ -73,8 +73,10 @@ std::string ErrnoMessage(const std::string& prefix, int error_number) {
     return prefix + ": " + std::strerror(error_number);
 }
 
-ClientStatus ConnectAddress(const sockaddr* address, socklen_t address_length,
-                            std::chrono::steady_clock::time_point deadline, UniqueFd* connected) {
+ClientStatus ConnectAddress(const sockaddr* address,
+                            socklen_t address_length,
+                            std::chrono::steady_clock::time_point deadline,
+                            UniqueFd* connected) {
     UniqueFd candidate(::socket(address->sa_family, SOCK_STREAM, 0));
     if (candidate.get() < 0) {
         return Error(ClientError::ConnectFailed, ErrnoMessage("socket creation failed", errno));

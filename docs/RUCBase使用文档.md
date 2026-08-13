@@ -47,8 +47,6 @@ cd rucbase-lab
 git submodule update --init --recursive
 ```
 
-GoogleTest 的查找顺序是：仓库子模块、系统安装包、CMake 自动下载。离线环境应提前准备子模块；不希望 CMake 访问网络时，可以增加 `-DRUCBASE_FETCH_DEPENDENCIES=OFF`。
-
 ## 3. 编译
 
 在仓库根目录执行：
@@ -64,15 +62,7 @@ cmake --build --preset debug-client -j 4
 cmake --build --preset debug -j 4
 ```
 
-构建产物位于 `build/debug/bin/`。常用预设如下：
-
-| Preset | 用途 |
-| --- | --- |
-| `debug` | 日常开发和调试 |
-| `release` | 优化构建 |
-| `asan` | 检查内存错误 |
-| `ubsan` | 检查未定义行为 |
-| `tsan` | 检查数据竞争 |
+构建产物位于 `build/debug/bin/`。课程实验使用 `debug` 预设即可。
 
 只编译一个目标时，可以使用：
 
@@ -118,29 +108,23 @@ cd build/debug
 ctest --preset debug --output-on-failure
 ```
 
-按框架或 Lab 运行：
+按实验运行：
 
 ```bash
-# 不依赖学生实验实现的框架冒烟测试
-ctest --preset smoke
-
-# 所有框架测试
-ctest --preset framework
-
-# 所有 GoogleTest 单元测试
-ctest --preset unit
-
-# 当前 Lab 的测试
 ctest --preset lab1
 ctest --preset lab2
 ctest --preset lab3
 ctest --preset lab4
+```
 
-# 查询、事务和并发黑盒测试
+也可以按类别运行：
+
+```bash
+# 所有单元测试
+ctest --preset unit
+
+# 查询、事务和并发黑盒测试（需要 pytest）
 ctest --preset blackbox
-
-# 只运行加分测试
-ctest --preset bonus
 ```
 
 运行单个测试：
@@ -150,18 +134,17 @@ cmake --build --preset debug --target lab1_lru_replacer_test -j 4
 ./build/debug/bin/lab1_lru_replacer_test
 ```
 
-黑盒测试需要 pytest。缺少 pytest 时，`blackbox_pytest_dependency` 会明确失败，不会把“没有运行黑盒测试”误报为成功。测试程序会为每个用例创建独立的临时数据库并选择动态端口；失败日志位于 `build/debug/test-logs/`。黑盒客户端通过 Wire callback 收集类型化单元格，测试直接比较列名、SQL 类型、NULL 和未经展示格式化的值；CLI 的定宽表格、字符串截断和浮点格式化不参与判分。测试用 `CHAR` 数据约定为合法 UTF-8 文本。
+黑盒测试需要安装 pytest。每个用例会使用独立的临时数据库。测试失败时，日志位于 `build/debug/test-logs/`。
 
 各 Lab 文档还保留了与课程讲义兼容的 Python 测试入口。测试范围和评分以对应 Lab 文档为准。
 
 ## 6. 完成一次实验的建议流程
 
 1. 阅读对应 Lab 文档，确认任务范围和允许修改的接口；
-2. 找到源码中的 `Todo` 和接口注释，先梳理不变量与边界情况；
-3. 只构建当前任务对应的测试目标；
-4. 先运行小范围测试，再运行该 Lab 的完整测试；
-5. 根据失败信息和 `build/debug/test-logs/` 定位问题；
-6. 提交前检查 `git diff`，确认没有提交构建产物、数据库目录或调试文件。
+2. 在源码中找到标有 `Todo` 的函数，结合接口注释理解要求；
+3. 只编译当前任务对应的测试；
+4. 先跑小范围测试，再跑该实验的完整测试；
+5. 根据失败信息和 `build/debug/test-logs/` 定位问题。
 
 学生应独立完成实验核心代码，并按照课程要求使用私有仓库或指定平台提交，不要公开包含实验答案的仓库。
 

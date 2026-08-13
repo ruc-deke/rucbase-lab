@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #pragma once
@@ -9,7 +9,12 @@
 
 class BufferPoolManager;
 
-/** @brief 一次缓冲池 pin 的只移动 RAII 所有者。 */
+/**
+ * @file page_guard.h
+ * @brief 框架内部。Lab1 作业实现 fetch_page / unpin_page，不要实现或改写本文件。
+ */
+
+/** @brief 框架内部的 pin 所有者。Lab1 作业实现 fetch/unpin，不要实现本类。 */
 class PageGuard {
 public:
     PageGuard() noexcept = default;
@@ -58,7 +63,8 @@ private:
 
     BufferPoolManager* buffer_pool_manager_ = nullptr;  ///< 非拥有指针，必须比 guard 生命周期更长。
     Page* page_ = nullptr;                              ///< pin 期间保持有效。
-    PageId page_id_{};                                  ///< 捕获 pin 时的标识，避免依赖可复用帧的后续状态。
+    /// 捕获 pin 时的标识，避免依赖可复用帧的后续状态。
+    PageId page_id_{};
     bool dirty_ = false;
 };
 

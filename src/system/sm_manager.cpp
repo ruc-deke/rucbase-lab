@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "sm_manager.h"
@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "common/context.h"
+#include "common/wire_result.h"
 #include "index/index_manager.h"
 #include "record/rm_manager.h"
 #include "storage/buffer_pool_manager.h"
@@ -66,51 +67,21 @@ void set_string_result(Context* context,
         throw InternalError("utility result requires a request context");
     }
 
-    WireResultSet result;
-    result.has_query_result = true;
-
-    auto account = [&result](size_t bytes) {
-        if (!result.try_account(bytes)) {
-            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-        }
-    };
-
-    if (column_names.size() > WireResultSet::kMaxBufferedBytes / sizeof(WireResultColumn)) {
-        throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-    }
-    account(column_names.size() * sizeof(WireResultColumn));
-    result.columns.reserve(column_names.size());
+    std::vector<WireResultColumn> columns;
+    columns.reserve(column_names.size());
     for (auto& name : column_names) {
-        account(name.size());
-        result.columns.push_back({.name = std::move(name), .type = TYPE_STRING});
+        columns.push_back({.name = std::move(name), .type = TYPE_STRING});
     }
+    context->result().set_columns(std::move(columns));
 
-    if (row_values.size() > WireResultSet::kMaxBufferedBytes / sizeof(std::vector<WireResultCell>)) {
-        throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-    }
-    account(row_values.size() * sizeof(std::vector<WireResultCell>));
-    result.rows.reserve(row_values.size());
     for (auto& values : row_values) {
-        if (values.size() != result.columns.size()) {
-            throw InternalError("utility result row does not match its columns");
-        }
-        if (values.size() > WireResultSet::kMaxBufferedBytes / sizeof(WireResultCell)) {
-            throw InternalError("utility result exceeds the 16 MiB teaching wire buffer");
-        }
-
         std::vector<WireResultCell> row;
-        account(values.size() * sizeof(WireResultCell));
         row.reserve(values.size());
         for (auto& value : values) {
-            account(value.size());
-            WireResultCell cell{};
-            cell.str_val = std::move(value);
-            row.push_back(std::move(cell));
+            row.push_back({.type = TYPE_STRING, .str_val = std::move(value)});
         }
-        result.rows.push_back(std::move(row));
+        context->result().add_row(std::move(row));
     }
-
-    context->wire_result_ = std::move(result);
 }
 
 }  // namespace
@@ -160,9 +131,7 @@ void SmManager::open_db(const std::string& db_name) {
 
 void SmManager::flush_meta() const { write_meta_file(DB_META_NAME, db_); }
 
-void SmManager::show_database(Context* context) const {
-    set_string_result(context, {"Database"}, {{db_.name_}});
-}
+void SmManager::show_database(Context* context) const { set_string_result(context, {"Database"}, {{db_.name_}}); }
 
 void SmManager::close_db() {
     // TODO(Lab 3): 刷盘并关闭所有表、索引和数据库元数据。
@@ -215,9 +184,8 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
         }
         col_names.push_back(name);
 
-        const bool fixed_length_mismatch =
-            (type == TYPE_INT && len != static_cast<int>(sizeof(int))) ||
-            (type == TYPE_FLOAT && len != static_cast<int>(sizeof(float)));
+        const bool fixed_length_mismatch = (type == TYPE_INT && len != static_cast<int>(sizeof(int))) ||
+                                           (type == TYPE_FLOAT && len != static_cast<int>(sizeof(float)));
         if (len <= 0 || fixed_length_mismatch) {
             throw InvalidColLengthError(len);
         }
@@ -273,8 +241,11 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     throw NotImplementedError("SmManager::drop_table (Lab 3)");
 }
 
-void SmManager::create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
-    // TODO(Lab 3): 创建并加载索引，同时维护索引元数据。
+void SmManager::create_index(const std::string& tab_name,
+                             const std::vector<std::string>& col_names,
+                             [[maybe_unused]] bool unique,
+                             Context* context) {
+    // TODO(Lab 3): 用 IndexMeta::make(表, 列, unique) 构造定义，再交给 IndexManager::create_index。
     throw NotImplementedError("SmManager::create_index (Lab 3)");
 }
 

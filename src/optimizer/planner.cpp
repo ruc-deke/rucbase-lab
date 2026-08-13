@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "planner.h"
@@ -258,7 +258,7 @@ std::unique_ptr<Plan> Planner::do_planner(std::shared_ptr<AnalyzedQuery> query, 
         case ast::StatementKind::CreateIndex: {
             const auto& statement = static_cast<const ast::CreateIndexStmt&>(*query->bound_statement);
             return std::make_unique<DDLPlan>(T_CreateIndex, statement.tab_name, statement.col_names,
-                                             std::vector<ColDef>());
+                                             std::vector<ColDef>(), statement.unique);
         }
         case ast::StatementKind::DropIndex: {
             const auto& statement = static_cast<const ast::DropIndexStmt&>(*query->bound_statement);

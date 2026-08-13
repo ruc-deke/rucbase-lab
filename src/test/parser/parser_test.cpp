@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "parser/parser.h"
@@ -40,6 +40,25 @@ TEST(ParserTest, ParsesUtilityAndDdlStatements) {
     EXPECT_EQ(create->fields[1].type_len.type, ast::DataType::Float);
     EXPECT_EQ(create->fields[2].type_len.type, ast::DataType::String);
     EXPECT_EQ(create->fields[2].type_len.declared_len, 4);
+}
+
+TEST(ParserTest, ParsesCreateIndexUniqueFlag) {
+    ParseResult result = Parse("create index grade (id);");
+    ASSERT_TRUE(result.ok());
+    auto index = std::dynamic_pointer_cast<ast::CreateIndexStmt>(result.statement);
+    ASSERT_NE(index, nullptr);
+    EXPECT_EQ(index->tab_name, "grade");
+    ASSERT_EQ(index->col_names.size(), 1U);
+    EXPECT_EQ(index->col_names[0], "id");
+    EXPECT_FALSE(index->unique);
+
+    result = Parse("create unique index grade (id, name);");
+    ASSERT_TRUE(result.ok());
+    index = std::dynamic_pointer_cast<ast::CreateIndexStmt>(result.statement);
+    ASSERT_NE(index, nullptr);
+    EXPECT_EQ(index->tab_name, "grade");
+    ASSERT_EQ(index->col_names.size(), 2U);
+    EXPECT_TRUE(index->unique);
 }
 
 TEST(ParserTest, ParsesDmlAndDecodesEscapedQuotes) {

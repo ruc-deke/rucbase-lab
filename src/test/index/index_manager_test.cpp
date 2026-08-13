@@ -1,4 +1,4 @@
-// Copyright (c) 2023-2026 Renmin University of China
+// Copyright (c) 2023-2027 Renmin University of China
 // SPDX-License-Identifier: MulanPSL-2.0
 
 #include "index/index_manager.h"
@@ -31,7 +31,7 @@ TEST(IndexManagerTest, ReopenRestoresPageAllocatorHighWaterMark) {
         if (disk_manager.is_file(index_name)) {
             disk_manager.destroy_file(index_name);
         }
-        index_manager.create_index(kTableName, kIndexCols);
+        index_manager.create_index(IndexMeta::make(kTableName, kIndexCols));
         // This regression test becomes runnable after the Lab1 disk layer is
         // supplied; keep the scaffold suite green before that prerequisite.
         if (!disk_manager.is_file(index_name)) {
@@ -69,6 +69,33 @@ TEST(IndexManagerTest, ReopenRestoresPageAllocatorHighWaterMark) {
         index_manager.close_index(index.get());
         index_manager.destroy_index(kTableName, kIndexCols);
     }
+}
+
+TEST(IndexManagerTest, CreateIndexRecordsUniqueFlag) {
+    DiskManager disk_manager;
+    BufferPoolManager buffer_pool_manager(8, &disk_manager);
+    IndexManager index_manager(&disk_manager, &buffer_pool_manager);
+    const std::string index_name = index_manager.make_index_name(kTableName, kIndexCols);
+    if (disk_manager.is_file(index_name)) {
+        disk_manager.destroy_file(index_name);
+    }
+
+    index_manager.create_index(IndexMeta::make(kTableName, kIndexCols));
+    if (!disk_manager.is_file(index_name)) {
+        GTEST_SKIP() << "requires the Lab1 DiskManager implementation";
+    }
+    {
+        auto index = index_manager.open_index(kTableName, kIndexCols);
+        EXPECT_FALSE(index->is_unique());
+        index_manager.close_index(index.get());
+        index_manager.destroy_index(kTableName, kIndexCols);
+    }
+
+    index_manager.create_index(IndexMeta::make(kTableName, kIndexCols, true));
+    auto unique_index = index_manager.open_index(kTableName, kIndexCols);
+    EXPECT_TRUE(unique_index->is_unique());
+    index_manager.close_index(unique_index.get());
+    index_manager.destroy_index(kTableName, kIndexCols);
 }
 
 }  // namespace
