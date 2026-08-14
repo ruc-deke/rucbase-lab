@@ -30,7 +30,7 @@ RUCBase 的系统框架参考并借鉴了 CMU 15-445 课程的 [BusTub](https://
 
 <h2 id="quick-start">快速开始</h2>
 
-推荐使用仓库提供的课程 Docker 环境。手工配置时建议使用 Ubuntu 24.04 LTS、GCC 11+ 或 Clang 14+、CMake 3.22+。
+推荐使用课程配套的 Docker 环境。手工配置时建议使用 Ubuntu 24.04 LTS、GCC 11+ 或 Clang 14+、CMake 3.22+。
 
 ```bash
 git clone --recursive https://github.com/ruc-deke/rucbase-lab.git
