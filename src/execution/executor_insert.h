@@ -64,15 +64,23 @@ public:
         }
 
         rid_ = fh_->insert_record(rec.data, context_);
+
+        // 逐个维护索引。唯一索引可能抛出 DuplicateKeyError，此时要撤销本条记录已经写入的
+        // 全部内容：先删除前面索引中已插入的 (key, rid)，再删除记录，保证表和索引保持一致。
+        std::vector<std::pair<BPlusTree*, std::vector<char>>> inserted;
         try {
             for (auto& index : tab_.indexes) {
                 auto ih =
                     sm_manager_->indexes_.at(sm_manager_->get_index_manager()->make_index_name(tab_name_, index.cols))
                         .get();
-                const std::vector<char> key = index.make_key(rec.data);
+                std::vector<char> key = index.make_key(rec.data);
                 ih->insert_entry(key.data(), rid_, context_->transaction());
+                inserted.emplace_back(ih, std::move(key));
             }
         } catch (...) {
+            for (auto it = inserted.rbegin(); it != inserted.rend(); ++it) {
+                it->first->delete_entry(it->second.data(), rid_, context_->transaction());
+            }
             fh_->delete_record(rid_, context_);
             throw;
         }

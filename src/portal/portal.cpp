@@ -14,6 +14,7 @@
 #include "execution/executor_delete.h"
 #include "execution/executor_index_scan.h"
 #include "execution/executor_insert.h"
+#include "execution/executor_merge_join.h"
 #include "execution/executor_nestedloop_join.h"
 #include "execution/executor_projection.h"
 #include "execution/executor_seq_scan.h"
@@ -107,9 +108,12 @@ std::unique_ptr<AbstractExecutor> Portal::convert_plan_executor(Plan& plan, Cont
                                                    context);
     }
     if (auto* join = dynamic_cast<JoinPlan*>(&plan)) {
-        return std::make_unique<NestedLoopJoinExecutor>(convert_plan_executor(*join->left_, context),
-                                                        convert_plan_executor(*join->right_, context),
-                                                        std::move(join->conds_));
+        auto left = convert_plan_executor(*join->left_, context);
+        auto right = convert_plan_executor(*join->right_, context);
+        if (join->tag == T_SortMerge) {
+            return std::make_unique<MergeJoinExecutor>(std::move(left), std::move(right), std::move(join->conds_));
+        }
+        return std::make_unique<NestedLoopJoinExecutor>(std::move(left), std::move(right), std::move(join->conds_));
     }
     if (auto* sort = dynamic_cast<SortPlan*>(&plan)) {
         return std::make_unique<SortExecutor>(convert_plan_executor(*sort->subplan_, context), sort->sel_col_,

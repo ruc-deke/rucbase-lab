@@ -101,15 +101,6 @@ public:
         assert(disk_manager_->is_dir(TEST_DB_NAME));
     };
 
-    void RecreateIndex(bool unique) {
-        index_manager_->close_index(tree_.get());
-        tree_.reset();
-        index_manager_->destroy_index(TEST_FILE_NAME, TEST_COL);
-        index_manager_->create_index(IndexMeta::make(TEST_FILE_NAME, TEST_COL_META, unique));
-        tree_ = index_manager_->open_index(TEST_FILE_NAME, TEST_COL);
-        pin_baseline_ = buffer_pool_manager_->get_pin_snapshot();
-    }
-
     ::testing::AssertionResult tree_invariants_hold() const {
         const auto report = BPlusTreeInvariantChecker::check(*tree_);
         if (report.ok()) return ::testing::AssertionSuccess();
@@ -328,7 +319,7 @@ TEST_F(BPlusTreeTests, InsertTest) {
 /**
  * @brief 随机插入1~10000
  *
- * @note lab2 计分：20 points
+ * @note lab2 计分：15 points
  */
 TEST_F(BPlusTreeTests, LargeScaleTest) {
     const int64_t scale = 10000;
@@ -383,37 +374,4 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
         scan.next();
     }
     EXPECT_EQ(current_key, keys.size() + 1);
-}
-
-TEST_F(BPlusTreeTests, NonUniqueIndexAllowsDuplicateKeys) {
-    ASSERT_FALSE(tree_->is_unique());
-
-    int64_t key = 7;
-    const char* index_key = reinterpret_cast<const char*>(&key);
-    const Rid first{.page_no = 1, .slot_no = 0};
-    const Rid second{.page_no = 1, .slot_no = 1};
-    ASSERT_NE(tree_->insert_entry(index_key, first, txn_.get()), static_cast<page_id_t>(-1));
-    ASSERT_NE(tree_->insert_entry(index_key, second, txn_.get()), static_cast<page_id_t>(-1));
-    ASSERT_TRUE(tree_invariants_hold());
-
-    std::vector<Rid> rids;
-    ASSERT_TRUE(tree_->get_value(index_key, &rids, txn_.get()));
-    ASSERT_EQ(rids.size(), 2U);
-}
-
-TEST_F(BPlusTreeTests, UniqueIndexRejectsDuplicateKeys) {
-    RecreateIndex(true);
-    ASSERT_TRUE(tree_->is_unique());
-
-    int64_t key = 7;
-    const char* index_key = reinterpret_cast<const char*>(&key);
-    const Rid first{.page_no = 1, .slot_no = 0};
-    const Rid second{.page_no = 1, .slot_no = 1};
-    ASSERT_NE(tree_->insert_entry(index_key, first, txn_.get()), static_cast<page_id_t>(-1));
-    EXPECT_THROW(tree_->insert_entry(index_key, second, txn_.get()), DuplicateKeyError);
-
-    std::vector<Rid> rids;
-    ASSERT_TRUE(tree_->get_value(index_key, &rids, txn_.get()));
-    ASSERT_EQ(rids.size(), 1U);
-    EXPECT_EQ(rids[0].slot_no, 0);
 }

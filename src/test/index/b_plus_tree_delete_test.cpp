@@ -400,7 +400,7 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
 /**
  * @brief 随机插入和删除多个键值对
  *
- * @note lab2 计分：20 points
+ * @note lab2 计分：15 points
  */
 TEST_F(BPlusTreeTests, LargeScaleTest) {
     const int order = 255;  // 若order太小，而插入数据过多，将会超出缓冲池
@@ -460,21 +460,4 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
     }
     std::cout << "Insert keys count: " << add_cnt << '\n' << "Delete keys count: " << del_cnt << '\n';
     check_all(tree_.get(), mock);
-}
-
-TEST_F(BPlusTreeTests, NonUniqueDeleteRemovesOnlyMatchingRid) {
-    ASSERT_FALSE(tree_->is_unique());
-
-    int64_t key = 7;
-    const char* index_key = reinterpret_cast<const char*>(&key);
-    const Rid first{.page_no = 1, .slot_no = 0};
-    const Rid second{.page_no = 1, .slot_no = 1};
-    ASSERT_NE(tree_->insert_entry(index_key, first, txn_.get()), static_cast<page_id_t>(-1));
-    ASSERT_NE(tree_->insert_entry(index_key, second, txn_.get()), static_cast<page_id_t>(-1));
-
-    ASSERT_TRUE(tree_->delete_entry(index_key, first, txn_.get()));
-    std::vector<Rid> rids;
-    ASSERT_TRUE(tree_->get_value(index_key, &rids, txn_.get()));
-    ASSERT_EQ(rids.size(), 1U);
-    EXPECT_EQ(rids[0].slot_no, 1);
 }

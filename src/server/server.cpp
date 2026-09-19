@@ -102,7 +102,7 @@ Server::Server(std::string database_name, std::string bind_address, const int po
       sm_manager_(&disk_manager_, &buffer_pool_manager_, &rm_manager_, &index_manager_),
       log_manager_(&disk_manager_),
       transaction_manager_(&lock_manager_, &sm_manager_),
-      ql_manager_(&sm_manager_, &transaction_manager_),
+      ql_manager_(&sm_manager_, &transaction_manager_, &planner_),
       recovery_manager_(&disk_manager_, &buffer_pool_manager_, &sm_manager_),
       planner_(&sm_manager_),
       optimizer_(&sm_manager_, &planner_),

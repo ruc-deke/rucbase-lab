@@ -34,6 +34,7 @@ private:
     void analyze_update(const ast::UpdateStmt& statement, AnalyzedQuery& query) const;
     void analyze_delete(const ast::DeleteStmt& statement, AnalyzedQuery& query) const;
     void analyze_insert(const ast::InsertStmt& statement, AnalyzedQuery& query) const;
+    static void analyze_set_knob(const ast::SetKnobStmt& statement, AnalyzedQuery& query);
 
     [[nodiscard]] static std::vector<std::string> get_table_names(const std::shared_ptr<ast::FromNode>& from);
     static TabCol check_column(const std::vector<ColMeta>& all_cols, TabCol target);

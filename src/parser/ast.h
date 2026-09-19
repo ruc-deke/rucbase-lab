@@ -35,6 +35,7 @@ enum class StatementKind {
     Help,
     ShowTables,
     ShowDatabase,
+    SetKnob,
     TxnBegin,
     TxnCommit,
     TxnAbort,
@@ -186,6 +187,17 @@ struct ShowTablesStmt : public Statement {
 
 struct ShowDatabaseStmt : public Statement {
     ShowDatabaseStmt() : Statement(StatementKind::ShowDatabase) {}
+};
+
+/** @brief `SET name = value`：修改服务端的查询设置，例如 `SET enable_sortmerge = true`。 */
+struct SetKnobStmt : public Statement {
+    std::string name;
+    std::string value;
+
+    SetKnobStmt(std::string name_, std::string value_)
+        : Statement(StatementKind::SetKnob),
+          name(std::move(name_)),
+          value(std::move(value_)) {}
 };
 
 struct TxnBeginStmt : public Statement {

@@ -17,6 +17,7 @@
 #include "executor_seq_scan.h"
 #include "executor_update.h"
 #include "optimizer/plan.h"
+#include "optimizer/planner.h"
 #include "system/sm_manager.h"
 #include "transaction/transaction.h"
 #include "transaction/transaction_manager.h"
@@ -35,7 +36,8 @@ constexpr char help_info[] =
     "  INSERT INTO table_name VALUES (value [, value ...])\n"
     "  DELETE FROM table_name [WHERE where_clause]\n"
     "  UPDATE table_name SET column_name = value [, column_name = value ...] [WHERE where_clause]\n"
-    "  SELECT selector FROM table_name [WHERE where_clause]\n"
+    "  SELECT selector FROM table_name [{, | JOIN} table_name ...] [WHERE where_clause]\n"
+    "  SET enable_sortmerge = {true | false}\n"
     "type:\n"
     "  {INT | FLOAT | CHAR(n)}\n"
     "where_clause:\n"
@@ -94,6 +96,14 @@ void QlManager::run_cmd_utility(const Plan& plan, txn_id_t* txn_id, Context* con
             }
             case T_DescTable: {
                 sm_manager_->desc_table(utility_plan->tab_name_, context);
+                break;
+            }
+            case T_SetKnob: {
+                const auto& set_knob = dynamic_cast<const SetKnobPlan&>(*utility_plan);
+                if (set_knob.knob_ != "enable_sortmerge") {
+                    throw InternalError("Unexpected setting: " + set_knob.knob_);
+                }
+                planner_->set_enable_sortmerge(set_knob.value_);
                 break;
             }
             case T_Transaction_begin: {

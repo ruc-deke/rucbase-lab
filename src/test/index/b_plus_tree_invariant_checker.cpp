@@ -205,7 +205,7 @@ private:
 
             for (size_t i = 1; i < child_summaries.size(); ++i) {
                 if (!child_summaries[i - 1].has_value() || !child_summaries[i].has_value()) continue;
-                if (compare_keys(child_summaries[i - 1]->maximum, child_summaries[i]->minimum) >= 0) {
+                if (out_of_order(child_summaries[i - 1]->maximum, child_summaries[i]->minimum)) {
                     add(path + ": child " + std::to_string(snapshot->children[i - 1]) +
                         " subtree overlaps or is out of order with child " + std::to_string(snapshot->children[i]));
                 }
@@ -223,11 +223,22 @@ private:
 
     void check_local_key_order(const NodeSnapshot& node, const std::string& path) {
         for (size_t i = 1; i < node.keys.size(); ++i) {
-            if (compare_keys(node.keys[i - 1], node.keys[i]) >= 0) {
-                add(path + ": keys at slots " + std::to_string(i - 1) + " and " + std::to_string(i) +
-                    " are not strictly increasing");
+            if (out_of_order(node.keys[i - 1], node.keys[i])) {
+                add(path + ": keys at slots " + std::to_string(i - 1) + " and " + std::to_string(i) + " are not " +
+                    (header_.unique_ ? "strictly increasing" : "non-decreasing"));
             }
         }
+    }
+
+    /**
+     * @brief 判断两个相邻位置的键是否违反顺序。
+     *
+     * 唯一索引要求严格递增。非唯一索引允许相同 key 并存，同一 key 的记录还可能
+     * 跨越相邻叶子，因此只要求非递减。
+     */
+    bool out_of_order(const Key& left, const Key& right) const {
+        const int result = compare_keys(left, right);
+        return header_.unique_ ? result >= 0 : result > 0;
     }
 
     void check_leaf_chain(const std::optional<NodeSnapshot>& sentinel) {

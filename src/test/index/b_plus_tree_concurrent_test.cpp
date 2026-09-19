@@ -292,12 +292,16 @@ int getThreadId() {
 }
 
 // helper function to insert
-void InsertHelper(BPlusTree* tree, const std::vector<int64_t>& keys, __attribute__((unused)) uint64_t thread_itr = 0) {
+// 每个线程只插入 key % thread_num == thread_itr 的那部分 key，因此同一条 (key, rid) 不会被插入两次；
+// 各线程的 key 交错分布，仍然会在同一批叶子上竞争。
+void InsertHelper(BPlusTree* tree, const std::vector<int64_t>& keys, uint64_t thread_num, uint64_t thread_itr) {
     // create transaction
     Transaction* transaction = new Transaction(0);  // 注意，每个线程都有一个事务；不能从上层传入一个共用的事务
+    const auto is_mine = [&](int64_t key) { return static_cast<uint64_t>(key) % thread_num == thread_itr; };
 
     const char* index_key;
     for (auto key : keys) {
+        if (!is_mine(key)) continue;
         int32_t value = static_cast<int32_t>(static_cast<uint32_t>(key));
         Rid rid = {.page_no = static_cast<int32_t>(static_cast<uint64_t>(key) >> 32U), .slot_no = value};
         index_key = (const char*)&key;
@@ -306,6 +310,7 @@ void InsertHelper(BPlusTree* tree, const std::vector<int64_t>& keys, __attribute
 
     std::vector<Rid> rids;
     for (auto key : keys) {
+        if (!is_mine(key)) continue;
         rids.clear();
         index_key = (const char*)&key;
         tree->get_value(index_key, &rids, transaction);  // 调用GetValue
@@ -358,7 +363,7 @@ TEST_F(BPlusTreeConcurrentTest, InsertScaleTest) {
     std::shuffle(keys.begin(), keys.end(), rng);
 
     // 这里调用了insert_entry，并且用thread_num个进程并发插入（并发查找也放进去了）
-    LaunchParallelTest(thread_num, InsertHelper, tree_.get(), keys);
+    LaunchParallelTest(thread_num, InsertHelper, tree_.get(), keys, static_cast<uint64_t>(thread_num));
     ASSERT_TRUE(tree_invariants_hold());
     printf("Insert key 1~%" PRId64 " finished\n", scale);
 
@@ -379,7 +384,7 @@ TEST_F(BPlusTreeConcurrentTest, InsertScaleTest) {
 /**
  * @brief concurrent insert 1~10000 and delete 1~9900
  *
- * @note lab2 计分：20 points
+ * @note lab2 计分：15 points
  */
 TEST_F(BPlusTreeConcurrentTest, MixScaleTest) {
     const int64_t scale = 10000;
@@ -396,7 +401,7 @@ TEST_F(BPlusTreeConcurrentTest, MixScaleTest) {
         keys.push_back(key);
     }
     // 这里调用了insert_entry，并且用thread_num个进程并发插入（包括并发查找）
-    LaunchParallelTest(thread_num, InsertHelper, tree_.get(), keys);
+    LaunchParallelTest(thread_num, InsertHelper, tree_.get(), keys, static_cast<uint64_t>(thread_num));
     ASSERT_TRUE(tree_invariants_hold());
     printf("Insert key 1~%" PRId64 " finished\n", scale);
 

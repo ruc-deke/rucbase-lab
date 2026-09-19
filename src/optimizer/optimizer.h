@@ -31,6 +31,8 @@ public:
                 return std::make_unique<OtherPlan>(T_ShowDatabase, std::string());
             case ast::StatementKind::ShowTables:
                 return std::make_unique<OtherPlan>(T_ShowTable, std::string());
+            case ast::StatementKind::SetKnob:
+                return std::make_unique<SetKnobPlan>(query->bound_knob_name, query->bound_knob_value);
             case ast::StatementKind::DescTable: {
                 const auto& desc_table = static_cast<const ast::DescTableStmt&>(*query->bound_statement);
                 return std::make_unique<OtherPlan>(T_DescTable, desc_table.tab_name);

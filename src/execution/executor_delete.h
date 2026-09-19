@@ -41,6 +41,10 @@ public:
         context_ = context;
     }
 
+    /**
+     * @brief 按 rids_ 删除记录，并按 (key, rid) 删除它在每个索引中的项。
+     * @note 同一 key 在普通索引中可能对应多条记录，只能删掉属于当前记录的那一条。
+     */
     std::unique_ptr<RmRecord> next() override { throw NotImplementedError("DeleteExecutor::next"); }
 
     Rid& rid() override { return abstract_rid_; }

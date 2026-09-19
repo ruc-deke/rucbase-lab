@@ -15,22 +15,25 @@
 #include "record/rm_defs.h"
 #include "system/sm_meta.h"
 
+/**
+ * @brief 按单个字段对子算子的输出排序。
+ *
+ * 用于 ORDER BY，也作为排序归并连接两侧的输入。输出记录的字段布局与子算子完全相同。
+ * 框架只支持单个排序键；如需多键排序，可自行扩展数据结构。
+ */
 class SortExecutor : public AbstractExecutor {
 private:
-    std::unique_ptr<AbstractExecutor> prev_;
-    ColMeta cols_;  // 框架中只支持一个键排序，需要自行修改数据结构支持多个键排序
-    size_t tuple_num;
-    bool is_desc_;
-    std::vector<size_t> used_tuple;
-    std::unique_ptr<RmRecord> current_tuple;
+    std::unique_ptr<AbstractExecutor> prev_;  // 子算子
+    ColMeta sort_col_;                        // 排序字段在子算子输出记录中的位置和类型
+    bool is_desc_;                            // 是否降序
+    // 提示：排序算子需要先读完子算子的全部输出，再按顺序返回。
+    // 请自行添加保存记录和迭代位置所需的成员。
 
 public:
     SortExecutor(std::unique_ptr<AbstractExecutor> prev, const TabCol& sel_cols, bool is_desc) {
         prev_ = std::move(prev);
-        cols_ = prev_->get_col_offset(sel_cols);
+        sort_col_ = *get_col(prev_->cols(), sel_cols);
         is_desc_ = is_desc;
-        tuple_num = 0;
-        used_tuple.clear();
     }
 
     void begin_tuple() override { throw NotImplementedError("SortExecutor::begin_tuple"); }

@@ -21,6 +21,7 @@ typedef enum PlanTag {
     T_ShowDatabase,
     T_ShowTable,
     T_DescTable,
+    T_SetKnob,
     T_CreateTable,
     T_DropTable,
     T_CreateIndex,
@@ -36,6 +37,7 @@ typedef enum PlanTag {
     T_SeqScan,
     T_IndexScan,
     T_NestLoop,
+    T_SortMerge,
     T_Sort,
     T_Projection
 } PlanTag;
@@ -74,6 +76,14 @@ public:
     std::vector<std::string> index_col_names_;
 };
 
+/**
+ * @brief 两个子计划的内连接。
+ *
+ * conds_ 中每个列与列比较条件的 lhs_col 来自左子树、rhs_col 来自右子树。
+ * tag 为 T_NestLoop 时使用嵌套循环连接；为 T_SortMerge 时使用排序归并连接，此时
+ * conds_[0] 是归并键（OP_EQ），两个孩子都是按各自连接列升序排列的 SortPlan，
+ * conds_ 中其余条件需要在归并匹配后继续检查。
+ */
 class JoinPlan : public Plan {
 public:
     JoinPlan(PlanTag tag, std::unique_ptr<Plan> left, std::unique_ptr<Plan> right, std::vector<Condition> conds)
@@ -188,4 +198,16 @@ public:
     OtherPlan(PlanTag tag, std::string tab_name) : Plan(tag), tab_name_(std::move(tab_name)) {}
 
     std::string tab_name_;
+};
+
+/** @brief `SET name = value` 的执行计划；设置项和取值已由 Analyzer 校验。 */
+class SetKnobPlan : public OtherPlan {
+public:
+    SetKnobPlan(std::string knob, bool value)
+        : OtherPlan(T_SetKnob, std::string()),
+          knob_(std::move(knob)),
+          value_(value) {}
+
+    std::string knob_;
+    bool value_;
 };

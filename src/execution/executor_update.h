@@ -43,6 +43,12 @@ public:
         rids_ = std::move(rids);
         context_ = context;
     }
+    /**
+     * @brief 按 rids_ 逐条更新记录，并维护表上的全部索引。
+     * @throws DuplicateKeyError 新值与某个唯一索引中已有的 key 冲突。抛出前，发生冲突的这一行
+     *         （记录本身以及它在所有索引中的项）必须恢复原状。
+     * @note 把一行的唯一键更新为它原来的值不算冲突。
+     */
     std::unique_ptr<RmRecord> next() override { throw NotImplementedError("UpdateExecutor::next"); }
 
     Rid& rid() override { return abstract_rid_; }

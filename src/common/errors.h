@@ -147,6 +147,12 @@ public:
 };
 
 // QL errors
+class InvalidKnobError : public RMDBError {
+public:
+    InvalidKnobError(const std::string& name, const std::string& value)
+        : RMDBError("Invalid setting: " + name + " = " + value) {}
+};
+
 class InvalidValueCountError : public RMDBError {
 public:
     InvalidValueCountError() : RMDBError("Invalid value count") {}

@@ -119,6 +119,10 @@ utility_stmt:
     {
         $$ = std::make_shared<HelpStmt>();
     }
+    |   SET IDENTIFIER '=' IDENTIFIER
+    {
+        $$ = std::make_shared<SetKnobStmt>(std::move($2), std::move($4));
+    }
     ;
 
 ddl_stmt:

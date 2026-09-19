@@ -55,15 +55,20 @@ rucbase_add_gtest(lab1_rm_page_guard_test record/rm_page_guard_test.cpp rucbase:
 
 rucbase_add_gtest(lab2_b_plus_tree_insert_test index/b_plus_tree_insert_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_delete_test index/b_plus_tree_delete_test.cpp rucbase::core unit lab2)
+rucbase_add_gtest(lab2_b_plus_tree_duplicate_test index/b_plus_tree_duplicate_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_b_plus_tree_concurrent_test index/b_plus_tree_concurrent_test.cpp rucbase::core unit lab2)
 foreach(target IN ITEMS
         lab2_b_plus_tree_insert_test
         lab2_b_plus_tree_delete_test
+        lab2_b_plus_tree_duplicate_test
         lab2_b_plus_tree_concurrent_test)
     target_sources(${target} PRIVATE index/b_plus_tree_invariant_checker.cpp)
 endforeach()
 rucbase_add_gtest(lab2_index_layout_test index/index_layout_test.cpp rucbase::core unit lab2)
 rucbase_add_gtest(lab2_index_manager_test index/index_manager_test.cpp rucbase::core unit lab2)
+
+rucbase_add_gtest(lab3_sort_executor_test execution/sort_test.cpp rucbase::core unit lab3)
+rucbase_add_gtest(lab3_merge_join_test execution/merge_join_test.cpp rucbase::core unit lab3)
 
 rucbase_add_gtest(framework_error_test common/error_test.cpp rucbase::core unit framework smoke)
 rucbase_add_gtest(framework_transaction_ownership_test transaction/transaction_ownership_test.cpp rucbase::core unit framework smoke)

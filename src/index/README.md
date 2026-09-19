@@ -1,6 +1,6 @@
 # 索引模块导读
 
-`src/index` 实现基于 B+ 树的唯一索引。Lab 2 只要求补全 `BPlusTreeNode` 和 `BPlusTree` 中标有 `Todo` 的算法；文件管理、磁盘布局和顺序扫描由框架提供。
+`src/index` 实现基于 B+ 树的二级索引，默认允许重复 key，也可以声明为唯一索引。Lab 2 只要求补全 `BPlusTreeNode` 和 `BPlusTree` 中标有 `Todo` 的算法；文件管理、磁盘布局和顺序扫描由框架提供。
 
 ## 文件职责
 
@@ -31,5 +31,6 @@
 - `BPlusTree` 对应一棵已打开的索引。
 - `fetch_node` / `create_node` 返回 `IndexNode`。用 `node->` 访问结点中的键和值；结点离开作用域后，对应页面会自动解除固定。
 - 树里存的是 `(key, Rid)`。默认同一 key 可以有多条；`IndexMeta::unique` / `file_header_->unique_` 为真时，插入重复 key 抛出 `DuplicateKeyError`。删除按 `(key, Rid)` 指定一条。
+- 同一 key 的多条记录可能因为分裂分布在多个相邻叶子中，查找、删除和范围扫描都要考虑这种情况。
 
 具体实验要求和接口说明见 [Lab 2：索引管理](<../../docs/RUCBase-Lab2[索引管理].md>)。

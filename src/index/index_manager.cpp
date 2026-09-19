@@ -173,7 +173,7 @@ void IndexManager::close_index(const BPlusTree* index) {
     index->file_header_->serialize(header_data.data());
     disk_manager_->write_page(index->file_descriptor_, INDEX_FILE_HEADER_PAGE, header_data.data(),
                               index->file_header_->serialized_size_);
-    // 必须先刷新缓存页，再关闭底层文件描述符。
-    buffer_pool_manager_->flush_all_pages(index->file_descriptor_);
+    // 必须先写回并移出缓存页，再关闭底层文件描述符；fd 会被之后打开的文件复用。
+    buffer_pool_manager_->discard_file_pages(index->file_descriptor_);
     disk_manager_->close_file(index->file_descriptor_);
 }

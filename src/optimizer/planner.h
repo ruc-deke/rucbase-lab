@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -21,6 +22,7 @@ class SmManager;
 class Planner {
 private:
     SmManager* sm_manager_;
+    std::atomic<bool> enable_sortmerge_{false};  ///< SET enable_sortmerge；服务端全局生效。
 
     enum class ConditionCoverage {
         None,
@@ -33,6 +35,10 @@ public:
     explicit Planner(SmManager* sm_manager) : sm_manager_(sm_manager) {}
 
     std::unique_ptr<Plan> do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context);
+
+    /** @brief 设置是否对含等值条件的连接使用排序归并连接。默认关闭，即全部使用嵌套循环连接。 */
+    void set_enable_sortmerge(bool enable) noexcept { enable_sortmerge_.store(enable); }
+    [[nodiscard]] bool enable_sortmerge() const noexcept { return enable_sortmerge_.load(); }
 
 private:
     // 逻辑优化：改写查询结构。
@@ -47,6 +53,7 @@ private:
                                           std::vector<std::unique_ptr<Plan>> scan_plans,
                                           std::vector<Condition> join_conditions);
     std::unique_ptr<Plan> make_scan_plan(const std::string& table, std::vector<Condition> conds) const;
+    std::unique_ptr<Plan> choose_join_algorithm(std::unique_ptr<Plan> plan) const;
 
     bool choose_index(const std::string& table,
                       const std::vector<Condition>& conds,

@@ -1,0 +1,79 @@
+| id | name | class | sid | course | score |
+| 1 | Alice | 1 | 1 | OS | 92.500000 |
+| 1 | Alice | 1 | 1 | DB | 60.000000 |
+| 1 | Alice | 1 | 1 | AI | 81.000000 |
+| 2 | Bob | 1 | 2 | DB | 88.000000 |
+| 2 | Bob | 1 | 2 | OS | 70.500000 |
+| 3 | Carol | 2 | 3 | DB | 75.000000 |
+| 3 | Carol | 2 | 3 | OS | 66.000000 |
+| name | course | score |
+| Alice | OS | 92.500000 |
+| Alice | AI | 81.000000 |
+| Bob | DB | 88.000000 |
+| Bob | OS | 70.500000 |
+| Carol | DB | 75.000000 |
+| id | name | class | sid | course | score |
+| 1 | Alice | 1 | 1 | OS | 92.500000 |
+| 1 | Alice | 1 | 1 | DB | 60.000000 |
+| 1 | Alice | 1 | 1 | AI | 81.000000 |
+| 2 | Bob | 1 | 1 | OS | 92.500000 |
+| 2 | Bob | 1 | 1 | DB | 60.000000 |
+| 2 | Bob | 1 | 1 | AI | 81.000000 |
+| 3 | Carol | 2 | 2 | DB | 88.000000 |
+| 3 | Carol | 2 | 2 | OS | 70.500000 |
+| 4 | Dave | 2 | 2 | DB | 88.000000 |
+| 4 | Dave | 2 | 2 | OS | 70.500000 |
+| 5 | Erin | 3 | 3 | DB | 75.000000 |
+| 5 | Erin | 3 | 3 | OS | 66.000000 |
+| sid | course | score | name | credit |
+| 6 | AI | 99.000000 | AI | 2 |
+| 1 | AI | 81.000000 | AI | 2 |
+| 2 | DB | 88.000000 | DB | 3 |
+| 2 | DB | 88.000000 | DB | 5 |
+| 3 | DB | 75.000000 | DB | 3 |
+| 3 | DB | 75.000000 | DB | 5 |
+| 1 | DB | 60.000000 | DB | 3 |
+| 1 | DB | 60.000000 | DB | 5 |
+| 1 | OS | 92.500000 | OS | 4 |
+| 2 | OS | 70.500000 | OS | 4 |
+| 3 | OS | 66.000000 | OS | 4 |
+| name | name | credit |
+| Alice | AI | 2 |
+| Alice | DB | 3 |
+| Bob | DB | 3 |
+| Carol | DB | 3 |
+| Alice | DB | 5 |
+| Bob | DB | 5 |
+| Carol | DB | 5 |
+| Alice | OS | 4 |
+| Bob | OS | 4 |
+| Carol | OS | 4 |
+| sid | course | score | score | extra |
+| 2 | OS | 70.500000 | 70.500000 | 2 |
+| 2 | OS | 70.500000 | 70.500000 | 3 |
+| 2 | DB | 88.000000 | 88.000000 | 1 |
+| 6 | AI | 99.000000 | 99.000000 | 4 |
+| id | name | class | sid | course | score |
+| 2 | Bob | 1 | 2 | DB | 88.000000 |
+| 2 | Bob | 1 | 2 | OS | 70.500000 |
+| 3 | Carol | 2 | 3 | DB | 75.000000 |
+| 3 | Carol | 2 | 3 | OS | 66.000000 |
+| id | name | class | sid | course | score |
+| 3 | Carol | 2 | 3 | DB | 75.000000 |
+| 3 | Carol | 2 | 3 | OS | 66.000000 |
+| id | name | class | name | credit |
+| id | name | class | id |
+| id | sid |
+| 3 | 1 |
+| 4 | 1 |
+| 2 | 1 |
+| 5 | 1 |
+| id | name | class | sid | course | score |
+| 3 | Carol | 2 | 3 | DB | 75.000000 |
+| 3 | Carol | 2 | 3 | OS | 66.000000 |
+| 1 | Alice | 1 | 1 | OS | 92.500000 |
+| 1 | Alice | 1 | 1 | DB | 60.000000 |
+| 1 | Alice | 1 | 1 | AI | 81.000000 |
+| 2 | Bob | 1 | 2 | DB | 88.000000 |
+| 2 | Bob | 1 | 2 | OS | 70.500000 |
+failure

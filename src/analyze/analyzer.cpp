@@ -4,6 +4,9 @@
 #include "analyze/analyzer.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
+#include <string_view>
 #include <utility>
 
 #include "system/sm_manager.h"
@@ -32,6 +35,9 @@ std::shared_ptr<AnalyzedQuery> Analyzer::analyze(const std::shared_ptr<ast::Stat
             break;
         case ast::StatementKind::Insert:
             analyze_insert(static_cast<const ast::InsertStmt&>(*statement), *query);
+            break;
+        case ast::StatementKind::SetKnob:
+            analyze_set_knob(static_cast<const ast::SetKnobStmt&>(*statement), *query);
             break;
         case ast::StatementKind::Help:
         case ast::StatementKind::ShowTables:
@@ -236,6 +242,28 @@ void Analyzer::analyze_delete(const ast::DeleteStmt& statement, AnalyzedQuery& q
     query.bound_target_table = table.name;
     get_clause(statement.where, query.bound_conds);
     check_clause(table.cols, query.bound_conds);
+}
+
+/**
+ * @brief 校验 SET 语句的设置项和取值。
+ *
+ * 设置项名称和布尔取值都不区分大小写。
+ * @throws InvalidKnobError 未知设置项，或取值不是 true/false。
+ */
+void Analyzer::analyze_set_knob(const ast::SetKnobStmt& statement, AnalyzedQuery& query) {
+    static constexpr std::array<std::string_view, 1> kKnobs = {"enable_sortmerge"};
+
+    const auto lower = [](std::string text) {
+        std::ranges::transform(text, text.begin(), [](unsigned char c) { return std::tolower(c); });
+        return text;
+    };
+    std::string name = lower(statement.name);
+    const std::string value = lower(statement.value);
+    if (std::ranges::find(kKnobs, name) == kKnobs.end() || (value != "true" && value != "false")) {
+        throw InvalidKnobError(statement.name, statement.value);
+    }
+    query.bound_knob_name = std::move(name);
+    query.bound_knob_value = value == "true";
 }
 
 /** @brief 按表定义的列顺序检查 INSERT 值，并预先编码定长存储形式。 */

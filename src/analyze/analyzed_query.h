@@ -39,4 +39,7 @@ struct AnalyzedQuery {
     std::vector<SetClause> bound_set_clauses;
     // INSERT 的值列表，已按目标列长度编码。
     std::vector<Value> bound_values;
+    // SET 语句：已校验的设置项名称（小写）和布尔取值。
+    std::string bound_knob_name;
+    bool bound_knob_value = false;
 };

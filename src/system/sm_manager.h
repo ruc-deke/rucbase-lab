@@ -116,7 +116,9 @@ public:
     void drop_table(const std::string& tab_name, Context* context);
 
     /**
-     * @brief 为指定字段创建索引。
+     * @brief 为指定字段创建索引，并把表中已有记录写入索引。
+     * @param unique 为 true 时创建唯一索引。
+     * @throws DuplicateKeyError 声明 UNIQUE 但已有数据存在重复 key；此时不留下索引文件和元数据。
      * @todo Lab 3：由学生实现索引创建流程。
      */
     void create_index(const std::string& tab_name,

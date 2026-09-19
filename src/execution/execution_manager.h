@@ -12,6 +12,7 @@
 class AbstractExecutor;
 class Context;
 class Plan;
+class Planner;
 class SmManager;
 class TransactionManager;
 
@@ -19,9 +20,13 @@ class QlManager {
 private:
     SmManager* sm_manager_;
     TransactionManager* txn_mgr_;
+    Planner* planner_;  ///< 保存 SET 语句修改的查询设置；非拥有指针。
 
 public:
-    QlManager(SmManager* sm_manager, TransactionManager* txn_mgr) : sm_manager_(sm_manager), txn_mgr_(txn_mgr) {}
+    QlManager(SmManager* sm_manager, TransactionManager* txn_mgr, Planner* planner)
+        : sm_manager_(sm_manager),
+          txn_mgr_(txn_mgr),
+          planner_(planner) {}
 
     // PortalStmt 保留计划所有权；执行管理器只在调用期间借用计划。
     void run_mutli_query(const Plan& plan, Context* context) const;

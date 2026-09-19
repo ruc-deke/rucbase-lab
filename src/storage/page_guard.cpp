@@ -4,6 +4,7 @@
 #include "page_guard.h"
 
 #include <utility>
+#include <vector>
 
 #include "buffer_pool_manager.h"
 
@@ -57,6 +58,23 @@ PageGuard BufferPoolManager::new_page_guard(PageId* page_id) {
         return {};
     }
     return PageGuard(this, page, page->get_page_id());
+}
+
+void BufferPoolManager::discard_file_pages(int fd) {
+    flush_all_pages(fd);
+    std::vector<PageId> resident_pages;
+    {
+        std::scoped_lock lock{latch_};
+        for (const auto& [page_id, frame_id] : page_table_) {
+            if (page_id.fd == fd) {
+                resident_pages.push_back(page_id);
+            }
+        }
+    }
+    // delete_page 自己加锁，因此在释放 latch_ 之后逐页调用。
+    for (const PageId& page_id : resident_pages) {
+        (void)delete_page(page_id);
+    }
 }
 
 PinSnapshot BufferPoolManager::get_pin_snapshot() const {

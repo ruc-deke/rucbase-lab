@@ -349,6 +349,108 @@ TEST_F(QueryPlanningTest, BuildsJoinForDisconnectedTableGroups) {
     EXPECT_NE(FindScan(plan.get(), "d"), nullptr);
 }
 
+TEST_F(QueryPlanningTest, PlansSetKnobAsUtility) {
+    auto parsed = rucbase::parser::Parse("set ENABLE_SORTMERGE = True;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = optimizer_.plan_query(analyzer_.analyze(parsed.statement), nullptr);
+    auto* set_knob = dynamic_cast<SetKnobPlan*>(plan.get());
+    ASSERT_NE(set_knob, nullptr);
+    EXPECT_EQ(set_knob->tag, T_SetKnob);
+    EXPECT_EQ(set_knob->knob_, "enable_sortmerge");
+    EXPECT_TRUE(set_knob->value_);
+}
+
+TEST_F(QueryPlanningTest, RejectsUnknownKnobOrValue) {
+    for (const char* sql : {"set enable_hashjoin = true;", "set enable_sortmerge = yes;"}) {
+        auto parsed = rucbase::parser::Parse(sql);
+        ASSERT_TRUE(parsed.ok()) << sql;
+        EXPECT_THROW(analyzer_.analyze(parsed.statement), InvalidKnobError) << sql;
+    }
+}
+
+TEST_F(QueryPlanningTest, UsesNestedLoopJoinByDefault) {
+    auto parsed = rucbase::parser::Parse("select * from a, b where a.id = b.id;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* join = dynamic_cast<JoinPlan*>(dynamic_cast<SelectPlan*>(plan.get())->projection_->subplan_.get());
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->tag, T_NestLoop);
+    EXPECT_NE(dynamic_cast<ScanPlan*>(join->left_.get()), nullptr);
+    EXPECT_NE(dynamic_cast<ScanPlan*>(join->right_.get()), nullptr);
+}
+
+TEST_F(QueryPlanningTest, UsesSortMergeJoinForEquiJoinWhenEnabled) {
+    planner_.set_enable_sortmerge(true);
+    // 等值条件写在后面、列顺序与 FROM 相反，检查归并键被放到首位且 lhs 属于左孩子。
+    auto parsed = rucbase::parser::Parse("select * from a, b where a.id < b.x and b.y = a.id;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* join = dynamic_cast<JoinPlan*>(dynamic_cast<SelectPlan*>(plan.get())->projection_->subplan_.get());
+    ASSERT_NE(join, nullptr);
+    EXPECT_EQ(join->tag, T_SortMerge);
+    ASSERT_EQ(join->conds_.size(), 2U);
+    const Condition& key = join->conds_[0];
+    EXPECT_EQ(key.op, OP_EQ);
+    EXPECT_FALSE(key.is_rhs_val);
+    EXPECT_EQ(join->conds_[1].op, OP_LT);
+
+    auto* left_sort = dynamic_cast<SortPlan*>(join->left_.get());
+    auto* right_sort = dynamic_cast<SortPlan*>(join->right_.get());
+    ASSERT_NE(left_sort, nullptr);
+    ASSERT_NE(right_sort, nullptr);
+    EXPECT_FALSE(left_sort->is_desc_);
+    EXPECT_FALSE(right_sort->is_desc_);
+    auto* left_scan = dynamic_cast<ScanPlan*>(left_sort->subplan_.get());
+    auto* right_scan = dynamic_cast<ScanPlan*>(right_sort->subplan_.get());
+    ASSERT_NE(left_scan, nullptr);
+    ASSERT_NE(right_scan, nullptr);
+    EXPECT_EQ(key.lhs_col.tab_name, left_scan->tab_name_);
+    EXPECT_EQ(key.rhs_col.tab_name, right_scan->tab_name_);
+    EXPECT_EQ(left_sort->sel_col_.tab_name, key.lhs_col.tab_name);
+    EXPECT_EQ(left_sort->sel_col_.col_name, key.lhs_col.col_name);
+    EXPECT_EQ(right_sort->sel_col_.tab_name, key.rhs_col.tab_name);
+    EXPECT_EQ(right_sort->sel_col_.col_name, key.rhs_col.col_name);
+}
+
+TEST_F(QueryPlanningTest, KeepsNestedLoopJoinWithoutEquality) {
+    planner_.set_enable_sortmerge(true);
+    for (const char* sql : {"select * from a, b where a.id < b.id;", "select * from a, b;"}) {
+        auto parsed = rucbase::parser::Parse(sql);
+        ASSERT_TRUE(parsed.ok()) << sql;
+        auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+        auto* join = dynamic_cast<JoinPlan*>(dynamic_cast<SelectPlan*>(plan.get())->projection_->subplan_.get());
+        ASSERT_NE(join, nullptr) << sql;
+        EXPECT_EQ(join->tag, T_NestLoop) << sql;
+    }
+}
+
+TEST_F(QueryPlanningTest, UsesSortMergeJoinAtEveryLevelOfMultiTableJoin) {
+    planner_.set_enable_sortmerge(true);
+    auto parsed = rucbase::parser::Parse("select * from a, b, c where a.id = b.id and b.x = c.value;");
+    ASSERT_TRUE(parsed.ok());
+
+    auto plan = planner_.do_planner(analyzer_.analyze(parsed.statement), nullptr);
+    auto* top = dynamic_cast<JoinPlan*>(dynamic_cast<SelectPlan*>(plan.get())->projection_->subplan_.get());
+    ASSERT_NE(top, nullptr);
+    EXPECT_EQ(top->tag, T_SortMerge);
+    int merge_joins = 0;
+    for (Plan* child : {top->left_.get(), top->right_.get()}) {
+        auto* sort = dynamic_cast<SortPlan*>(child);
+        ASSERT_NE(sort, nullptr);
+        if (auto* inner = dynamic_cast<JoinPlan*>(sort->subplan_.get())) {
+            EXPECT_EQ(inner->tag, T_SortMerge);
+            ++merge_joins;
+        }
+    }
+    EXPECT_EQ(merge_joins, 1);
+    EXPECT_NE(FindScan(plan.get(), "a"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "b"), nullptr);
+    EXPECT_NE(FindScan(plan.get(), "c"), nullptr);
+}
+
 TEST_F(QueryPlanningTest, PreservesFromTableOrderDuringAnalysis) {
     auto parsed = rucbase::parser::Parse("select a.id from a join b, c;");
     ASSERT_TRUE(parsed.ok());

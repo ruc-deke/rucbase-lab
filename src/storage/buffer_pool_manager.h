@@ -67,6 +67,15 @@ public:
     [[nodiscard]] PageGuard fetch_page_guard(PageId page_id);
     [[nodiscard]] PageGuard new_page_guard(PageId* page_id);
 
+    /**
+     * @brief 关闭文件前，把该文件在缓冲池中的页面写回磁盘并移出缓冲池。
+     *
+     * 操作系统会复用已关闭的文件描述符。如果旧文件的页面仍以 (fd, page_no) 留在缓冲池里，
+     * 之后用同一 fd 打开的文件就会读到这些过期页面。
+     * @pre 该文件没有仍被固定的页面；被固定的页面无法移出，会原样保留。
+     */
+    void discard_file_pages(int fd);
+
 private:
     bool find_victim_page(frame_id_t* frame_id);
 

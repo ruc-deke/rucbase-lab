@@ -107,8 +107,8 @@ int BPlusTreeNode::lower_bound(const char* target) const {
 /**
  * @brief 在当前node中查找第一个>target的key_idx
  *
- * @return key_idx，范围为[1,num_key)，如果返回的key_idx=num_key，则表示target大于等于最后一个key
- * @note 注意此处的范围从1开始
+ * @return key_idx，范围为[0,num_key]，如果返回的key_idx=num_key，则表示target大于等于最后一个key
+ * @note 内部结点用它定位孩子时，返回 0 表示 target 比第一个 key 还小（只会出现在最左侧路径上）。
  */
 int BPlusTreeNode::upper_bound(const char* target) const {
     // Todo:
@@ -143,7 +143,7 @@ bool BPlusTreeNode::leaf_lookup(const char* key, Rid** value) {
  */
 page_id_t BPlusTreeNode::internal_lookup(const char* key) {
     // Todo:
-    // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
+    // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置；key 比第一个 key 还小时进入第一个孩子
     // 2. 获取该孩子节点（子树）所在页面的编号
     // 3. 返回页面编号
 
@@ -263,17 +263,19 @@ std::pair<IndexNode, bool> BPlusTree::find_leaf_page(const char* key,
 }
 
 /**
- * @brief 用于查找指定键在叶子结点中的对应的值result
+ * @brief 查找指定 key 对应的全部 Rid。
  *
  * @param key 查找的目标key值
  * @param result 用于存放结果的容器
  * @param transaction 事务指针
  * @return bool 返回目标键值对是否存在
+ * @note 非唯一索引中，同一 key 的记录可能因分裂分布在多个相邻叶子里。
  */
 bool BPlusTree::get_value(const char* key, std::vector<Rid>* result, Transaction* transaction) {
     // Todo:
     // 1. 获取目标 key 所在的叶子结点
-    // 2. 在叶子中找到该 key 的全部记录（非唯一索引可能有多条），把 rid 放入 result
+    // 2. 找到该 key 的全部记录（非唯一索引可能有多条），把 rid 放入 result
+    // 思考：同一 key 的记录跨越多个叶子时，第 1 步找到的叶子是否一定包含第一条？
     // 提示：IndexNode 离开作用域即 unpin。
 
     return false;
@@ -329,6 +331,8 @@ void BPlusTree::insert_into_parent(IndexNode& old_node,
  * @param value 键对应的 Rid。
  * @param transaction 事务指针
  * @return page_id_t 插入到的叶结点的page_no
+ * @throws DuplicateKeyError 唯一索引中已存在相同 key，此时树保持不变。
+ * @pre 调用方不会重复插入完全相同的 (key, value)。
  */
 page_id_t BPlusTree::insert_entry(const char* key, const Rid& value, Transaction* transaction) {
     // Todo:
@@ -342,13 +346,15 @@ page_id_t BPlusTree::insert_entry(const char* key, const Rid& value, Transaction
 }
 
 /**
- * @brief 用于删除B+树中含有指定key的键值对
+ * @brief 删除 B+ 树中的一条 (key, rid)。
  * @param key 要删除的key值
+ * @param rid 要删除的记录位置；同一 key 的其他记录保留
  * @param transaction 事务指针
+ * @return 该 (key, rid) 存在并被删除时返回 true
  */
 bool BPlusTree::delete_entry(const char* key, const Rid& rid, Transaction* transaction) {
     // Todo:
-    // 1. 获取 (key, rid) 所在的叶子结点
+    // 1. 获取 (key, rid) 所在的叶子结点；与 get_value 一样，它可能不在第一次找到的叶子里
     // 2. 只删除这一条键值对（同一 key 的其他记录保留）
     // 3. 如果删除成功需要调用 coalesce_or_redistribute 处理合并或重分配
 
@@ -464,22 +470,37 @@ Rid BPlusTree::get_rid(const IndexPosition& position) const {
 }
 
 /**
- * @brief FindLeafPage + lower_bound
+ * @brief 返回整棵树中第一个 key >= 目标 key 的索引项位置。
  *
- * @param key
- * @return IndexPosition
- * @note 上层传入的key本来是int类型，通过(const char *)&key进行了转换
- * 可用*(int *)key转换回去
+ * @param key 目标 key
+ * @return IndexPosition 可作为 IndexScan 的起点
+ * @note 位置规范：若结果恰好落在某个非最后叶子的末尾（slot_no == size），应改为下一叶子的
+ *       第 0 个槽；若所有 key 都小于目标 key，返回 leaf_end()。这样得到的位置才能与
+ *       IndexScan::next() 产生的位置直接比较。
  */
-IndexPosition BPlusTree::lower_bound(const char* key) { return IndexPosition{.page_no = INDEX_NO_PAGE, .slot_no = -1}; }
+IndexPosition BPlusTree::lower_bound(const char* key) {
+    // Todo:
+    // 1. 找到可能包含目标 key 的叶子，并在叶子内定位
+    // 2. 按上面的位置规范调整返回值
+    // 思考：非唯一索引中，“第一个 >= key”的索引项可能在哪个叶子里？
+
+    return IndexPosition{.page_no = INDEX_NO_PAGE, .slot_no = -1};
+}
 
 /**
- * @brief FindLeafPage + upper_bound
+ * @brief 返回整棵树中第一个 key > 目标 key 的索引项位置。
  *
- * @param key
- * @return IndexPosition
+ * @param key 目标 key
+ * @return IndexPosition 可作为 IndexScan 的终点
+ * @note 位置规范与 lower_bound() 相同。
  */
-IndexPosition BPlusTree::upper_bound(const char* key) { return IndexPosition{.page_no = INDEX_NO_PAGE, .slot_no = -1}; }
+IndexPosition BPlusTree::upper_bound(const char* key) {
+    // Todo:
+    // 1. 找到可能包含目标 key 的叶子，并在叶子内定位
+    // 2. 按 lower_bound() 的位置规范调整返回值
+
+    return IndexPosition{.page_no = INDEX_NO_PAGE, .slot_no = -1};
+}
 
 /**
  * @brief 指向最后一个叶子的最后一个结点的后一个

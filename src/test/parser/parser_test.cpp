@@ -61,6 +61,18 @@ TEST(ParserTest, ParsesCreateIndexUniqueFlag) {
     EXPECT_TRUE(index->unique);
 }
 
+TEST(ParserTest, ParsesSetKnob) {
+    ParseResult result = Parse("set enable_sortmerge = true;");
+    ASSERT_TRUE(result.ok());
+    const auto set_knob = std::dynamic_pointer_cast<ast::SetKnobStmt>(result.statement);
+    ASSERT_NE(set_knob, nullptr);
+    EXPECT_EQ(set_knob->name, "enable_sortmerge");
+    EXPECT_EQ(set_knob->value, "true");
+
+    EXPECT_FALSE(Parse("set enable_sortmerge;").ok());
+    EXPECT_FALSE(Parse("set enable_sortmerge = 'true';").ok());
+}
+
 TEST(ParserTest, ParsesDmlAndDecodesEscapedQuotes) {
     ParseResult result = Parse("insert into tb values (1, 3.14, 'Tom''s book');");
     ASSERT_TRUE(result.ok());

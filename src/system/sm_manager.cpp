@@ -246,6 +246,8 @@ void SmManager::create_index(const std::string& tab_name,
                              [[maybe_unused]] bool unique,
                              Context* context) {
     // TODO(Lab 3): 用 IndexMeta::make(表, 列, unique) 构造定义，再交给 IndexManager::create_index。
+    // 表中已有的记录也要插入新索引。若声明了 UNIQUE 而已有数据存在重复 key，
+    // 建索引应失败：清理已创建的索引文件和句柄，不修改元数据，再把异常抛给上层。
     throw NotImplementedError("SmManager::create_index (Lab 3)");
 }
 

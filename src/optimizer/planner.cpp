@@ -145,7 +145,7 @@ std::shared_ptr<AnalyzedQuery> Planner::logical_optimization(std::shared_ptr<Ana
 std::unique_ptr<Plan> Planner::physical_optimization(const AnalyzedQuery& query, Context* context) {
     static_cast<void>(context);
 
-    auto root = build_from_plan(query);
+    auto root = choose_join_algorithm(build_from_plan(query));
     if (query.bound_order_col.has_value()) {
         root = std::make_unique<SortPlan>(T_Sort, std::move(root), *query.bound_order_col, query.bound_order_desc);
     }
@@ -236,6 +236,38 @@ std::unique_ptr<Plan> Planner::build_join_tree(const std::vector<std::string>& t
     return join_root;
 }
 
+/**
+ * @brief 为连接树中的每个连接选择算法。
+ *
+ * 开启 enable_sortmerge 且连接条件中有列与列的等值比较时，改用排序归并连接：
+ * 把第一个等值条件移到 conds_ 首位作为归并键，并在左右孩子上各加一个按连接列
+ * 升序排序的 SortPlan。其余条件保持原顺序，由归并连接算子在匹配后检查。
+ */
+std::unique_ptr<Plan> Planner::choose_join_algorithm(std::unique_ptr<Plan> plan) const {
+    auto* join = dynamic_cast<JoinPlan*>(plan.get());
+    if (join == nullptr) {
+        return plan;
+    }
+    join->left_ = choose_join_algorithm(std::move(join->left_));
+    join->right_ = choose_join_algorithm(std::move(join->right_));
+    if (!enable_sortmerge()) {
+        return plan;
+    }
+
+    const auto merge_key = std::ranges::find_if(
+        join->conds_, [](const Condition& condition) { return !condition.is_rhs_val && condition.op == OP_EQ; });
+    if (merge_key == join->conds_.end()) {
+        return plan;
+    }
+    std::rotate(join->conds_.begin(), merge_key, merge_key + 1);
+
+    const Condition& key = join->conds_.front();
+    join->tag = T_SortMerge;
+    join->left_ = std::make_unique<SortPlan>(T_Sort, std::move(join->left_), key.lhs_col, false);
+    join->right_ = std::make_unique<SortPlan>(T_Sort, std::move(join->right_), key.rhs_col, false);
+    return plan;
+}
+
 // 生成DDL语句和DML语句的查询执行计划
 std::unique_ptr<Plan> Planner::do_planner(std::shared_ptr<AnalyzedQuery> query, Context* context) {
     switch (query->bound_statement->kind()) {
@@ -292,6 +324,7 @@ std::unique_ptr<Plan> Planner::do_planner(std::shared_ptr<AnalyzedQuery> query, 
         case ast::StatementKind::Help:
         case ast::StatementKind::ShowTables:
         case ast::StatementKind::ShowDatabase:
+        case ast::StatementKind::SetKnob:
         case ast::StatementKind::TxnBegin:
         case ast::StatementKind::TxnCommit:
         case ast::StatementKind::TxnAbort:

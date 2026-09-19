@@ -21,7 +21,9 @@ B+树的结构如图：
 
 注意：
 
-（1）索引按 `(key, Rid)` 存放。默认同一 key 可以对应多条记录；创建时加上唯一约束后，每个 key 至多一条。单元测试用 `IndexMeta::make(表, 列, true)` 再交给 `IndexManager::create_index`；SQL 为 `CREATE UNIQUE INDEX 表名 (列名)`。唯一约束在 `insert_entry` 中检查，重复时抛出 `DuplicateKeyError`。
+（1）索引按 `(key, Rid)` 存放。默认同一 key 可以对应多条记录；创建时加上唯一约束后，每个 key 至多一条。单元测试用 `IndexMeta::make(表, 列, true)` 再交给 `IndexManager::create_index`；SQL 为 `CREATE UNIQUE INDEX 表名 (列名)`。唯一约束在 `insert_entry` 中检查，重复时抛出 `DuplicateKeyError`，并且树保持不变。
+
+非唯一索引中，同一 key 的多条记录会因为结点分裂分布在**多个相邻叶子**里。例如阶数为 3 时插入 40 条 key=7 的记录，它们至少占据十几个叶子。此时父结点里可能出现多个相同的 key，某个 key 左边的子树中也可能含有与它相等的 key。查找、删除和范围扫描都必须正确处理这种情况，具体怎么做由你自己设计。
 
 （2）结点能容纳的键值对数量小于最大值，大于等于最小值。这相当于留出了一个多余的空位，方便B+树进行插入和删除操作。
 
@@ -135,9 +137,9 @@ class BPlusTreeNode {
 
 ​		用于内部结点根据key来查找该key所在的孩子结点（子树）。
 
-​		值value为Rid类型，对于内部结点，其Rid中的page_no表示指向的孩子结点的页面编号。而内部结点每个key右边的value指向的孩子结点中的键均大于等于该key，每个key左边的value指向的孩子结点中的键均小于该key。根据这一特性，思考如何找到key所在的孩子结点。
+​		值value为Rid类型，对于内部结点，其Rid中的page_no表示指向的孩子结点的页面编号。而内部结点每个key右边的value指向的孩子结点中的键均大于等于该key，每个key左边的value指向的孩子结点中的键均小于等于该key（唯一索引中为严格小于）。根据这一特性，思考如何找到key所在的孩子结点。
 
-​		提示：可以调用`upper_bound()`和`get_rid()`函数。
+​		提示：可以调用`upper_bound()`和`get_rid()`函数。注意目标 key 比第一个 key 还小的情况（例如插入新的最小值），此时应进入第一个孩子。
 
 #### （2）B+树的查找
 
@@ -146,6 +148,8 @@ class BPlusTree {
     std::pair<IndexNode, bool> find_leaf_page(const char *key, IndexOperation operation, Transaction *transaction,
                                               bool find_first = false);
     bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);
+    IndexPosition lower_bound(const char *key);
+    IndexPosition upper_bound(const char *key);
 };
 ```
 
@@ -163,9 +167,15 @@ class BPlusTree {
 
 - `bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);`
 
-  用于查找指定键在叶子结点中的对应的值`result`。非唯一索引时，同一 key 可能有多条记录，需要全部放入 `result`。
+  用于查找指定键在叶子结点中的对应的值`result`。非唯一索引时，同一 key 可能有多条记录，需要全部放入 `result`，即使它们分布在多个叶子中。
 
-  提示：可以调用`find_leaf_page()`、`lower_bound()` / `upper_bound()` 或 `leaf_lookup()`。
+  提示：可以调用`find_leaf_page()`、`lower_bound()` / `upper_bound()` 或 `leaf_lookup()`。叶子之间可以通过 `get_prev_leaf()` / `get_next_leaf()` 互相访问。
+
+- `IndexPosition lower_bound(const char *key);` / `IndexPosition upper_bound(const char *key);`
+
+  `BPlusTree` 上的同名函数，返回整棵树中第一个 key 大于等于 / 大于目标 key 的索引项位置，用 `IndexPosition{叶子页号, 槽号}` 表示。`[lower_bound(k), upper_bound(k))` 就是 key 等于 `k` 的全部索引项，可以直接交给 `IndexScan` 遍历，后续实验的索引扫描也依赖它。
+
+  位置规范：如果结果恰好落在某个非最后叶子的末尾（`slot_no == size`），要改成下一个叶子的第 0 个槽；如果所有 key 都小于目标 key，返回 `leaf_end()`。只有这样，返回的位置才能和 `IndexScan::next()` 走到的位置直接比较。
 
 ### 任务2 B+树的插入
 
@@ -216,7 +226,7 @@ class BPlusTree {
 
 ​		首先找到要插入的叶结点，然后将键值对插入到该叶结点。如果该结点插入后已满，即size==max_size，就需要分裂成两个结点，分裂后还需要将新结点相关信息插入到父结点，不断向上递归插入直到当前结点在插入后未满或到达根结点。
 
-​		若 `is_unique()` 为真且树中已有相同 key，抛出 `DuplicateKeyError`，不要插入。
+​		若 `is_unique()` 为真且树中已有相同 key，抛出 `DuplicateKeyError`，不要插入。上层不会重复插入完全相同的 `(key, rid)`，无需处理这种情况。
 
 ​		提示：需要调用`find_leaf_page()`、`insert()`、`split()`、`insert_into_parent()`。
 
@@ -286,9 +296,9 @@ class BPlusTree {
 
 - `bool delete_entry(const char *key, const Rid &rid, Transaction *transaction);`
 
-​		用于删除B+树中的一条 `(key, rid)`。
+​		用于删除B+树中的一条 `(key, rid)`。该键值对存在并被删除时返回 `true`，不存在时返回 `false`。
 
-​		首先找到该键值对所在的叶结点，只删除这一条。如果删除后该结点小于半满，则需要合并（Coalesce）或重分配（Redistribute）。
+​		首先找到该键值对所在的叶结点，只删除这一条。与 `get_value()` 一样，要删除的记录可能不在第一次找到的叶子里。如果删除后该结点小于半满，则需要合并（Coalesce）或重分配（Redistribute）。
 
 ​		提示：需要调用`find_leaf_page()`、`remove()`、`coalesce_or_redistribute()`。
 
@@ -359,11 +369,12 @@ B+树删除的整体流程如下图：
 
 本实验满分为100分，测试文件对应的任务点及其分值如下：
 
-| 任务点                         | 测试文件                                       | 分值 |
-| ------------------------------ | --------------------------------------------  | ---- |
-| 任务1和任务2  B+树的查找和插入 | src/test/index/b_plus_tree_insert_test.cpp      | 30   |
-| 任务3 B+树的删除               | src/test/index/b_plus_tree_delete_test.cpp     | 40   |
-| 任务4 B+树的并发控制           | src/test/index/b_plus_tree_concurrent_test.cpp  | 30   |
+| 任务点                         | 测试文件                                        | 分值 |
+| ------------------------------ | ----------------------------------------------- | ---- |
+| 任务1和任务2  B+树的查找和插入 | src/test/index/b_plus_tree_insert_test.cpp      | 25   |
+| 任务3 B+树的删除               | src/test/index/b_plus_tree_delete_test.cpp      | 35   |
+| 任务1～3 重复键与唯一约束      | src/test/index/b_plus_tree_duplicate_test.cpp   | 15   |
+| 任务4 B+树的并发控制           | src/test/index/b_plus_tree_concurrent_test.cpp  | 25   |
 
 在仓库根目录编译并运行本实验的测试：
 
@@ -374,5 +385,6 @@ ctest --preset lab2
 ```
 
 注意：
-1. 本实验的测试只调用 `get_value()`、`insert_entry()`、`delete_entry(key, rid, txn)` 这三个函数。学生可以自行添加和修改辅助函数，但不能修改以上三个函数的声明。
-2. 索引单元测试直接使用 `IndexManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。
+1. 本实验的测试调用 `get_value()`、`insert_entry()`、`delete_entry(key, rid, txn)` 以及 `BPlusTree::lower_bound()` / `upper_bound()`。学生可以自行添加和修改辅助函数，但不能修改以上函数的声明。
+2. 测试会用不变式检查器验证树结构：结点大小、父指针、叶子链表、每个结点的第一个 key 等于子树最小值、key 的顺序（唯一索引严格递增，普通索引非递减），并检查缓冲池中没有遗留的 pin。
+3. 索引单元测试直接使用 `IndexManager` 创建测试索引，不要求提前实现 Lab3 的 `SmManager::create_index()`。SQL 层的 `CREATE UNIQUE INDEX` 在 Lab3 中测试。

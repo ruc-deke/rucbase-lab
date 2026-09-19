@@ -1,0 +1,47 @@
+failure
+| id | name | score |
+| 1 | Alice | 90.000000 |
+| 2 | Bob | 80.500000 |
+failure
+| id | name | score |
+| 1 | Alice | 90.000000 |
+| 2 | Bob | 80.500000 |
+| id | name | score |
+| 3 | Alice | 90.000000 |
+| 2 | Bob | 80.500000 |
+| 1 | Carol | 70.000000 |
+| id | name | score |
+| 3 | Alice | 90.000000 |
+| 2 | Dave | 60.000000 |
+| 1 | Carol | 70.000000 |
+failure
+failure
+| cid | sid | tag |
+| 1 | 10 | a |
+| 2 | 10 | b |
+| 3 | 10 | c |
+| 1 | 11 | e |
+failure
+| cid | sid | tag |
+| 1 | 10 | a |
+| 2 | 10 | b |
+| 3 | 10 | c |
+| 1 | 11 | e |
+| 1 | 10 | f |
+failure
+| a | b | c |
+| 1 | 1 | x |
+| 2 | 5 | y |
+| 3 | 6 | z |
+failure
+| a | b | c |
+| 1 | 1 | x |
+| 2 | 5 | y |
+| 3 | 6 | z |
+failure
+failure
+| a | b | c |
+| 1 | 1 | x |
+| 2 | 5 | y |
+| 3 | 6 | z |
+| 7 | 20 | w |
