@@ -134,53 +134,122 @@ python3 query_unit_test.py basic_query_test6.sql
 
 ## 实验三：排序归并连接（20分）
 
-嵌套循环连接对左表的每条记录都要扫描一遍右表。对于等值连接，**排序归并连接（Sort-Merge Join）** 先把两侧输入分别按连接键排好序，再像归并两个有序数组一样同时向前推进两侧，每侧只读一遍。
+实验二的嵌套循环连接（Nested Loop Join）对左孩子的每一条记录，都要把右孩子从头扫描一遍，代价约为 |L| × |R|。对于等值连接（如 `A.id = B.id`），**排序归并连接（Sort-Merge Join）** 先把两侧输入分别按连接键排好序，再像归并两个有序数组那样同时向前推进两侧，每一侧只需读一遍。
+
+本实验需要实现两个算子：**排序算子 `SortExecutor`** 和 **归并连接算子 `MergeJoinExecutor`**。开关、优化器改写和算子树的构建由框架完成。
+
+### 算法思路
+
+设左右两侧都已按连接键升序排列，各有一个游标指向当前记录，比较两边的连接键：
+
+- 左 < 右：左边这条不可能再匹配，左游标前进；
+- 左 > 右：右游标前进；
+- 左 = 右：找到一组 key 相同的记录，输出左右两组记录两两组合的结果，前提是还满足其余连接条件；然后两侧越过这一组，继续比较。
+
+任意一侧读完后，连接结束。
+
+例：左表按 `id` 排序为 `1, 2, 2, 4`，右表按 `sid` 排序为 `2, 2, 3, 4, 4`，连接条件为 `id = sid`：
+
+| 左游标 | 右游标 | 比较 | 动作 |
+| --- | --- | --- | --- |
+| 1 | 2 | 1 < 2 | 左游标前进 |
+| 2 | 2 | 相等 | key = 2：左边 2 条、右边 2 条，输出 2 × 2 = 4 条 |
+| 4 | 3 | 4 > 3 | 右游标前进 |
+| 4 | 4 | 相等 | key = 4：左边 1 条、右边 2 条，输出 1 × 2 = 2 条 |
+| （读完） | | | 结束，共 6 条 |
 
 ### 如何启用
 
-归并连接默认关闭。执行下面的语句后，优化器会对**含有列与列等值条件**的连接使用归并连接，其余连接仍然使用嵌套循环：
+归并连接默认关闭，此时所有连接都使用嵌套循环。执行下面的语句后，优化器会对**含有列与列等值条件**的连接改用归并连接，其余连接仍然使用嵌套循环：
 
 ```sql
-set enable_sortmerge = true;   -- 关闭：set enable_sortmerge = false;
+set enable_sortmerge = true;    -- 关闭：set enable_sortmerge = false;
 ```
 
-该设置对整个服务端生效。启用后，优化器（框架代码，`Planner::choose_join_algorithm`）会：
+该设置对整个服务端生效，直到再次修改或服务端重启。调试时可以先关闭它，用嵌套循环连接的结果做对照。
 
-1. 把第一个等值条件放到 `conds[0]`，作为归并键，其中 `lhs_col` 来自左孩子，`rhs_col` 来自右孩子；
-2. 在左右孩子上各加一个按连接列升序排列的排序算子；
-3. 其余连接条件保持原样，由归并连接算子在键相等后继续检查。
+### 框架已经提供的部分
 
-例如 `select * from A, B where A.id = B.id and A.x < B.y` 生成的算子树如下：
+| 位置 | 作用 |
+| --- | --- |
+| Parser / Analyzer | 解析并校验 `SET enable_sortmerge = true / false` |
+| `Planner::choose_join_algorithm` | 把满足条件的连接改写为归并连接，并在左右孩子上各加一个排序算子 |
+| `Portal::convert_plan_executor` | 为归并连接计划创建 `MergeJoinExecutor`，为排序计划创建 `SortExecutor` |
+| `SortExecutor` 的构造函数 | 设置 `prev_`（孩子）、`sort_col_`（排序字段在孩子记录中的位置）、`is_desc_` |
+| `MergeJoinExecutor` 的构造函数 | 计算输出字段 `cols_`、记录长度 `len_`，以及下面三个成员 |
+
+`MergeJoinExecutor` 构造函数准备好的成员：
+
+- `left_key_` / `right_key_`：连接键在左、右孩子记录中的位置和类型（`ColMeta`）；
+- `merge_cond_`：归并键条件，即 `left_key_ = right_key_`；
+- `residual_conds_`：其余连接条件，要在连接键相等后继续检查。
+
+优化器生成的算子树如下，以 `select * from A, B where A.id = B.id and A.x < B.y` 为例：
 
 ```cpp
 //              P (Projection)
 //              |
-//              MJ (MergeJoin, conds = [A.id = B.id, A.x < B.y])
+//              MJ (MergeJoin: 归并键 A.id = B.id，附加条件 A.x < B.y)
 //            /    \
 //      Sort(A.id)  Sort(B.id)
 //          |          |
 //          A          B
 ```
 
-### 需要实现的算子
+多表连接时，归并连接的孩子也可能是另一个连接算子外面套一层排序算子。
 
-- `SortExecutor`（`execution_sort.h`）：读完孩子的全部输出，按单个字段升序或降序排好后依次返回。输出记录的字段布局与孩子相同。它也用于 `ORDER BY`。
-- `MergeJoinExecutor`（`executor_merge_join.h`）：构造函数由框架给出，已经算好了输出字段、归并键在左右记录中的位置 `left_key_` / `right_key_`，以及附加条件 `residual_conds_`。你需要实现 `begin_tuple()`、`next_tuple()`、`next()`，以及基类中未标记 `Todo` 的 `is_end()`、`cols()`、`tuple_len()` 等接口。
+### 需要实现的内容
 
-需要思考的问题：
+| 算子 | 文件 | 需要实现的接口 |
+| --- | --- | --- |
+| `SortExecutor` | `src/execution/execution_sort.h` | `begin_tuple()`、`next_tuple()`、`next()`，以及 `is_end()`、`cols()`、`tuple_len()` |
+| `MergeJoinExecutor` | `src/execution/executor_merge_join.h` | `begin_tuple()`、`next_tuple()`、`next()`，以及 `is_end()`、`cols()`、`tuple_len()` |
 
-- 两侧都可能有连接键相同的一组记录，此时应输出这两组记录的笛卡尔积。火山模型的孩子算子只能向前迭代，无法“退回去”重读，该怎样处理？
+后三个接口在基类中没有标记 `Todo`，但必须实现：排序算子要读取孩子的 `cols()`，上层算子也要读取这两个算子的 `cols()` 和 `tuple_len()`。两个算子需要保存哪些状态，请自行在类中添加成员。
+
+各接口的含义与其他算子一致：`begin_tuple()` 定位到第一条结果，`next_tuple()` 前进到下一条，`is_end()` 判断是否已经没有结果，`next()` 返回当前结果。
+
+**`SortExecutor` 的要求**
+
+- 先读完孩子的全部输出，再按 `sort_col_` 升序或降序（`is_desc_`）依次返回；
+- 输出记录的字段布局与孩子完全相同；
+- 只扫描孩子一遍，即孩子的 `begin_tuple()` 只调用一次；
+- 它同样用于 `ORDER BY`，实现后可以直接用 `select * from t order by id desc;` 验证。
+
+**`MergeJoinExecutor` 的要求**
+
+- 结果与相同条件下的嵌套循环连接一致（不要求行的顺序）；
+- 输出的每条记录是左孩子记录在前、右孩子记录在后，与 `cols_` 的布局一致；
+- 输出按连接键非递减排列，这是归并连接天然具有的性质；
+- 每个孩子只扫描一遍，即 `begin_tuple()` 恰好调用一次，**不能**像嵌套循环那样重扫右孩子；
+- 键相等时还要检查 `residual_conds_`，全部满足才输出；
+- 任意一侧为空时，结果为空。
+
+### 需要思考的问题
+
+- 两侧都可能有连接键相同的一组记录，此时应输出这两组记录两两组合的结果。火山模型的孩子只能向前迭代，不能“退回去”重读，该怎样处理？
 - 某一侧先读完时，算子应当何时结束？
-- 两个 `char(n)` 列比较时，长度可能不同，例如 `char(8)` 与 `char(16)`。怎样比较才能与嵌套循环连接的判等结果一致？
+- `next_tuple()` 每次只前进一条结果。算子需要记住哪些中间状态，才能从上一次停下的地方继续？
+- 两个 `char(n)` 列比较时，长度可能不同，例如 `char(8)` 与 `char(16)`。怎样比较，才能与嵌套循环连接的判等结果一致？
+- 排序算子需要把孩子的全部输出放入内存。本实验数据量很小，不要求实现外部排序。
+
+建议的完成顺序：先完成实验二的嵌套循环连接；再实现排序算子，用 `ORDER BY` 和 `lab3_sort_executor_test` 验证；然后实现归并连接算子，先通过 `lab3_merge_join_test`，最后运行 `basic_query_test7`。
 
 ### 测试点及分数
 
-- `lab3_sort_executor_test`、`lab3_merge_join_test`：直接用内存数据源测试算子。除了结果正确，还会检查两点：归并连接的输出按连接键有序；每个孩子只被扫描一遍，即 `begin_tuple()` 恰好调用一次。
-- `basic_query_test7`：开启 `enable_sortmerge` 后的 SQL 测试，覆盖一对多、多对多、字符串和浮点连接键、三表连接、附加条件、空表等情况。
+| 测试 | 内容 | 分数 |
+| --- | --- | --- |
+| `lab3_sort_executor_test` | 用内存数据源直接测试排序算子：升序、降序、重复值，int / float / char 字段，空输入 | 5 |
+| `lab3_merge_join_test` | 用内存数据源直接测试归并连接算子：一对一、一对多、多对多、无匹配、空输入、float / char 连接键、附加条件、随机数据；同时检查输出按键有序、每个孩子只扫描一遍 | 10 |
+| `basic_query_test7` | 开启 `enable_sortmerge` 后的 SQL 测试：多对多、字符串和浮点连接键、三表连接、附加条件、空表，以及关闭开关后的对照 | 5 |
 
 ```bash
-ctest --preset lab3 -R "sort_executor|merge_join"
-cd src/test/query && python3 query_unit_test.py basic_query_test7.sql
+# 两个单元测试
+ctest --preset lab3 -R "sort_executor|merge_join" --output-on-failure
+
+# SQL 测试
+cd src/test/query
+python3 query_unit_test.py basic_query_test7.sql
 ```
 
 
