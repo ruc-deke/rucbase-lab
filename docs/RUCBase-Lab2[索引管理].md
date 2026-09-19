@@ -13,6 +13,38 @@
 
 学生只需要实现 `BPlusTree` 和 `BPlusTreeNode` 中标有 `Todo` 的接口；`IndexManager`、`IndexScan` 和序列化代码均由框架提供。
 
+## 普通索引与唯一索引（UNIQUE）
+
+本实验的 B+ 树要同时支持两种索引：
+
+| 索引类型 | 创建方式 | 同一 key 的记录数 | 插入重复 key 时 |
+| --- | --- | --- | --- |
+| 普通索引 | `CREATE INDEX 表名 (列名, ...)` | 任意多条 | 正常插入 |
+| 唯一索引 | `CREATE UNIQUE INDEX 表名 (列名, ...)` | 至多一条 | 抛出 `DuplicateKeyError`，树保持不变 |
+
+索引中存放的是 `(key, Rid)` 键值对：`key` 是索引列的取值（复合索引按列顺序拼接），`Rid` 是该记录在表文件中的位置。两种索引的页面布局完全相同，区别只在于是否允许重复 key。
+
+**唯一性从哪里来。** 创建索引时，`IndexMeta::make(表, 列, unique)` 记录这条索引是否唯一；`IndexManager::create_index` 把它写入索引文件头 `IndexFileHeader::unique_`。在 `BPlusTree` 中调用 `is_unique()` 即可读取，不需要自己保存。本实验的单元测试直接用 `IndexMeta::make(表, 列, true)` 创建唯一索引；SQL 层的 `CREATE UNIQUE INDEX` 在 Lab 3 中接入和测试。
+
+**本实验需要做到：**
+
+1. **唯一约束**：`insert_entry()` 在唯一索引中遇到已存在的 key 时，抛出 `DuplicateKeyError`（定义在 `common/errors.h`），不能插入，也不能留下任何修改（包括分裂出的结点和未释放的 pin）。
+2. **重复 key**：普通索引中，`insert()` 把新记录插在已有相同 key 的后面；`get_value()` 返回该 key 的**全部** `Rid`。
+3. **按 `(key, Rid)` 删除**：`delete_entry(key, rid, txn)` 只删除 key 和 rid 都匹配的那一条，同一 key 的其他记录保留；不存在时返回 `false`。
+4. **跨叶子的重复 key**：同一 key 的多条记录会因为结点分裂分布在**多个相邻叶子**中，查找、删除和范围扫描都要处理这种情况。
+
+以阶数 3（每个结点最多存 3 个键值对）为例，依次插入 `(5,r1) (7,r2) (7,r3) (7,r4) (7,r5)` 后，树可能是：
+
+```text
+             [5 | 7]
+            /       \
+       [5, 7]  -->  [7, 7, 7]
+```
+
+key = 7 的 4 条记录分布在两个叶子中，父结点中 key 7 左边的子树里也有 7。如果查找 7 时只按父结点里的 key 7 进入右边的孩子，就会漏掉左边叶子里的那条记录。怎样找到并处理这些记录由你自己设计；叶子之间可以通过 `get_prev_leaf()` / `get_next_leaf()` 互相访问。
+
+上述要求由 `src/test/index/b_plus_tree_duplicate_test.cpp` 测试（15 分），详见文末“实验计分”。
+
 ![Lab 2 索引管理实验流程图](pics/Lab2流程图.png)
 
 B+树的结构如图：
@@ -21,9 +53,7 @@ B+树的结构如图：
 
 注意：
 
-（1）索引按 `(key, Rid)` 存放。默认同一 key 可以对应多条记录；创建时加上唯一约束后，每个 key 至多一条。单元测试用 `IndexMeta::make(表, 列, true)` 再交给 `IndexManager::create_index`；SQL 为 `CREATE UNIQUE INDEX 表名 (列名)`。唯一约束在 `insert_entry` 中检查，重复时抛出 `DuplicateKeyError`，并且树保持不变。
-
-非唯一索引中，同一 key 的多条记录会因为结点分裂分布在**多个相邻叶子**里。例如阶数为 3 时插入 40 条 key=7 的记录，它们至少占据十几个叶子。此时父结点里可能出现多个相同的 key，某个 key 左边的子树中也可能含有与它相等的 key。查找、删除和范围扫描都必须正确处理这种情况，具体怎么做由你自己设计。
+（1）索引按 `(key, Rid)` 存放，普通索引允许重复 key，唯一索引不允许，详见上文“普通索引与唯一索引（UNIQUE）”。
 
 （2）结点能容纳的键值对数量小于最大值，大于等于最小值。这相当于留出了一个多余的空位，方便B+树进行插入和删除操作。
 
